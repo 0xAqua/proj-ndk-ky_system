@@ -29,3 +29,4 @@
 | 5    | 020          | V000050 | 出力画面       | RAGが予測したインシデント（危険予知結果）を表示する。  |
 
 <p style="text-align: center;"><strong>表 2‑1 Webサイト画面一覧</strong></p>
+
