@@ -1,11 +1,54 @@
 # 4. アクセスパターン定義
 
-本章では、本システムで想定する主要なユースケースに対し、**どのキーで DynamoDB を引くか／どのインデックスを使うか／どの範囲で取得するか**を明示します。
- 第3章で定義した3テーブル（`TenantMaster`, `UserMaster`, `ConstructionMaster`）を中心に、認証・入力画面表示・インシデント検索に必要な読み書きパターンを列挙します。
+本章では、本システムで想定される主要ユースケースに対し、どのキーで DynamoDB を参照するか／どのインデックスを利用するか／どの条件でデータを取得・更新するかを定義します。
+
+第3章で定義した3つのテーブル（`TenantUserMaster`、`ConstructionMaster`、`ComponentLabelMaster`）を対象とし、 認証・入力画面表示・ラベル設定などの操作における読み書きパターンを整理します。
 
 ## 4-1. 前提
 
-- すべてのアクセスは **テナント境界（tenant_id）を必ず条件に含める** ことを前提とします。
-- 読み取りは原則として **Query（PK固定＋SK条件）** または **GetItem（PK+SK完全一致）** を用います。Scan は運用・管理ツールに限定します。
-- ログインIDでのユーザー照会は、`UserMaster` に定義する **GSI（`login_id-index`）** を利用します。
-- 階層マスタは `begins_with(nodePath, ...)` により子要素を段階的に取得します。
+- すべての操作は **テナント境界（`tenant_id`）** を条件に含めることを前提とします。
+- 読み取りは原則として **`Query`（PK固定＋SK条件）** または **`GetItem`（PK＋SK完全一致）** を使用し、
+   **`Scan`** は管理・メンテナンス用途に限定します。
+- ログインIDによるユーザー照会には、`TenantUserMaster` に設定された **GSI（`login_id-index`）** を利用します。
+- 階層型データ（`ConstructionMaster`）は **`begins_with(nodePath, ...)`** により階層ごとに絞り込みます。
+- ラベル設定（`ComponentLabelMaster`）は、`tenant_id` + `component_key` で即時参照されます。
+
+## 4-2. テーブル別アクセスパターン一覧
+
+#### (1) `TenantUserMaster`
+
+テナント情報およびユーザー情報の取得・登録・更新に利用されるKey-Valueアクセス。
+
+| No.    | ユースケース     | 操作                | 条件キー                                        | 使用インデックス        | 説明                               |
+| ------ | ---------------- | ------------------- | ----------------------------------------------- | ----------------------- | ---------------------------------- |
+| TU-001 | テナント情報取得 | GetItem             | `tenant_id` + `record_id = TENANT#xxxx`         | ―                       | テナントの基本設定を取得。         |
+| TU-002 | ユーザー情報取得 | GetItem             | `tenant_id` + `record_id = USER#xxxx`           | ―                       | ユーザー詳細を取得。               |
+| TU-003 | ユーザー一覧取得 | Query               | `tenant_id` + `begins_with(record_id, "USER#")` | ―                       | テナント内の全ユーザー一覧を取得。 |
+| TU-004 | ログイン認証     | Query               | `login_id`                                      | GSI（`login_id-index`） | ログインIDをキーにユーザー検索。   |
+| TU-005 | 登録／更新       | PutItem／UpdateItem | `tenant_id` + `record_id`                       | ―                       | 新規作成または情報更新。           |
+
+#### (2) `ConstructionMaster`
+
+入力画面で利用する階層型マスタ（部門・工事種別・工程・作業・機材）の取得に利用。
+
+| No.    | ユースケース | 操作  | 条件キー                                                     | 使用インデックス | 説明                           |
+| ------ | ------------ | ----- | ------------------------------------------------------------ | ---------------- | ------------------------------ |
+| CM-001 | 部門一覧取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#")`               | ―                | 全部門を取得。                 |
+| CM-002 | 工事種別取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#1#TYPE#")`        | ―                | 指定部門配下の工事種別を取得。 |
+| CM-003 | 工事工程取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#1#TYPE#1#PROJ#")` | ―                | 指定種別配下の工程を取得。     |
+| CM-004 | 作業内容取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#1#TYPE#1#PROJ#1#TASK#")` | ―                | 指定工程配下の作業を取得。     |
+| CM-005 | 機材情報取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#...#EQUIP#")`     | ―                | 指定作業配下の機材を取得。     |
+
+#### (3) `ComponentLabelMaster`
+
+UIコンポーネントの設定（ラベル文言、入力形式、コンポーネント種別など）の取得・更新に利用します。
+ 本テーブルは、テナント単位でフォーム構成や入力UIのタイプ（CheckBox／ComboBox／TextBox等）を柔軟に変更できるよう設計されており、業務や部門ごとの入力画面構成を統一的に管理します。
+
+| No.    | ユースケース           | 操作       | 条件キー                      | 使用インデックス | 説明                                                         |
+| ------ | ---------------------- | ---------- | ----------------------------- | ---------------- | ------------------------------------------------------------ |
+| CL-001 | 全UI設定一覧取得       | Query      | `tenant_id`                   | ―                | テナントに登録されたすべてのUIコンポーネント設定を取得。     |
+| CL-002 | 個別UI設定取得         | GetItem    | `tenant_id` + `component_key` | ―                | 指定されたコンポーネントの設定（ラベル名、タイプなど）を取得。 |
+| CL-003 | コンポーネント種別更新 | UpdateItem | `tenant_id` + `component_key` | ―                | CheckBox／ComboBox／TextBoxなど、コンポーネント種別を変更。  |
+| CL-004 | ラベル文言更新         | UpdateItem | `tenant_id` + `component_key` | ―                | 管理者がUI上のラベル名を変更。                               |
+| CL-005 | 表示・非表示切替       | UpdateItem | `tenant_id` + `component_key` | ―                | コンポーネントの表示可否を制御。                             |
+| CL-006 | コンポーネント上限設定 | UpdateItem | `tenant_id` + `component_key` | ―                | TextBoxなど可変数コンポーネントの上限値（最大10）を設定。    |
