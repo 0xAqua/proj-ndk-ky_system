@@ -1,0 +1,32 @@
+{
+  "ndk-ky-dev-dynamodb-ConstructionMaster": [
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {"S": "T001"},
+          "nodePath": {"S": "DEPT#1#TYPE#1#PROJ#1"},
+          "type": {"S": "ConstructionType"},
+          "name": {"S": "コンクリート打設"},
+          "order": {"N": "1"},
+          "status": {"S": "active"},
+          "createdAt": {"S": "2025-11-05T00:00:00Z"},
+          "updatedAt": {"S": "2025-11-05T00:00:00Z"}
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {"S": "T001"},
+          "nodePath": {"S": "DEPT#1#TYPE#2#PROJ#1"},
+          "type": {"S": "ConstructionType"},
+          "name": {"S": "鉄筋組立"},
+          "order": {"N": "2"},
+          "status": {"S": "active"},
+          "createdAt": {"S": "2025-11-05T00:00:00Z"},
+          "updatedAt": {"S": "2025-11-05T00:00:00Z"}
+        }
+      }
+    }
+  ]
+}
