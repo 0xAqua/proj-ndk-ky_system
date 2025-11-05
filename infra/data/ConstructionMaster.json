@@ -3,28 +3,462 @@
     {
       "PutRequest": {
         "Item": {
-          "tenant_id": {"S": "T001"},
-          "nodePath": {"S": "DEPT#1#TYPE#1#PROJ#1"},
-          "type": {"S": "ConstructionType"},
-          "name": {"S": "コンクリート打設"},
-          "order": {"N": "1"},
-          "status": {"S": "active"},
-          "createdAt": {"S": "2025-11-05T00:00:00Z"},
-          "updatedAt": {"S": "2025-11-05T00:00:00Z"}
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1"
+          },
+          "type": {
+            "S": "Department"
+          },
+          "name": {
+            "S": "共通"
+          },
+          "status": {
+            "S": "active"
+          }
         }
       }
     },
     {
       "PutRequest": {
         "Item": {
-          "tenant_id": {"S": "T001"},
-          "nodePath": {"S": "DEPT#1#TYPE#2#PROJ#1"},
-          "type": {"S": "ConstructionType"},
-          "name": {"S": "鉄筋組立"},
-          "order": {"N": "2"},
-          "status": {"S": "active"},
-          "createdAt": {"S": "2025-11-05T00:00:00Z"},
-          "updatedAt": {"S": "2025-11-05T00:00:00Z"}
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#1"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "共通"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#1#PROJ#1"
+          },
+          "type": {
+            "S": "ConstructionProject"
+          },
+          "name": {
+            "S": "二重床"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#1#PROJ#1#TASK#1"
+          },
+          "type": {
+            "S": "Task"
+          },
+          "name": {
+            "S": "柱上作業"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#1#PROJ#1#TASK#1#EQUIP#1"
+          },
+          "type": {
+            "S": "Equipment"
+          },
+          "name": {
+            "S": "墜落制止用器具（フルハーネス型）"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#1#PROJ#1#TASK#1#EQUIP#2"
+          },
+          "type": {
+            "S": "Equipment"
+          },
+          "name": {
+            "S": "ワークポジショ二ング用ロープ"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#1#PROJ#1#TASK#1#EQUIP#3"
+          },
+          "type": {
+            "S": "Equipment"
+          },
+          "name": {
+            "S": "ランヤード"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#1#PROJ#1#TASK#1#EQUIP#4"
+          },
+          "type": {
+            "S": "Equipment"
+          },
+          "name": {
+            "S": "連結ベルト"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#1#PROJ#1#TASK#1#EQUIP#5"
+          },
+          "type": {
+            "S": "Equipment"
+          },
+          "name": {
+            "S": "検電器"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#2"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "基礎"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#1#TYPE#3"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "電柱・支線"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#2"
+          },
+          "type": {
+            "S": "Department"
+          },
+          "name": {
+            "S": "アクセス"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#2#TYPE#4"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "装機"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#2#TYPE#5"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "配線"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#2#TYPE#6"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "試験"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#2#TYPE#7"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "アンテナ"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#3"
+          },
+          "type": {
+            "S": "Department"
+          },
+          "name": {
+            "S": "ネットワーク"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#3#TYPE#8"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "配線"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#3#TYPE#9"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "アンテナ"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#3#TYPE#10"
+          },
+          "type": {
+            "S": "ConstructionType"
+          },
+          "name": {
+            "S": "養生仮説"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#4"
+          },
+          "type": {
+            "S": "Department"
+          },
+          "name": {
+            "S": "土木"
+          },
+          "status": {
+            "S": "active"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id": {
+            "S": "t0001"
+          },
+          "nodePath": {
+            "S": "DEPT#5"
+          },
+          "type": {
+            "S": "Department"
+          },
+          "name": {
+            "S": "モバイル"
+          },
+          "status": {
+            "S": "active"
+          }
         }
       }
     }
