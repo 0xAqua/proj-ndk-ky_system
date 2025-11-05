@@ -1,12 +1,11 @@
 # -----------------------------------------------------------------
-# DynamoDB ConstructionMaster 定義
+# DynamoDB ConstructionMaster テーブル
 # -----------------------------------------------------------------
 resource "aws_dynamodb_table" "construction_master" {
-  name         = "ndk-ky-dev-dynamodb-ConstructionMaster"
-  billing_mode = "PAY_PER_REQUEST"
-
-  hash_key  = "tenant_id"
-  range_key = "nodePath"
+  name           = "ndk-ky-dev-dynamodb-ConstructionMaster"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "tenant_id"
+  range_key      = "nodePath"
 
   attribute {
     name = "tenant_id"
