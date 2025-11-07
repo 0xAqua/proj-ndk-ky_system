@@ -25,16 +25,15 @@
 | **削除方針**                 | 論理削除（`status = inactive`）を基本とし、物理削除は定期バッチで実施。 |
 | **備考**                     | テナント／ユーザーの双方を統合管理する Key-Value ストア。    |
 
-## 5-2. `ConstructionMaster`
+## 5-2. `TenantConstructionMaster`
 
-| 項目                         | 内容                                                         |
+| **テーブル名**               | `TenantConstructionMaster`                                   |
 | ---------------------------- | ------------------------------------------------------------ |
-| **テーブル名**               | `ConstructionMaster`                                         |
-| **用途**                     | 入力画面で利用される階層型マスタ（部門、工種、工程、作業、機材）を管理。 |
+| **用途**                     | 入力画面で利用される階層型マスタ（部門、工種、工程、作業、機材、現場条件、その他設備）を管理。 |
 | **パーティションキー（PK）** | `tenant_id`：テナントを一意に識別。                          |
 | **ソートキー（SK）**         | `nodePath`：階層パス（例：`DEPT#1#TYPE#1#PROJ#1`）。         |
 | **主な属性**                 |                                                              |
-| ├ `type`                     | アイテム種別（`Department`／`ConstructionType`／`Task`／`Equipment`など） |
+| ├ `type`                     | アイテム種別（`Department`／`ConstructionType`／`Task`／`Equipment`／`SiteCondition`／`OtherEquipment` など） |
 | ├ `name`                     | 表示名                                                       |
 | ├ `order`                    | 表示順                                                       |
 | ├ `status`                   | 状態（`active`／`inactive`）                                 |

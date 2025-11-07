@@ -27,17 +27,21 @@
 | TU-004 | ログイン認証     | Query               | `login_id`                                      | GSI（`login_id-index`） | ログインIDをキーにユーザー検索。   |
 | TU-005 | 登録／更新       | PutItem／UpdateItem | `tenant_id` + `record_id`                       | ―                       | 新規作成または情報更新。           |
 
-#### (2) `ConstructionMaster`
+#### (2) `TenantConstructionMaster`
 
-入力画面で利用する階層型マスタ（部門・工事種別・工程・作業・機材）の取得に利用。
+入力画面で利用する階層型マスタ（部門・工事種別・工程・作業・機材・現場条件・その他設備）の取得に利用。
 
-| No.    | ユースケース | 操作  | 条件キー                                                     | 使用インデックス | 説明                           |
-| ------ | ------------ | ----- | ------------------------------------------------------------ | ---------------- | ------------------------------ |
-| CM-001 | 部門一覧取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#")`               | ―                | 全部門を取得。                 |
-| CM-002 | 工事種別取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#1#TYPE#")`        | ―                | 指定部門配下の工事種別を取得。 |
-| CM-003 | 工事工程取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#1#TYPE#1#PROJ#")` | ―                | 指定種別配下の工程を取得。     |
-| CM-004 | 作業内容取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#1#TYPE#1#PROJ#1#TASK#")` | ―                | 指定工程配下の作業を取得。     |
-| CM-005 | 機材情報取得 | Query | `tenant_id` + `begins_with(nodePath, "DEPT#...#EQUIP#")`     | ―                | 指定作業配下の機材を取得。     |
+| No.    | ユースケース       | 操作  | 条件キー                                                     | 使用インデックス | 説明                                      |
+| ------ | ------------------ | ----- | ------------------------------------------------------------ | ---------------- | ----------------------------------------- |
+| CM-001 | 部門一覧取得       | Query | `tenant_id` + `begins_with(nodePath, "DEPT#")`               | ―                | すべての部門を取得。                      |
+| CM-002 | 工事種別取得       | Query | `tenant_id` + `begins_with(nodePath, "DEPT#<id>#TYPE#")`     | ―                | 指定部門配下の工事種別を取得。            |
+| CM-003 | 工程一覧取得       | Query | `tenant_id` + `begins_with(nodePath, "DEPT#<id>#TYPE#<id>#PROJ#")` | ―                | 指定工事種別配下の工程を取得。            |
+| CM-004 | 作業内容取得       | Query | `tenant_id` + `begins_with(nodePath, "DEPT#<id>#TYPE#<id>#PROJ#<id>#TASK#")` | ―                | 指定工程配下の作業を取得。                |
+| CM-005 | 機材情報取得       | Query | `tenant_id` + `begins_with(nodePath, "DEPT#<id>#TYPE#<id>#PROJ#<id>#TASK#<id>#EQUIP#")` | ―                | 指定作業配下の機材を取得。                |
+| CM-006 | 現場条件一覧取得   | Query | `tenant_id` + `begins_with(nodePath, "SITE#")`               | ―                | すべての現場条件（SiteCondition）を取得。 |
+| CM-007 | 現場条件詳細取得   | Query | `tenant_id` + `begins_with(nodePath, "SITE#<id>#DETAIL#")`   | ―                | 指定現場条件の詳細を取得。                |
+| CM-008 | その他設備一覧取得 | Query | `tenant_id` + `begins_with(nodePath, "OTHEREQUIP#")`         | ―                | その他設備（OtherEquipment）を取得。      |
+| CM-009 | その他設備詳細取得 | Query | `tenant_id` + `begins_with(nodePath, "OTHEREQUIP#<id>#DETAIL#")` | ―                | 指定その他設備の詳細を取得。              |
 
 #### (3) `ComponentLabelMaster`
 

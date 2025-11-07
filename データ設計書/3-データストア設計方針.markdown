@@ -4,10 +4,10 @@
 
 ### 3-1. 基本方針：マルチテナント設計
 
-- 全テーブル（`TenantMaster`, `UserMaster`, `ConstructionMaster`）において、**`tenant_id` をパーティションキー（PK）**またはパーティションキーの一部として使用します。
+- 全テーブル（`TenantUserMaster`, `TenantConstructionMaster`, `ComponentLabelMaster`）において、**`tenant_id` をパーティションキー（PK）**またはパーティションキーの一部として使用します。
 - これにより、すべてのデータがテナントごとに物理的に分離（サイロ化）され、他のテナントのデータに誤ってアクセスするリスクを排除し、スケーラビリティを確保します。
 
-## 3-2. 方針①：Key-Valueストアとしての利用（`TenantMaster`, `UserMaster`）
+## 3-2. 方針①：Key-Valueストアとしての利用（TenantUserMaster）
 
 テナント情報およびユーザー情報は、いずれも「**IDを指定して、単一の情報を取得する**」という典型的な Key-Value アクセスを中心とするため、
  本システムではこれらを共通のテーブル **`TenantUserMaster`** に統合して管理します。
@@ -29,28 +29,39 @@
     3. **一覧取得（将来的な拡張）:**
         `Query` 操作（`tenant_id` + `begins_with(record_id, "USER#")`）により、テナントに所属する全ユーザーを一覧取得可能です。
 
-## 3-3. 方針②：階層型データストアとしての利用（`ConstructionMaster`）
+## 3-3. 方針②：階層型データストアとしての利用（`TenantConstructionMaster`）
 
-「部門 → 工程種別 → 工事工程 → ...」という深い階層を持つ工事マスタは、UIの階層型ドロップダウンの動作（＝アクセスパターン）に合わせて最適化します。
+「部門 → 工種 → 工程 → 作業 → 機材 → 現場条件 → その他設備」といった多層構造を持つ工事マスタは、
+ UIの階層型ドロップダウンの動作（＝アクセスパターン）に最適化した設計を行います。
 
-- **用途:** UIの入力画面で利用する、階層型の選択肢マスタを管理します。
-- **設計:** **隣接リストパターン (Adjacency List Pattern)** を採用します。
-  - **PK (Partition Key):** `tenant_id` を使用します。これにより、テナントごとのマスタデータを1つのパーティションに集約します。
-  - **SK (Sort Key):** `nodePath` という複合キーを定義します。このキーに、そのデータが階層のどこに位置するかを示す「**パス情報**」を文字列としてエンコードします。
+- **用途:** 
+
+  UIの入力画面で利用する、階層型の選択肢マスタを管理します。
+  フロントエンドでは、このデータをもとに選択肢を動的生成します。
+
+- **設計:** 
+  
+  **隣接リストパターン (Adjacency List Pattern)** を採用します。
+   各アイテムは、上位ノードを示す「パス情報（`nodePath`）」を持ち、階層構造を再現します。
+  
+  - **PK (Partition Key):** `tenant_id`
+     → テナント単位でマスタデータを独立管理。
+  - **SK (Sort Key):** `nodePath`
+     → 階層構造を示す複合キー。ノードの種類と連番を `#` 区切りで表現。
 
 `nodePath` (SK) には、そのアイテムの階層パスを示す、以下のような文字列が格納されます。
 
-| `nodePath` (SK) の値                | `type` (アイテム種別) | `name` (名前) |
-| ----------------------------------- | --------------------- | ------------- |
-| DEPT#1                              | Department            | 共通          |
-| DEPT#1#TYPE#1                       | ConstructionType      | 共通          |
-| DEPT#1#TYPE#1#PROJ#1                | ConstructionProject   | 二重床        |
-| DEPT#1#TYPE#1#PROJ#1#TASK#1         | Task                  | 柱上作業      |
-| DEPT#1#TYPE#1#PROJ#1#TASK#1#EQUIP#1 | Equipment             | フルハーネス  |
-| DEPT#1#TYPE#2                       | ConstructionType      | 基礎          |
-| DEPT#2                              | Department            | アクセス      |
-| DEPT#2#TYPE#4                       | ConstructionType      | 装機          |
-|                                     |                       |               |
+| `nodePath` の値                       | `type` (アイテム種別) | `name` (表示名) |
+| ------------------------------------- | --------------------- | --------------- |
+| `DEPT#1`                              | Department            | 共通            |
+| `DEPT#1#TYPE#1`                       | ConstructionType      | 共通            |
+| `DEPT#1#TYPE#1#PROJ#1`                | ConstructionProject   | 二重床          |
+| `DEPT#1#TYPE#1#PROJ#1#TASK#1`         | Task                  | 柱上作業        |
+| `DEPT#1#TYPE#1#PROJ#1#TASK#1#EQUIP#1` | Equipment             | フルハーネス    |
+| `SITE#1`                              | SiteCondition         | 高温環境        |
+| `SITE#1#DETAIL#1`                     | SiteConditionDetail   | 室内作業        |
+| `OTHEREQUIP#1`                        | OtherEquipment        | 安全標識        |
+| `OTHEREQUIP#1#DETAIL#1`               | OtherEquipmentDetail  | 仮設フェンス    |
 
 ## 3-4. 方針③：ラベル／コンポーネント設定ストアとしての利用（`ComponentLabelMaster`）
 
