@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="5c2103bb-44f7-43ac-ac2f-e1976618931f" name="変更" comment="Remove .gitignore and README.md" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="aws/dynamodb" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;0xAqua&quot;
+  }
+}</component>
+  <component name="GitToolBoxStore">
+    <option name="recentBranches">
+      <RecentBranches>
+        <option name="branchesForRepo">
+          <list>
+            <RecentBranchesForRepo>
+              <option name="branches">
+                <list>
+                  <RecentBranch>
+                    <option name="branchName" value="docs" />
+                    <option name="lastUsedInstant" value="1762481732" />
+                  </RecentBranch>
+                  <RecentBranch>
+                    <option name="branchName" value="aws/dynamodb" />
+                    <option name="lastUsedInstant" value="1762443932" />
+                  </RecentBranch>
+                  <RecentBranch>
+                    <option name="branchName" value="main" />
+                    <option name="lastUsedInstant" value="1762443931" />
+                  </RecentBranch>
+                </list>
+              </option>
+              <option name="repositoryRootUrl" value="file://$PROJECT_DIR$" />
+            </RecentBranchesForRepo>
+          </list>
+        </option>
+      </RecentBranches>
+    </option>
+  </component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/0xAqua/proj-ndk-ky_system.git&quot;,
+    &quot;accountId&quot;: &quot;2be02754-73c4-4fdc-ad6a-642e8833f35c&quot;
+  }
+}</component>
+  <component name="ProjectCodeStyleSettingsMigration">
+    <option name="version" value="2" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 8
+}</component>
+  <component name="ProjectId" id="356wSWyWTBlptI4ljiBR55KIunQ" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "SONARLINT_PRECOMMIT_ANALYSIS": "true",
+    "cidr.known.project.marker": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "main",
+    "junie.onboarding.icon.badge.shown": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/Users/tsuji/NDIS/Projects/NDK/proj-ndk-ky_system",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/docs" />
+      <recent name="$PROJECT_DIR$/python-flatten-json-for-dynamodb/data" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration default="true" type="Application" factoryName="Application">
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-WS-252.27397.92" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="デフォルトタスク">
+      <changelist id="5c2103bb-44f7-43ac-ac2f-e1976618931f" name="変更" comment="" />
+      <created>1762443829624</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1762443829624</updated>
+      <workItem from="1762443830841" duration="17549000" />
+      <workItem from="1762596175671" duration="817000" />
+      <workItem from="1762611269681" duration="5813000" />
+      <workItem from="1763526878015" duration="659000" />
+      <workItem from="1764082283430" duration="87000" />
+      <workItem from="1764082372907" duration="195000" />
+    </task>
+    <task id="LOCAL-00001" summary="Update .gitignore to exclude IntelliJ project files">
+      <option name="closed" value="true" />
+      <created>1762443920433</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1762443920433</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Add initial project files: .gitignore, README, and sample data JSON file">
+      <option name="closed" value="true" />
+      <created>1762444942886</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1762444942886</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Add functionality to flatten hierarchical JSON into DynamoDB-style JSON">
+      <option name="closed" value="true" />
+      <created>1762445934365</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1762445934365</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Localize code comments and logging messages to Japanese for improved clarity and consistency.">
+      <option name="closed" value="true" />
+      <created>1762446200043</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1762446200043</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Updated `TenantConstructionMaster` design documentation to include hierarchical data structure, expanded API specifications, and new access patterns for site conditions and other equipment. Revised related sections for consistency and clarity.">
+      <option name="closed" value="true" />
+      <created>1762485734124</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1762485734124</updated>
+    </task>
+    <task id="LOCAL-00006" summary="Updated screen design documents: improved `出力画面` JSON structure details, revised formatting for `表紙`, added new display control table in `マルチテナント設計`, and refined OTP authentication document numbering.">
+      <option name="closed" value="true" />
+      <created>1762486852452</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1762486852452</updated>
+    </task>
+    <task id="LOCAL-00007" summary="docsへ移動">
+      <option name="closed" value="true" />
+      <created>1762487177996</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1762487177996</updated>
+    </task>
+    <task id="LOCAL-00008" summary="Remove .gitignore and README.md">
+      <option name="closed" value="true" />
+      <created>1764082427286</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1764082427286</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Update .gitignore to exclude IntelliJ project files" />
+    <MESSAGE value="Add initial project files: .gitignore, README, and sample data JSON file" />
+    <MESSAGE value="Add functionality to flatten hierarchical JSON into DynamoDB-style JSON" />
+    <MESSAGE value="Localize code comments and logging messages to Japanese for improved clarity and consistency." />
+    <MESSAGE value="Updated `TenantConstructionMaster` design documentation to include hierarchical data structure, expanded API specifications, and new access patterns for site conditions and other equipment. Revised related sections for consistency and clarity." />
+    <MESSAGE value="Updated screen design documents: improved `出力画面` JSON structure details, revised formatting for `表紙`, added new display control table in `マルチテナント設計`, and refined OTP authentication document numbering." />
+    <MESSAGE value="docsへ移動" />
+    <MESSAGE value="Remove .gitignore and README.md" />
+    <option name="LAST_COMMIT_MESSAGE" value="Remove .gitignore and README.md" />
+  </component>
+</project>
