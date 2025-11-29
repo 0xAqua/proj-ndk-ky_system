@@ -1,0 +1,65 @@
+{
+  "ndk-ky-dev-tenant-user-master": [
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id":   { "S": "tenant-a" },
+          "tenant_name": { "S": "テナントA株式会社" },
+          "domain":      { "S": "tenant-a.example.com" },
+          "departments": {
+            "M": {
+              "COMMON":  { "S": "共通" },
+              "NETWORK": { "S": "ネットワーク" },
+              "MOBILE":  { "S": "モバイル" }
+            }
+          },
+          "user_id":    { "S": "3714ca08-f021-708e-8329-eb90ac3d2283" },
+          "status":     { "S": "ACTIVE" },
+          "created_at": { "S": "2025-11-29T00:00:00Z" },
+          "updated_at": { "S": "2025-11-29T00:00:00Z" }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id":   { "S": "tenant-b" },
+          "tenant_name": { "S": "テナントBホールディングス" },
+          "domain":      { "S": "tenant-b.example.com" },
+          "departments": {
+            "M": {
+              "COMMON":   { "S": "共通" },
+              "SYSTEM":   { "S": "情報システム" },
+              "ACCOUNT":  { "S": "経理" }
+            }
+          },
+          "user_id":    { "S": "3714ca08-f021-708e-8329-eb90ac3d2283" },
+          "status":     { "S": "ACTIVE" },
+          "created_at": { "S": "2025-11-29T00:00:00Z" },
+          "updated_at": { "S": "2025-11-29T00:00:00Z" }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "tenant_id":   { "S": "tenant-c" },
+          "tenant_name": { "S": "テナントCソリューションズ" },
+          "domain":      { "S": "tenant-c.example.com" },
+          "departments": {
+            "M": {
+              "COMMON": { "S": "共通" },
+              "NW":     { "S": "ネットワーク" },
+              "MOBILE": { "S": "モバイル" },
+              "CLOUD":  { "S": "クラウドインフラ" }
+            }
+          },
+          "user_id":    { "S": "3714ca08-f021-708e-8329-eb90ac3d2283" },
+          "status":     { "S": "INACTIVE" },
+          "created_at": { "S": "2025-11-20T00:00:00Z" },
+          "updated_at": { "S": "2025-11-25T00:00:00Z" }
+        }
+      }
+    }
+  ]
+}
