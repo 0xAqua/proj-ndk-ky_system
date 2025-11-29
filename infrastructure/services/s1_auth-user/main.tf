@@ -67,14 +67,12 @@ resource "aws_lambda_function" "this" {
       LOG_LEVEL                     = "INFO"
     }
   }
-  tracing_config { mode = "Active" }
 
-  # ★★★ 超最新機能: テナント分離モード (Nov 2025) ★★★
-  # これを入れると、Lambdaの実行環境（コンテナ）がテナントIDごとに隔離されます。
-  # 他のテナントのデータがメモリに残るリスク（クロス汚染）を基盤レベルで防げます。
-  tenancy_config {
-    tenant_isolation_mode = "PER_TENANT"
+  tracing_config {
+    mode = "Active"
   }
+
+  # ★削除: テナント分離モード設定は削除済み
 }
 
 # ─────────────────────────────
@@ -114,12 +112,7 @@ resource "aws_lambda_permission" "apigw" {
 # ─────────────────────────────
 # 4. CloudWatch Log Group (ログ管理)
 # ─────────────────────────────
-# Lambdaが自動で作る前に、Terraformで設定を決めておく
 resource "aws_cloudwatch_log_group" "this" {
-  # Lambdaのロググループ名は必ず "/aws/lambda/<関数名>" である必要がある
   name              = "/aws/lambda/${var.name_prefix}"
-  retention_in_days = 30 # 開発環境なら1週間〜1ヶ月で十分
-
-  # 削除時にログも一緒に消す設定（本番では false 推奨）
-  # skip_destroy      = false
+  retention_in_days = 30
 }

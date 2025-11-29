@@ -29,7 +29,7 @@ def create_response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
 @tracer.capture_lambda_handler
 @event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context(log_event=False) # log_event=Trueにするとeventを自動ログ出力（本番はFalse推奨）
-def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
+def lambda_handler(event: APIGatewayProxyEventV2):
 
     # 3. 環境変数のチェック
     if not TABLE_NAME:
