@@ -29,6 +29,7 @@ variable "callback_urls" {
 
     # 採用する方針: 認証専用ドメイン 1つに集約
     "https://auth.example.com/callback",
+    "http://localhost:3000/api/auth/callback"
   ]
 }
 
@@ -46,5 +47,6 @@ variable "logout_urls" {
   default = [
     # "https://tenant-a.example.com/auth/logged-out", # テナントごとには増やさない
     "https://auth.example.com/logout-complete",
+    "http://localhost:3000"
   ]
 }
