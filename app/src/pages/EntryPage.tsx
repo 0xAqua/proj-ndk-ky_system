@@ -1,10 +1,10 @@
 import { MainLayout } from "@/components/layout/MainLayout.tsx";
-import { Text } from "@chakra-ui/react"; // 例としてTextをインポート
+import { EntryForm } from "@/features/entry/components/EntryForm";
 
 const EntryPage = () => {
     return (
         <MainLayout>
-            <Text>Hello World</Text>
+            <EntryForm />
         </MainLayout>
 
     );

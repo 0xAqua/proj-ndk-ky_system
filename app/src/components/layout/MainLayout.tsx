@@ -8,7 +8,7 @@ type MainLayoutProps = {
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
     return (
-        <Box minH="100vh" display="flex" flexDirection="column" pt={4}>
+        <Box minH="100vh" display="flex" flexDirection="column" p={4}>
 
             <Header />
 
@@ -16,7 +16,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
                 <Container
                     maxW="480px"
-                    px={{ base: 4, md: 8 }}
+                    p={0}
                 >
                     {children}
                 </Container>
