@@ -3,11 +3,6 @@ variable "name_prefix" {
   type        = string
 }
 
-variable "region" {
-  description = "AWS Region (e.g. ap-northeast-1)"
-  type        = string
-}
-
 # ─────────────────────────────
 # DynamoDB (Job管理用)
 # ─────────────────────────────
