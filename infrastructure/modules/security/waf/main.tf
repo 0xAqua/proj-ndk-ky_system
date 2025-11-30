@@ -11,7 +11,7 @@ terraform {
 # CloudFront用のWAFは "CLOUDFRONT" スコープで作成
 resource "aws_wafv2_web_acl" "this" {
   name        = "${var.name_prefix}-cf-waf"
-  description = "WAF for CloudFront (Global)"
+  description = "WAF for CloudFront - Global"
   scope       = "CLOUDFRONT"
 
   default_action {
@@ -154,4 +154,30 @@ resource "aws_wafv2_web_acl" "this" {
       sampled_requests_enabled   = true
     }
   }
+
+  rule {
+    name     = "GeoBlock-NonJP"
+    priority = 5 # 他のルールより先に判定させる
+
+    action {
+      block {} # ブロックする
+    }
+
+    statement {
+      not_statement {
+        statement {
+          geo_match_statement {
+            country_codes = ["JP"] # 日本(JP)「以外(NOT)」ならブロック
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "GeoBlock-NonJP"
+      sampled_requests_enabled   = true
+    }
+  }
 }
+

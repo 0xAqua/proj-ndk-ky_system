@@ -27,9 +27,9 @@ resource "aws_cognito_user_pool" "this" {
   mfa_configuration = "OFF" # 本番化に向け "OPTIONAL" または "ON" に変更
 
   # 将来MFAを有効化する際の OTP 設定（今はOFFなので影響しません）
-  software_token_mfa_configuration {
-    enabled = true
-  }
+  # software_token_mfa_configuration {
+  #   enabled = true
+  # }
 
   # 将来MFAを有効化する際の Passkey (WebAuthn) 設定
   # ※ Terraform Provider AWS v5.x以降で使用可能

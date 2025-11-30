@@ -12,6 +12,8 @@ resource "aws_s3_bucket" "log_archive" {
     Environment = var.environment
     Module      = "data-s3"
   }
+
+  force_destroy = true
 }
 
 # 暗号化 (必須)
