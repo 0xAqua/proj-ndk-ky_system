@@ -8,7 +8,7 @@ export const useLoginForm = () => {
 
     const handleLogin = () => {
         // ここに将来Cognitoの処理が入る
-        navigate("/certification");
+        navigate("/entry");
     };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
