@@ -28,3 +28,12 @@ output "tenant_vq_manager_table_arn" {
   description = "ARN of the Tenant VQ Manager table"
   value       = aws_dynamodb_table.tenant_vq_manager.arn
 }
+
+#s4
+output "tenant_log_archive_table_name" {
+  value = aws_dynamodb_table.tenant_log_archive.name
+}
+
+output "tenant_log_archive_table_arn" {
+  value = aws_dynamodb_table.tenant_log_archive.arn
+}

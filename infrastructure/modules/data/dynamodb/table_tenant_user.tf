@@ -1,7 +1,3 @@
-locals {
-  name_prefix = "${var.project}-${var.environment}"
-}
-
 resource "aws_dynamodb_table" "tenant_user_master" {
   name         = "${local.name_prefix}-tenant-user-master"
   billing_mode = "PAY_PER_REQUEST"

@@ -1,7 +1,4 @@
-data "aws_region" "current" {}
-data "aws_caller_identity" "current" {}
-
-# 共通 IAM Trust Policy (省略せずに定義)
+# 共通 IAM Trust Policy
 data "aws_iam_policy_document" "assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -12,15 +9,38 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
+# Lambdaのソースコードをzip化する定義
+data "archive_file" "producer_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda/producer"
+  output_path = "${path.module}/producer_payload.zip"
+}
+
+data "archive_file" "worker_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda/worker"
+  output_path = "${path.module}/worker_payload.zip"
+}
+
 # ─────────────────────────────
-# IAM Role: Producer (API受付担当)
+# 1. IAM Role: Producer (API受付担当)
 # ─────────────────────────────
 resource "aws_iam_role" "producer_role" {
   name               = "${var.name_prefix}-producer-role"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
-resource "aws_iam_role_policy_attachment" "producer_basic" { /* BasicExecutionRole */ }
-resource "aws_iam_role_policy_attachment" "producer_xray" { /* XRayDaemonWriteAccess */ }
+
+# ★修正: Producerのログ出力権限 (AWS管理ポリシー)
+resource "aws_iam_role_policy_attachment" "producer_basic" {
+  role       = aws_iam_role.producer_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# ★修正: ProducerのX-Ray権限 (AWS管理ポリシー)
+resource "aws_iam_role_policy_attachment" "producer_xray" {
+  role       = aws_iam_role.producer_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+}
 
 data "aws_iam_policy_document" "producer_policy" {
   statement { # DynamoDB Put
@@ -40,14 +60,24 @@ resource "aws_iam_role_policy" "producer_policy" {
 }
 
 # ─────────────────────────────
-# IAM Role: Worker (VQ実行担当)
+# 2. IAM Role: Worker (VQ実行担当)
 # ─────────────────────────────
 resource "aws_iam_role" "worker_role" {
   name               = "${var.name_prefix}-worker-role"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
-resource "aws_iam_role_policy_attachment" "worker_basic" { /* BasicExecutionRole */ }
-resource "aws_iam_role_policy_attachment" "worker_xray" { /* XRayDaemonWriteAccess */ }
+
+# ★修正: Workerのログ出力権限
+resource "aws_iam_role_policy_attachment" "worker_basic" {
+  role       = aws_iam_role.worker_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# ★修正: WorkerのX-Ray権限
+resource "aws_iam_role_policy_attachment" "worker_xray" {
+  role       = aws_iam_role.worker_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+}
 
 data "aws_iam_policy_document" "worker_policy" {
   statement { # DynamoDB Read/Update
@@ -63,7 +93,7 @@ data "aws_iam_policy_document" "worker_policy" {
   statement { # Secrets Manager Read (API Key)
     effect    = "Allow"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [var.vq_secret_arn] # 特定のシークレットのみ許可
+    resources = ["${var.vq_secret_arn}*"]
   }
 }
 resource "aws_iam_role_policy" "worker_policy" {
@@ -72,15 +102,17 @@ resource "aws_iam_role_policy" "worker_policy" {
 }
 
 # ─────────────────────────────
-# Lambda Function: Producer (API受付)
+# 3. Lambda Function: Producer (API受付)
 # ─────────────────────────────
 resource "aws_lambda_function" "producer" {
   function_name = "${var.name_prefix}-producer"
   role          = aws_iam_role.producer_role.arn
-  handler       = "producer/main.lambda_handler"
+  handler       = "main.lambda_handler"
   runtime       = "python3.12"
-  timeout       = 15 # 高速にレスポンスを返すので短くてOK
-  # ... (archive_file/source_code_hash は省略)
+  timeout       = 15
+
+  filename         = data.archive_file.producer_zip.output_path
+  source_code_hash = data.archive_file.producer_zip.output_base64sha256
 
   environment {
     variables = {
@@ -88,17 +120,24 @@ resource "aws_lambda_function" "producer" {
       SQS_QUEUE_URL  = aws_sqs_queue.main.url
     }
   }
+
+  tracing_config {
+    mode = "Active"
+  }
 }
 
 # ─────────────────────────────
-# Lambda Function: Worker (VQ実行)
+# 4. Lambda Function: Worker (VQ実行)
 # ─────────────────────────────
 resource "aws_lambda_function" "worker" {
   function_name = "${var.name_prefix}-worker"
   role          = aws_iam_role.worker_role.arn
-  handler       = "worker/main.lambda_handler"
+  handler       = "main.lambda_handler"
   runtime       = "python3.12"
-  timeout       = 60 # VQが遅いので長めに設定 (最大15分まで設定可能)
+  timeout       = 60
+
+  filename         = data.archive_file.worker_zip.output_path
+  source_code_hash = data.archive_file.worker_zip.output_base64sha256
 
   environment {
     variables = {
@@ -106,19 +145,23 @@ resource "aws_lambda_function" "worker" {
       VQ_SECRET_ARN   = var.vq_secret_arn
     }
   }
+
+  tracing_config {
+    mode = "Active"
+  }
 }
 
 # ─────────────────────────────
-# Trigger: SQS -> Worker Lambda
+# 5. Trigger: SQS -> Worker Lambda
 # ─────────────────────────────
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
   event_source_arn = aws_sqs_queue.main.arn
   function_name    = aws_lambda_function.worker.arn
-  batch_size       = 1 # 1件ずつ処理
+  batch_size       = 1
 }
 
 # ─────────────────────────────
-# API Gateway Integration (Producer)
+# 6. API Gateway Integration (Producer)
 # ─────────────────────────────
 resource "aws_apigatewayv2_integration" "producer" {
   api_id           = var.api_gateway_id
@@ -146,4 +189,17 @@ resource "aws_lambda_permission" "apigw_producer" {
   function_name = aws_lambda_function.producer.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${var.api_gateway_execution_arn}/*/*"
+}
+
+# ─────────────────────────────
+# 7. CloudWatch Log Groups (明示的な作成)
+# ─────────────────────────────
+resource "aws_cloudwatch_log_group" "producer_log" {
+  name              = "/aws/lambda/${aws_lambda_function.producer.function_name}"
+  retention_in_days = 30
+}
+
+resource "aws_cloudwatch_log_group" "worker_log" {
+  name              = "/aws/lambda/${aws_lambda_function.worker.function_name}"
+  retention_in_days = 30
 }
