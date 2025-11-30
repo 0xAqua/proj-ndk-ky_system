@@ -1,40 +1,27 @@
-import { Box, Flex, Text, Image, IconButton, Badge } from "@chakra-ui/react";
-import logo from '@/assets/logo.png';
-import { LuLogOut } from "react-icons/lu";
+import type {ReactNode} from 'react';
+import { Box, Container } from '@chakra-ui/react';
+import { Header } from './Header';
 
-export const MainLayout = () => {
+type MainLayoutProps = {
+    children: ReactNode;
+};
 
-    const handleLogoutClick = () => {
-        // ログアウト処理のHooks（useAuthなど）がここに入ります
-        console.log("ログアウトクリック");
-    };
-
+export const MainLayout = ({ children }: MainLayoutProps) => {
     return (
-        <Box
-            as="header"
-            bg="white"
-            w="full"
-            p={4}
-            px={6}
-            borderRadius="2xl"
-        >
-            <Flex justify="space-between" align="center">
-                <Flex align="center" gap={2}>
-                    <Image src={logo} alt="Logo" h="32px" />
-                    <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                        危険予知システム
-                        <Badge variant="solid" colorPalette={"green"} ml={"2"}>Beta</Badge>
-                    </Text>
-                </Flex>
+        <Box minH="100vh" display="flex" flexDirection="column" pt={4}>
 
-                <IconButton
-                    aria-label="ログアウト"
-                    variant="ghost"
-                    onClick={handleLogoutClick}
+            <Header />
+
+            <Box flex="1" py={8} as="main">
+
+                <Container
+                    maxW="480px"
+                    px={{ base: 4, md: 8 }}
                 >
-                    <LuLogOut />
-                </IconButton>
-            </Flex>
+                    {children}
+                </Container>
+            </Box>
+
         </Box>
     );
 };
