@@ -9,9 +9,8 @@
           "domain":      { "S": "tenant-a.example.com" },
           "departments": {
             "M": {
-              "COMMON":  { "S": "共通" },
-              "NETWORK": { "S": "ネットワーク" },
-              "MOBILE":  { "S": "モバイル" }
+              "DEPT#1": { "S": "共通" },
+              "DEPT#3": { "S": "ネットワーク" }
             }
           },
           "status":     { "S": "ACTIVE" },
@@ -29,9 +28,8 @@
           "domain":      { "S": "tenant-b.example.com" },
           "departments": {
             "M": {
-              "COMMON":   { "S": "共通" },
-              "SYSTEM":   { "S": "情報システム" },
-              "ACCOUNT":  { "S": "経理" }
+              "DEPT#1": { "S": "共通" },
+              "DEPT#2": { "S": "アクセス" }
             }
           },
           "status":     { "S": "ACTIVE" },
@@ -49,7 +47,7 @@
           "domain":      { "S": "tenant-a.example.com" },
           "departments": {
             "M": {
-              "COMMON": { "S": "共通" }
+              "DEPT#1": { "S": "共通" }
             }
           },
           "status":     { "S": "ACTIVE" },
