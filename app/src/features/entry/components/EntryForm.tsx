@@ -1,55 +1,67 @@
+import { useState, useEffect } from "react";
+import { Box, Spinner, VStack, Button } from "@chakra-ui/react";
+import { useUserStore } from "@/stores/useUserStore";
+import { api } from "@/lib/api";
+
 import ConstructionDate from "@/features/entry/components/elements/ConstructionDate";
-import {useUserStore} from "@/stores/useUserStore.ts";
-import {useEffect} from "react";
-import {api} from "@/lib/api.ts";
-import {Box, Code, Spinner, Text, VStack} from "@chakra-ui/react";
+import { ConstructionProcess } from "@/features/entry/components/elements/ConstructionProcess";
 
 export const EntryForm = () => {
+    // Storeからはユーザー情報だけを取る
     const { tenantId, setUserData, isLoading, setLoading } = useUserStore();
 
+    const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+    const [selectedProcesses, setSelectedProcesses] = useState<string[]>([]);
+
     useEffect(() => {
-        // 画面が開かれたらデータを取りに行く
-        const fetchData = async () => {
-            // すでにデータがあるなら再取得しない（無駄な通信削減）
+        const initData = async () => {
             if (tenantId) return;
 
             setLoading(true);
             try {
-                const response = await api.get('/me');
+                // ユーザー情報取得 (s1)
+                const userRes = await api.get('/me');
+                setUserData(userRes.data);
 
-                // Storeに保存
-                setUserData(response.data);
+                // ★s2 (マスタ) の取得はここではやらない！
+                // 子コンポーネント (ConstructionProcess) に任せる
+
             } catch (error) {
-                console.error("Failed to fetch user data:", error);
-                alert("データ取得に失敗しました");
+                console.error("Failed to fetch data:", error);
             } finally {
                 setLoading(false);
             }
         };
 
-        void fetchData();
+        void initData();
     }, [tenantId, setUserData, setLoading]);
+
+    const handleSubmit = () => {
+        console.log("送信データ:", { date, selectedProcesses });
+    };
 
     if (isLoading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" h="100vh">
-                <Spinner size="xl" />
+                <Spinner size="xl" color="blue.500" />
             </Box>
         );
     }
 
     return (
-        <div>
-            <ConstructionDate />
-            <VStack gap={6} align="start">
-                <Box p={4} borderWidth={1} borderRadius="md" w="full" bg="gray.50">
-                    <Text fontWeight="bold" mb={2}>Storeの中身確認:</Text>
-                    <Text>テナントID: <Code>{tenantId}</Code></Text>
-                    <Text>ユーザーID: <Code>{useUserStore.getState().userId}</Code></Text>
-                    <Text>部署: <Code>{useUserStore.getState().departments.map(dept => `${dept.id}: ${dept.name}`).join(', ')}</Code></Text>
+        <Box maxW="600px" mx="auto" p={4}>
+            <VStack gap={6} align="stretch">
+                <ConstructionDate value={date} onChange={setDate} />
 
-                </Box>
+                <ConstructionProcess
+                    value={selectedProcesses}
+                    onChange={setSelectedProcesses}
+                />
+
+                <Button colorScheme="blue" onClick={handleSubmit} mt={4}>
+                    登録内容を確認
+                </Button>
             </VStack>
-        </div>
+        </Box>
     );
 };

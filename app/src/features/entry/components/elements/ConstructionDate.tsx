@@ -30,7 +30,7 @@ export default function ConstructionDate ({ value, onChange }: DateProps) {
                     <Input
                         type="date"
                         name="date"
-                        value={value ?? today} // value がない場合は当日を表示
+                        value={value ?? today}
                         onChange={(e) => onChange?.(e.target.value)}
                         w="full"
                     />
