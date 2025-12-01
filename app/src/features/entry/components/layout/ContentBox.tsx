@@ -14,10 +14,19 @@ type ContentBoxProps = {
 export const ContentBox = ({ children }: ContentBoxProps) => {
     return (
         <Box
-            px={{ base: 4 }}
-            py={{ base: 6 }}
+            // 1. Box自体を中央に配置する
             maxW="sm"
-            ml="0">
+            mx="auto" // margin-left: auto; margin-right: auto; の略。Boxを画面中央に配置します
+
+            // 2. Box内の要素を中央揃えにする
+            display="flex"
+            flexDirection="column"
+            alignItems="center" // 中の要素(children)を水平方向の中央に寄せます
+
+            // 3. 既存のスタイル
+            px={{ base: 0 }}
+            py={{ base: 6 }}
+        >
             {children}
         </Box>
     );

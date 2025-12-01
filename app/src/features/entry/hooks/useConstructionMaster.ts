@@ -1,55 +1,70 @@
+// src/features/entry/hooks/useConstructionMaster.ts
+
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useUserStore } from "@/stores/useUserStore";
 
-// 画面表示用に抽出したデータ型
-export type ConstructionType = {
-    id: string;       // 例: "NETWORK#TYPE#1"
-    name: string;     // 例: "舗装工事"
-    deptName: string; // 例: "ネットワーク事業部"
+// UIコンポーネント(ConstructionProcess)が期待するデータ型
+export type ProcessCategory = {
+    id: string;    // 工事種別ID (例: DEPT#1#TYPE#1)
+    name: string;  // 工事種別名
+    processes: {
+        id: string;    // 工程ID (例: ...#PROJ#1)
+        label: string; // 工程名
+    }[];
 };
 
 export const useConstructionMaster = () => {
-    const { departments } = useUserStore(); // 自分の部署 (例: [{id: "NETWORK", name: "..."}])
-    const [types, setTypes] = useState<ConstructionType[]>([]);
+    // 自分の部署情報をStoreから取得（フィルタリングの元情報）
+    const { departments } = useUserStore();
+
+    const [categories, setCategories] = useState<ProcessCategory[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // 部署情報がなければ何もしない
+        // 部署情報がなければロードしない
         if (departments.length === 0) return;
 
         const fetchMaster = async () => {
             setIsLoading(true);
             try {
-                // 1. テナントの全マスタデータを取得
+                // 1. APIからデータ(ツリー構造)を取得
                 const res = await api.get('/construction-master');
-                const rawTree = res.data; // ツリー構造の配列
+                const rawTree = res.data;
 
-                // 2. 自分の部署に紐づく「工事種別 (Type)」だけを抽出
-                const myDeptIds = departments.map(d => d.id); // ["COMMON", "NETWORK"]
-                const extractedTypes: ConstructionType[] = [];
+                // 2. ★構造化とフィルタリングの実行★
+                const myDeptIds = departments.map(d => d.id);
+                const formattedCategories: ProcessCategory[] = [];
 
                 rawTree.forEach((deptNode: any) => {
-                    // ルートノード(部署)のIDが、自分の部署リストにあるかチェック
-                    // ※ データ投入スクリプトで nodePath="NETWORK" のように入れている前提
-                    if (myDeptIds.includes(deptNode.id)) {
+                    // 自分の部署IDと一致しないノードはスキップ (フィルタリング)
+                    if (!myDeptIds.includes(deptNode.id)) return;
 
-                        // その配下にある "ConstructionType" (children) を全て取り出す
-                        deptNode.children?.forEach((typeNode: any) => {
-                            extractedTypes.push({
+                    // 部署の下にある「工事種別 (Type)」をループ
+                    deptNode.children?.forEach((typeNode: any) => {
+
+                        // 工事工程 (Project) のリストを抽出
+                        const processes = typeNode.children?.map((projNode: any) => ({
+                            id: projNode.id,    // nodePath ID
+                            label: projNode.name
+                        })) || [];
+
+                        // 工程がある場合のみ、アコーディオンのカテゴリとして追加
+                        if (processes.length > 0) {
+                            formattedCategories.push({
                                 id: typeNode.id,
                                 name: typeNode.name,
-                                deptName: deptNode.name
+                                processes: processes
                             });
-                        });
-                    }
+                        }
+                    });
                 });
-
-                setTypes(extractedTypes);
+                console.log("Formatted Categories:", formattedCategories);
+                setCategories(formattedCategories);
 
             } catch (err) {
-                console.error(err);
+                console.error("マスタデータの取得に失敗しました:", err);
                 setError("マスタデータの取得に失敗しました");
             } finally {
                 setIsLoading(false);
@@ -57,7 +72,8 @@ export const useConstructionMaster = () => {
         };
 
         void fetchMaster();
-    }, [departments]);
+    }, [departments]); // 部署情報が変わったら再実行
 
-    return { types, isLoading, error };
+    // 画面側はこれをそのまま受け取る
+    return { categories, isLoading, error };
 };
