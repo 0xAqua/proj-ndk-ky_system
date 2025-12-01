@@ -15,7 +15,6 @@ export const EntryForm = () => {
 
             setLoading(true);
             try {
-                // s1 API を叩く (ヘッダーは lib/api.ts が勝手につけてくれる！)
                 const response = await api.get('/me');
 
                 // Storeに保存
