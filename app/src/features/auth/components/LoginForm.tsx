@@ -1,13 +1,14 @@
 import { VStack, Text, Input, Button, Image, Link, Field } from "@chakra-ui/react";
 import logo from '@/assets/logo.png';
-import { useLoginForm } from "../hooks/useLoginForm"; // さっき作ったHook
+import { useLoginForm } from "../hooks/useLoginForm";
 
 export const LoginForm = () => {
-    // ロジックはHookから借りてくる
     const {
         username, setUsername,
         password, setPassword,
-        handleLogin, handleKeyPress
+        handleLogin,
+        isLoading, // ローディング状態も使うと親切
+        error      // エラーメッセージも表示
     } = useLoginForm();
 
     return (
@@ -22,46 +23,64 @@ export const LoginForm = () => {
                 ログイン
             </Text>
             <VStack gap={1} mb="4">
-                <Text fontSize="sm">
+                <Text fontSize="sm" color="gray.600">
                     危険予知システムへようこそ
                 </Text>
-                <Text fontSize="sm">
+                <Text fontSize="sm" color="gray.600">
                     サービスのご利用にはログインが必要です
                 </Text>
             </VStack>
 
-            <Field.Root w="full">
-                <Input
-                    placeholder="メールアドレスを入力"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    onKeyDown={handleKeyPress} // onKeyPressは非推奨なのでonKeyDown推奨
-                />
-            </Field.Root>
+            {/* ★ここがポイント！ formタグで囲む */}
+            <form onSubmit={handleLogin} style={{ width: '100%' }}>
+                <VStack gap={4} width="100%">
 
-            <Field.Root w="full">
-                <Input
-                    type="password"
-                    placeholder="パスワードを入力"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                />
-            </Field.Root>
+                    {/* エラーがあれば表示 */}
+                    {error && (
+                        <Text color="red.500" fontSize="sm" textAlign="center">
+                            {error}
+                        </Text>
+                    )}
 
-            <Button
-                w="full"
-                colorPalette="blue"
-                onClick={handleLogin}
-            >
-                ログイン
-            </Button>
+                    <Field.Root w="full">
+                        <Input
+                            name="email" // 自動入力に必須
+                            autoComplete="email" // ブラウザがメアドを提案してくれる
+                            placeholder="メールアドレスを入力"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                        />
+                    </Field.Root>
+
+                    <Field.Root w="full">
+                        <Input
+                            name="password"
+                            autoComplete="current-password" // パスワード管理ツールが反応する
+                            type="password"
+                            placeholder="パスワードを入力"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                    </Field.Root>
+
+                    <Button
+                        type="submit" // これでEnterキーで送信される
+                        w="full"
+                        colorPalette="blue"
+                        loading={isLoading} // 連打防止 & くるくる表示
+                        loadingText="ログイン中..."
+                    >
+                        ログイン
+                    </Button>
+                </VStack>
+            </form>
 
             <Text textAlign="left" mt={2} fontSize="sm">
-                <Link color="red.500" href="/forgot-password">
+                <Link color="blue.500" href="/">
                     パスワードをお忘れですか？
                 </Link>
             </Text>
         </VStack>
+
     );
 };
