@@ -1,40 +1,61 @@
 import { create } from 'zustand';
 
-// DynamoDB (s1) から返ってくるデータの型定義
-// ※ tenant_user_master_seed.json の構造に合わせます
-export interface TenantUser {
-    tenant_id: string;
-    user_id: string;
-    tenant_name: string;
-    departments: Record<string, { S: string }>; // DynamoDBのJSON構造に合わせて調整
-    // 実際はAPI側で整形しているなら { code: string, name: string }[] 等になりますが
-    // 一旦受け取れる緩い型にしておきます
+// 部署データの型（UIで使いやすい形に整形）
+export interface Department {
+    id: string;   // キー (例: "NETWORK")
+    name: string; // 表示名 (例: "ネットワーク部")
 }
 
+// Storeの型定義
 interface UserState {
+    // 3つの基本情報
     tenantId: string | null;
     userId: string | null;
-    tenantUser: TenantUser | null; // 詳細情報（部署など）
+    departments: Department[];
+
+    // ローディング状態
     isLoading: boolean;
 
-    // アクション
-    setUserData: (data: { tenantId: string; userId: string; tenantUser: TenantUser }) => void;
+    // アクション (データをセットする関数)
+    setUserData: (apiResponse: any) => void;
     clearUser: () => void;
     setLoading: (loading: boolean) => void;
 }
 
 export const useUserStore = create<UserState>((set) => ({
+    // 初期値
     tenantId: null,
     userId: null,
-    tenantUser: null,
+    departments: [],
     isLoading: false,
 
-    setUserData: (data) => set({
-        tenantId: data.tenantId,
-        userId: data.userId,
-        tenantUser: data.tenantUser
+    // API(s1) のレスポンスを受け取って Store に保存する
+    setUserData: (data) => {
+        // 1. 部署データの整形
+        // APIからは { "COMMON": "共通", "NETWORK": "ネットワーク" } のようなMapで来る想定
+        // これを [ { id: "COMMON", name: "共通" }, ... ] という配列に変換します
+        const rawDepts = data.tenantUser?.departments || {};
+
+        const formattedDepts: Department[] = Object.entries(rawDepts).map(([key, value]) => ({
+            id: key,
+            name: String(value) // 値が文字列であることを保証
+        }));
+
+        // 2. Stateの更新
+        set({
+            tenantId: data.tenantId,
+            userId: data.userId,
+            departments: formattedDepts,
+        });
+    },
+
+    // ログアウト時などにリセットする
+    clearUser: () => set({
+        tenantId: null,
+        userId: null,
+        departments: []
     }),
 
-    clearUser: () => set({ tenantId: null, userId: null, tenantUser: null }),
+    // ローディング切り替え
     setLoading: (loading) => set({ isLoading: loading }),
 }));

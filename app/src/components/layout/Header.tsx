@@ -2,12 +2,17 @@ import { Box, Flex, Text, Image, IconButton } from "@chakra-ui/react";
 import logo from '@/assets/logo.png';
 import { Badge } from "@chakra-ui/react"
 import { LuLogOut } from "react-icons/lu";
+import {signOut} from "aws-amplify/auth";
+import {useNavigate} from "react-router-dom";
 
 export const Header = () => {
-    const handleLogoutClick = () => {
-        // ログアウト処理
-        console.log("ログアウトクリック");
+    const navigate = useNavigate();
+
+    const handleLogoutClick = async () => {
+        await signOut();
+        navigate('/login');
     };
+
 
     return (
         <Box
