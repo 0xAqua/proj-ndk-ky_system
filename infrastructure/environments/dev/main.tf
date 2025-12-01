@@ -244,3 +244,13 @@ module "backup" {
     Project = local.project # "ndk-ky"
   }
 }
+
+output "auth_user_pool_id" {
+  value       = module.auth.user_pool_id
+  description = "Cognito User Pool ID for dev"
+}
+
+output "auth_user_pool_client_id" {
+  value       = module.auth.user_pool_client_id
+  description = "Cognito User Pool Client ID for dev"
+}

@@ -18,7 +18,7 @@ QUEUE_URL = os.environ["SQS_QUEUE_URL"]
 @tracer.capture_lambda_handler
 @event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context
-def lambda_handler(event: APIGatewayProxyEventV2):
+def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
     # 1. 入力チェック
     body = json.loads(event.body or "{}")
     eat = body.get("eat")

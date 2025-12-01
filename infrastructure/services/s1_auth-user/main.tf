@@ -1,6 +1,16 @@
 # ─────────────────────────────
+# 0. ローカル変数
+# ─────────────────────────────
+locals {
+  # Lambda のソースコードディレクトリ（main.py / requirements.txt が置いてある場所）
+  lambda_src_dir = "${path.module}/lambda"
+}
+
+# ─────────────────────────────
 # 1. IAM Role & Lambda Function
 # ─────────────────────────────
+
+# Lambda 用 AssumeRole ポリシー
 data "aws_iam_policy_document" "assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -21,6 +31,7 @@ resource "aws_iam_role_policy_attachment" "basic" {
   role       = aws_iam_role.this.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
+
 resource "aws_iam_role_policy_attachment" "xray" {
   role       = aws_iam_role.this.name
   policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
@@ -34,28 +45,63 @@ data "aws_iam_policy_document" "dynamodb_read" {
     resources = [var.tenant_user_master_table_arn]
   }
 }
+
 resource "aws_iam_role_policy" "dynamodb_read" {
   name   = "dynamodb-read-access"
   role   = aws_iam_role.this.id
   policy = data.aws_iam_policy_document.dynamodb_read.json
 }
 
-# Lambda ソースコードのZIP化
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/lambda"
-  output_path = "${path.module}/lambda_payload.zip"
-  excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+# ─────────────────────────────
+# Lambda 依存ライブラリのインストール（ローカルで pip 実行）
+# ─────────────────────────────
+resource "null_resource" "lambda_deps" {
+  # requirements.txt が変わったら再実行
+  triggers = {
+    requirements = filesha256("${local.lambda_src_dir}/requirements.txt")
+  }
+
+  provisioner "local-exec" {
+    working_dir = local.lambda_src_dir
+
+    command = <<-EOT
+      echo "[s1_auth-user] install deps with pip"
+
+      # 念のため過去の依存を掃除
+      rm -rf aws_lambda_powertools* boto3* __pycache__
+
+      # 依存ライブラリを lambda/ 直下にインストール
+      pip install -r requirements.txt -t .
+
+      echo "[s1_auth-user] deps installed"
+    EOT
+  }
 }
 
+# ─────────────────────────────
+# Lambda ソースコードのZIP化
+# ─────────────────────────────
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_dir  = local.lambda_src_dir
+  output_path = "${path.module}/lambda_payload.zip"
+  excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+
+  # 先に pip 実行してから ZIP させる
+  depends_on = [null_resource.lambda_deps]
+}
+
+# ─────────────────────────────
+# Lambda Function 本体
+# ─────────────────────────────
 resource "aws_lambda_function" "this" {
-  function_name    = var.name_prefix
-  role             = aws_iam_role.this.arn
-  handler          = "main.lambda_handler"
-  runtime          = "python3.12"
-  architectures    = ["arm64"]
-  timeout          = 10
-  memory_size      = 256
+  function_name = var.name_prefix
+  role          = aws_iam_role.this.arn
+  handler       = "main.lambda_handler"
+  runtime       = "python3.12"
+  architectures = ["arm64"]
+  timeout       = 10
+  memory_size   = 256
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
@@ -79,12 +125,11 @@ resource "aws_lambda_function" "this" {
 # 2. ルーティング設定 (共通AGWへ追加)
 # ─────────────────────────────
 resource "aws_apigatewayv2_integration" "lambda" {
-  api_id           = var.api_gateway_id
-  integration_type = "AWS_PROXY"
-
-  connection_type      = "INTERNET"
-  integration_method   = "POST"
-  integration_uri      = aws_lambda_function.this.invoke_arn
+  api_id                = var.api_gateway_id
+  integration_type      = "AWS_PROXY"
+  connection_type       = "INTERNET"
+  integration_method    = "POST"
+  integration_uri       = aws_lambda_function.this.invoke_arn
   payload_format_version = "2.0"
 }
 

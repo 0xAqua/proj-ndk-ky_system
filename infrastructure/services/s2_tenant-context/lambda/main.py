@@ -74,7 +74,7 @@ def build_tree(flat_items: list) -> list:
 @tracer.capture_lambda_handler
 @event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context(log_event=False)
-def lambda_handler(event: APIGatewayProxyEventV2):
+def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
     """
     工事マスタ取得API (階層構造JSON返却版)
     """

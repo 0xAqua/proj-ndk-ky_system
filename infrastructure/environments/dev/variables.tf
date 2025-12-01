@@ -8,7 +8,7 @@ variable "root_domain" {
 }
 
 locals {
-  project     = "ndk-ky"
+  project     = "ndk-ky-system"
   environment = "dev"
   region      = "ap-northeast-1"
 }

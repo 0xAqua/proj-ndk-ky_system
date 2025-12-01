@@ -1,4 +1,14 @@
+# ─────────────────────────────
+# 0. ローカル変数
+# ─────────────────────────────
+locals {
+  producer_src_dir = "${path.module}/lambda/producer"
+  worker_src_dir   = "${path.module}/lambda/worker"
+}
+
+# ─────────────────────────────
 # 共通 IAM Trust Policy
+# ─────────────────────────────
 data "aws_iam_policy_document" "assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -9,17 +19,79 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
+# ─────────────────────────────
+# Lambda 依存ライブラリのインストール（producer / worker）
+# ─────────────────────────────
+
+# producer 用
+resource "null_resource" "producer_deps" {
+  triggers = {
+    requirements = filesha256("${local.producer_src_dir}/requirements.txt")
+  }
+
+  provisioner "local-exec" {
+    working_dir = local.producer_src_dir
+
+    command = <<-EOT
+      echo "[s3_vq_workflow/producer] install deps with pip"
+
+      # 念のため過去の依存を掃除
+      rm -rf aws_lambda_powertools* boto3* __pycache__
+
+      # 依存ライブラリを producer ディレクトリ直下にインストール
+      pip install -r requirements.txt -t .
+
+      echo "[s3_vq_workflow/producer] deps installed"
+    EOT
+  }
+}
+
+# worker 用
+resource "null_resource" "worker_deps" {
+  triggers = {
+    requirements = filesha256("${local.worker_src_dir}/requirements.txt")
+  }
+
+  provisioner "local-exec" {
+    working_dir = local.worker_src_dir
+
+    command = <<-EOT
+      echo "[s3_vq_workflow/worker] install deps with pip"
+
+      # 念のため過去の依存を掃除
+      rm -rf aws_lambda_powertools* boto3* __pycache__
+
+      # 依存ライブラリを worker ディレクトリ直下にインストール
+      pip install -r requirements.txt -t .
+
+      echo "[s3_vq_workflow/worker] deps installed"
+    EOT
+  }
+}
+
+# ─────────────────────────────
 # Lambdaのソースコードをzip化する定義
+# ─────────────────────────────
+
 data "archive_file" "producer_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda/producer"
+  source_dir  = local.producer_src_dir
   output_path = "${path.module}/producer_payload.zip"
+
+  excludes = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+
+  # 先に pip 実行してから ZIP させる
+  depends_on = [null_resource.producer_deps]
 }
 
 data "archive_file" "worker_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda/worker"
+  source_dir  = local.worker_src_dir
   output_path = "${path.module}/worker_payload.zip"
+
+  excludes = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+
+  depends_on = [null_resource.worker_deps]
 }
 
 # ─────────────────────────────
@@ -30,13 +102,13 @@ resource "aws_iam_role" "producer_role" {
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
-# ★修正: Producerのログ出力権限 (AWS管理ポリシー)
+# Producerのログ出力権限
 resource "aws_iam_role_policy_attachment" "producer_basic" {
   role       = aws_iam_role.producer_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# ★修正: ProducerのX-Ray権限 (AWS管理ポリシー)
+# ProducerのX-Ray権限
 resource "aws_iam_role_policy_attachment" "producer_xray" {
   role       = aws_iam_role.producer_role.name
   policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
@@ -54,6 +126,7 @@ data "aws_iam_policy_document" "producer_policy" {
     resources = [aws_sqs_queue.main.arn]
   }
 }
+
 resource "aws_iam_role_policy" "producer_policy" {
   role   = aws_iam_role.producer_role.id
   policy = data.aws_iam_policy_document.producer_policy.json
@@ -67,13 +140,13 @@ resource "aws_iam_role" "worker_role" {
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
-# ★修正: Workerのログ出力権限
+# Workerのログ出力権限
 resource "aws_iam_role_policy_attachment" "worker_basic" {
   role       = aws_iam_role.worker_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# ★修正: WorkerのX-Ray権限
+# WorkerのX-Ray権限
 resource "aws_iam_role_policy_attachment" "worker_xray" {
   role       = aws_iam_role.worker_role.name
   policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
@@ -96,6 +169,7 @@ data "aws_iam_policy_document" "worker_policy" {
     resources = ["${var.vq_secret_arn}*"]
   }
 }
+
 resource "aws_iam_role_policy" "worker_policy" {
   role   = aws_iam_role.worker_role.id
   policy = data.aws_iam_policy_document.worker_policy.json
@@ -141,8 +215,8 @@ resource "aws_lambda_function" "worker" {
 
   environment {
     variables = {
-      JOB_TABLE_NAME  = var.job_table_name
-      VQ_SECRET_ARN   = var.vq_secret_arn
+      JOB_TABLE_NAME = var.job_table_name
+      VQ_SECRET_ARN  = var.vq_secret_arn
     }
   }
 
@@ -164,11 +238,11 @@ resource "aws_lambda_event_source_mapping" "sqs_trigger" {
 # 6. API Gateway Integration (Producer)
 # ─────────────────────────────
 resource "aws_apigatewayv2_integration" "producer" {
-  api_id           = var.api_gateway_id
-  integration_type = "AWS_PROXY"
-  connection_type      = "INTERNET"
-  integration_method   = "POST"
-  integration_uri      = aws_lambda_function.producer.invoke_arn
+  api_id                 = var.api_gateway_id
+  integration_type       = "AWS_PROXY"
+  connection_type        = "INTERNET"
+  integration_method     = "POST"
+  integration_uri        = aws_lambda_function.producer.invoke_arn
   payload_format_version = "2.0"
 }
 
