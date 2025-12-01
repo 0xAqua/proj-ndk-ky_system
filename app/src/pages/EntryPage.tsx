@@ -1,7 +1,7 @@
 import {EntryForm} from "@/features/entry/components/EntryForm.tsx";
 import {MainLayout} from "@/components/layout/MainLayout.tsx";
 
-const EntryPage = () => {
+export const EntryPage = () => {
 
     return (
         <MainLayout>
@@ -9,5 +9,3 @@ const EntryPage = () => {
         </MainLayout>
     );
 };
-
-export default EntryPage;

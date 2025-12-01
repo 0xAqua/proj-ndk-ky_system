@@ -1,15 +1,26 @@
-import { Routes, Route } from 'react-router-dom';
-import LoginPage from '@/pages/LoginPage';
-import EntryPage from "@/pages/EntryPage";
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { LoginPage } from '@/pages/LoginPage';
+import { EntryPage } from "@/pages/EntryPage";
+import { AuthGuard } from '@/features/auth/components/AuthGuard';
 
 export const AppRoutes = () => {
     return (
         <Routes>
-            <Route path="/" element={<LoginPage />} />
+            {/* デフォルトルートはログイン画面へリダイレクト */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+
+            {/* 公開ページ（ログイン画面） */}
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/entry" element={<EntryPage />} />
-            {/* 今後ここにページを追加していく */}
-            {/* <Route path="/entry" element={<EntryPage />} /> */}
+
+            {/* 保護されたページ（ログイン必須） */}
+            <Route
+                path="/entry"
+                element={
+                    <AuthGuard>
+                        <EntryPage />
+                    </AuthGuard>
+                }
+            />
         </Routes>
     );
 };
