@@ -1,15 +1,35 @@
-import { useState } from "react";
+import {useEffect, useState} from "react";
 import { useNavigate } from "react-router-dom";
-import { signIn } from "aws-amplify/auth";
+import { signIn, getCurrentUser } from "aws-amplify/auth";
 
 export const useLoginForm = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isCheckingSession, setIsCheckingSession] = useState(true);
     const navigate = useNavigate();
 
-    // ★重要: 引数を FormEvent に変更
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                // 現在のユーザーを取得してみる
+                await getCurrentUser();
+
+                // エラーにならなければログイン済み -> 入力画面へGO
+                console.log("Already logged in");
+                navigate("/entry", { replace: true }); // replace: true で「戻る」ボタンでログイン画面に戻れないようにする
+            } catch (err) {
+                // ログインしていなかったら何もしない（ログイン画面を表示）
+                console.log("Not logged in");
+            } finally {
+                setIsCheckingSession(false);
+            }
+        };
+
+        void checkAuth();
+    }, [navigate]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault(); // ★これがないと画面がリロードされてしまいます！
 
@@ -52,5 +72,6 @@ export const useLoginForm = () => {
         isLoading,
         error,
         handleLogin, // これを form の onSubmit に渡す
+        isCheckingSession
     };
 };

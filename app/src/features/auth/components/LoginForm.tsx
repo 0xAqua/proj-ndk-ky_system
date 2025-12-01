@@ -1,4 +1,4 @@
-import { VStack, Text, Input, Button, Image, Link, Field } from "@chakra-ui/react";
+import {VStack, Text, Input, Button, Image, Link, Field, Center, Spinner} from "@chakra-ui/react";
 import logo from '@/assets/logo.png';
 import { useLoginForm } from "../hooks/useLoginForm";
 
@@ -8,8 +8,17 @@ export const LoginForm = () => {
         password, setPassword,
         handleLogin,
         isLoading, // ローディング状態も使うと親切
-        error      // エラーメッセージも表示
+        error,      // エラーメッセージも表示
+        isCheckingSession
     } = useLoginForm();
+
+    if (isCheckingSession) {
+        return (
+            <Center h="100vh">
+                <Spinner size="xl" color="blue.500" />
+            </Center>
+        );
+    }
 
     return (
         <VStack gap={6}>
