@@ -4,6 +4,7 @@
       "PutRequest": {
         "Item": {
           "tenant_id":   { "S": "tenant-a" },
+          "user_id":     { "S": "37e4da48-c021-70f0-51c1-36b62732214c" },
           "tenant_name": { "S": "テナントA株式会社" },
           "domain":      { "S": "tenant-a.example.com" },
           "departments": {
@@ -13,10 +14,9 @@
               "MOBILE":  { "S": "モバイル" }
             }
           },
-          "user_id":    { "S": "3714ca08-f021-708e-8329-eb90ac3d2283" },
           "status":     { "S": "ACTIVE" },
-          "created_at": { "S": "2025-11-29T00:00:00Z" },
-          "updated_at": { "S": "2025-11-29T00:00:00Z" }
+          "created_at": { "S": "2025-12-01T00:00:00Z" },
+          "updated_at": { "S": "2025-12-01T00:00:00Z" }
         }
       }
     },
@@ -24,6 +24,7 @@
       "PutRequest": {
         "Item": {
           "tenant_id":   { "S": "tenant-b" },
+          "user_id":     { "S": "b7742ad8-c051-701a-b559-99e0d5f4491d" },
           "tenant_name": { "S": "テナントBホールディングス" },
           "domain":      { "S": "tenant-b.example.com" },
           "departments": {
@@ -33,31 +34,27 @@
               "ACCOUNT":  { "S": "経理" }
             }
           },
-          "user_id":    { "S": "3714ca08-f021-708e-8329-eb90ac3d2283" },
           "status":     { "S": "ACTIVE" },
-          "created_at": { "S": "2025-11-29T00:00:00Z" },
-          "updated_at": { "S": "2025-11-29T00:00:00Z" }
+          "created_at": { "S": "2025-12-01T00:00:00Z" },
+          "updated_at": { "S": "2025-12-01T00:00:00Z" }
         }
       }
     },
     {
       "PutRequest": {
         "Item": {
-          "tenant_id":   { "S": "tenant-c" },
-          "tenant_name": { "S": "テナントCソリューションズ" },
-          "domain":      { "S": "tenant-c.example.com" },
+          "tenant_id":   { "S": "tenant-a" },
+          "user_id":     { "S": "27a49a68-3001-706c-56bc-eb8b273b7198" },
+          "tenant_name": { "S": "テナントA株式会社" },
+          "domain":      { "S": "tenant-a.example.com" },
           "departments": {
             "M": {
-              "COMMON": { "S": "共通" },
-              "NW":     { "S": "ネットワーク" },
-              "MOBILE": { "S": "モバイル" },
-              "CLOUD":  { "S": "クラウドインフラ" }
+              "COMMON": { "S": "共通" }
             }
           },
-          "user_id":    { "S": "3714ca08-f021-708e-8329-eb90ac3d2283" },
-          "status":     { "S": "INACTIVE" },
-          "created_at": { "S": "2025-11-20T00:00:00Z" },
-          "updated_at": { "S": "2025-11-25T00:00:00Z" }
+          "status":     { "S": "ACTIVE" },
+          "created_at": { "S": "2025-12-01T00:00:00Z" },
+          "updated_at": { "S": "2025-12-01T00:00:00Z" }
         }
       }
     }
