@@ -14,6 +14,7 @@ export const LoginForm = () => {
 
     if (isCheckingSession) {
         return (
+            // Todo: デザインはまた考える
             <Center h="100vh">
                 <Spinner size="xl" color="blue.500" />
             </Center>
