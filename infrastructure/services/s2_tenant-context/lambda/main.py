@@ -25,48 +25,33 @@ def build_tree(flat_items: list) -> list:
     """
     フラットなDynamoDBアイテムリストを階層構造(Tree)に変換する
     """
-    # 1. 検索しやすいように辞書化 & 子供リストの初期化
-    # key: nodePath, value: item (with children)
     node_map = {}
     for item in flat_items:
-        # フロントエンドで使いやすいようにキー名を整理してもOK
         node = {
             "id": item.get("nodePath"),
             "name": item.get("name"),
-            "type": item.get("type"), # Department, Task 等
-            "data": item,             # 元データも一応残しておく
+            "type": item.get("type"),
+            "data": item,
             "children": []
         }
         node_map[item.get("nodePath")] = node
 
     root_nodes = []
 
-    # 2. 親子関係の紐付け
-    # nodePath例: DEPT#1#TYPE#1 -> 親は DEPT#1
-    # ロジック: 後ろのタグ(#AAA#1)を1つ消したものが親のパス
     for path, node in node_map.items():
-        # パスを分解 (例: "DEPT#1#TYPE#1" -> ["DEPT#1", "TYPE#1"])
         parts = path.split("#")
-
-        # 親がいるか判定 (要素数が2以上なら親がいる可能性がある)
-        # DEPT#1 (len=2) -> 親なし(Root)
-        # DEPT#1#TYPE#1 (len=4) -> 親は DEPT#1
-        # ※ あなたの定義 "DEPT#1" は "#" で分割すると ["DEPT", "1"] (len=2)
-        #    "DEPT#1#TYPE#1" は ["DEPT", "1", "TYPE", "1"] (len=4)
 
         if len(parts) <= 2:
             # ルートノード (Department)
             root_nodes.append(node)
         else:
-            # 親を探す: 後ろの2要素("TYPE", "1")を削ったパスを作る
+            # 親を探す: 後ろの2要素を削ったパスを作る
             parent_path = "#".join(parts[:-2])
             parent = node_map.get(parent_path)
 
             if parent:
                 parent["children"].append(node)
             else:
-                # 親が見つからない場合は孤立ノードとしてルート扱いにしても良いし、無視しても良い
-                # ここではルートに入れておく（データ不整合対策）
                 root_nodes.append(node)
 
     return root_nodes
@@ -76,19 +61,29 @@ def build_tree(flat_items: list) -> list:
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
     """
-    工事マスタ取得API (階層構造JSON返却版)
+    工事マスタ取得API
     """
-    if not event.request_context.authorizer.jwt:
-        return create_response(401, {"message": "Unauthorized"})
+    # ★修正: JWTトークンから tenant_id を安全に取得 (s1と同じ対応)
+    raw_claims = (
+        event.raw_event.get("requestContext", {})
+        .get("authorizer", {})
+        .get("jwt", {})
+        .get("claims", {})
+    )
 
-    claims = event.request_context.authorizer.jwt.claims
-    tenant_id = claims.get("custom:tenant_id") or claims.get("tenant_id")
+    tenant_id = raw_claims.get("custom:tenant_id") or raw_claims.get("tenant_id")
+
+    if not tenant_id:
+        logger.warning("Missing tenant_id in token.")
+        # デバッグ用にログ出力
+        logger.debug(f"Claims: {raw_claims}")
+        return create_response(400, {"message": "Invalid token"})
 
     logger.append_keys(tenant_id=tenant_id)
 
     # クエリパラメータ取得
     params = event.query_string_parameters or {}
-    dept_prefix = params.get("deptId") # 指定がなければ全件
+    dept_prefix = params.get("deptId")
 
     try:
         table = dynamodb.Table(TABLE_NAME)
@@ -100,7 +95,7 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
         response = table.query(KeyConditionExpression=key_condition)
         items = response.get("Items", [])
 
-        # ★ここで変換処理を実行
+        # 階層構造に変換
         tree_data = build_tree(items)
 
     except ClientError:
@@ -110,4 +105,4 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
         logger.exception("Unexpected error")
         return create_response(500, {"message": "Internal server error"})
 
-    return create_response(200, tree_data) # リストをそのまま返す
+    return create_response(200, tree_data)
