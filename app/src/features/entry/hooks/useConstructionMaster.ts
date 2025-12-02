@@ -1,21 +1,18 @@
-// src/features/entry/hooks/useConstructionMaster.ts
-
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useUserStore } from "@/stores/useUserStore";
 
-// UIコンポーネント(ConstructionProcess)が期待するデータ型
+// UIコンポーネントが期待するデータ型（最終構造）
 export type ProcessCategory = {
-    id: string;    // 工事種別ID (例: DEPT#1#TYPE#1)
+    id: string;    // 工事種別ID (ConstructionType)
     name: string;  // 工事種別名
     processes: {
-        id: string;    // 工程ID (例: ...#PROJ#1)
+        id: string;    // 工程ID (ConstructionProject)
         label: string; // 工程名
     }[];
 };
 
 export const useConstructionMaster = () => {
-    // 自分の部署情報をStoreから取得（フィルタリングの元情報）
     const { departments } = useUserStore();
 
     const [categories, setCategories] = useState<ProcessCategory[]>([]);
@@ -33,24 +30,29 @@ export const useConstructionMaster = () => {
                 const res = await api.get('/construction-master');
                 const rawTree = res.data;
 
-                // 2. ★構造化とフィルタリングの実行★
+                // 2. ★構造化とフィルタリングの実行★ (Hooksの責務)
                 const myDeptIds = departments.map(d => d.id);
                 const formattedCategories: ProcessCategory[] = [];
 
                 rawTree.forEach((deptNode: any) => {
-                    // 自分の部署IDと一致しないノードはスキップ (フィルタリング)
+                    // 部署IDが一致しないノードはスキップ (フィルタリング)
                     if (!myDeptIds.includes(deptNode.id)) return;
 
                     // 部署の下にある「工事種別 (Type)」をループ
                     deptNode.children?.forEach((typeNode: any) => {
 
-                        // 工事工程 (Project) のリストを抽出
-                        const processes = typeNode.children?.map((projNode: any) => ({
-                            id: projNode.id,    // nodePath ID
-                            label: projNode.name
-                        })) || [];
+                        // その下の「工程 (Project)」を抽出してリスト化
+                        // Project/Taskノードのみを対象とする (機材を排除)
+                        const processes = typeNode.children
+                            ?.filter((childNode: any) =>
+                                childNode.type === 'ConstructionProject' || childNode.type === 'Task'
+                            )
+                            .map((projNode: any) => ({
+                                id: projNode.id,    // nodePath IDを使用
+                                label: projNode.name
+                            })) || [];
 
-                        // 工程がある場合のみ、アコーディオンのカテゴリとして追加
+                        // 工程がある場合のみ、カテゴリとして追加
                         if (processes.length > 0) {
                             formattedCategories.push({
                                 id: typeNode.id,
@@ -60,7 +62,7 @@ export const useConstructionMaster = () => {
                         }
                     });
                 });
-                console.log("Formatted Categories:", formattedCategories);
+
                 setCategories(formattedCategories);
 
             } catch (err) {
