@@ -62,7 +62,7 @@ export const EntryForm = () => {
     }
 
     return (
-        <Box maxW="600px" mx="auto" p={4}>
+        <Box maxW="600px" mx="auto">
             <VStack gap={6} align="stretch">
                 <ConstructionDate value={date} onChange={setDate} />
                 <ConstructionProcess value={selectedProcesses} onChange={setSelectedProcesses} />

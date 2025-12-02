@@ -63,6 +63,7 @@ export const useConstructionMaster = () => {
                     });
                 });
 
+                console.log("Formatted Master Data:", formattedCategories);
                 setCategories(formattedCategories);
 
             } catch (err) {
