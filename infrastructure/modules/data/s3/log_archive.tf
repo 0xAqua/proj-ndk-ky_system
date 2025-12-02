@@ -13,6 +13,7 @@ resource "aws_s3_bucket" "log_archive" {
     Module      = "data-s3"
   }
 
+  # 開発中はOK、本番ではfalse推奨 Todo
   force_destroy = true
 }
 
@@ -75,4 +76,29 @@ resource "aws_s3_bucket_policy" "allow_cloudtrail" {
       }
     ]
   })
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "log_archive" {
+  bucket = aws_s3_bucket.log_archive.id
+
+  rule {
+    id     = "archive-old-logs"
+    status = "Enabled"
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    expiration {
+      days = 365  # 1年後に削除（要件に応じて調整）
+    }
+  }
+}
+
+resource "aws_s3_bucket_logging" "log_archive" {
+  bucket = aws_s3_bucket.log_archive.id
+
+  target_bucket = aws_s3_bucket.log_archive.id  # 自己参照 or 別バケット
+  target_prefix = "access-logs/"
 }

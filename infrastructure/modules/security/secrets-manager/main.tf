@@ -16,7 +16,7 @@ variable "example_tenant_id" {
 resource "aws_secretsmanager_secret" "vq_key_prefix" {
   name        = "${var.name_prefix}/vq-key/"
   description = "Base prefix for tenant-specific VQ API Keys."
-  recovery_window_in_days = 0
+  recovery_window_in_days = 7
 }
 
 # ─────────────────────────────
