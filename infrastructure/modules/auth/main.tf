@@ -42,11 +42,11 @@ resource "aws_cognito_user_pool" "this" {
   # }
 
   password_policy {
-    minimum_length    = 8
+    minimum_length    = 12
     require_lowercase = true
     require_numbers   = true
-    require_symbols   = false
-    require_uppercase = false
+    require_symbols   = true
+    require_uppercase = true
   }
 
   # tenant_id カスタム属性
@@ -104,6 +104,16 @@ resource "aws_cognito_user_pool_client" "web" {
 
   # ユーザー存在エラーの隠蔽（セキュリティ対策）
   prevent_user_existence_errors = "ENABLED"
+
+  access_token_validity  = 60      # 分（推奨: 15-60分）
+  id_token_validity      = 60      # 分
+  refresh_token_validity = 30      # 日（推奨: 7-30日）
+
+  token_validity_units {
+    access_token  = "minutes"
+    id_token      = "minutes"
+    refresh_token = "days"
+  }
 
   # ★重要: テナントID書き換え防止設定
   # ユーザー（ブラウザ）からは書き込み不可にする

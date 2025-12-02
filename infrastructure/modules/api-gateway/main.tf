@@ -8,6 +8,8 @@ resource "aws_apigatewayv2_api" "this" {
     allow_origins = ["*"] # 本番時は "https://example.com" 等に制限推奨
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     allow_headers = ["Content-Type", "Authorization"]
+    # allow_credentials = true  # 追加推奨
+    # max_age           = 300   # プリフライトキャッシュ
   }
 }
 
@@ -23,8 +25,29 @@ resource "aws_apigatewayv2_stage" "default" {
     # レート(秒間平均): 20リクエスト/秒
     throttling_rate_limit  = 20
   }
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_access_log.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      routeKey       = "$context.routeKey"
+      status         = "$context.status"
+      responseLength = "$context.responseLength"
+      errorMessage   = "$context.error.message"
+      # マルチテナント用：認証情報
+      sub            = "$context.authorizer.claims.sub"
+      tenantId       = "$context.authorizer.claims.custom:tenant_id"
+    })
+  }
 }
 
+resource "aws_cloudwatch_log_group" "api_access_log" {
+  name              = "/aws/apigateway/${var.name_prefix}-api"
+  retention_in_days = 30
+}
 # 3. 共通 Authorizer (Cognito JWT)
 resource "aws_apigatewayv2_authorizer" "jwt" {
   api_id           = aws_apigatewayv2_api.this.id
