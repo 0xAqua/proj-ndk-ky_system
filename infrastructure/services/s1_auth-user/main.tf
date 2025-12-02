@@ -102,9 +102,12 @@ resource "aws_lambda_function" "this" {
   architectures = ["arm64"]
   timeout       = 10
   memory_size   = 256
+  reserved_concurrent_executions = 100  # 最大同時実行数を制限
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
+  kms_key_arn = var.lambda_kms_key_arn
 
   environment {
     variables = {
@@ -160,4 +163,19 @@ resource "aws_lambda_permission" "apigw" {
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/aws/lambda/${var.name_prefix}"
   retention_in_days = 30
+}
+
+# KMS 復号権限
+data "aws_iam_policy_document" "kms_decrypt" {
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = [var.lambda_kms_key_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "kms_decrypt" {
+  name   = "kms-decrypt-access"
+  role   = aws_iam_role.this.id
+  policy = data.aws_iam_policy_document.kms_decrypt.json
 }

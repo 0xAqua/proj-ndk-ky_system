@@ -46,3 +46,8 @@ variable "authorizer_id" {
   description = "ID of the Cognito JWT Authorizer"
   type        = string
 }
+
+variable "lambda_kms_key_arn" {
+  description = "KMS key ARN for Lambda environment encryption"
+  type        = string
+}

@@ -71,6 +71,10 @@ module "s1_auth_user" {
   authorizer_id             = module.api_gateway.authorizer_id
   user_pool_client_id       = module.auth.user_pool_client_id
   user_pool_id              = module.auth.user_pool_id
+
+  # KMS
+  lambda_kms_key_arn = module.kms.lambda_key_arn
+
 }
 
 # ─────────────────────────────
@@ -89,6 +93,9 @@ module "s2_tenant_context" {
   api_gateway_id            = module.api_gateway.api_id
   api_gateway_execution_arn = module.api_gateway.api_execution_arn
   authorizer_id             = module.api_gateway.authorizer_id
+
+  # KMS
+  lambda_kms_key_arn = module.kms.lambda_key_arn
 }
 
 # ─────────────────────────────
@@ -189,6 +196,9 @@ module "s3_vq_workflow" {
 
   # ★追加: シークレット情報を渡す
   vq_secret_arn = module.secrets.secret_arn_prefix
+
+  # KMS
+  lambda_kms_key_arn = module.kms.lambda_key_arn
 }
 
 # ─────────────────────────────
@@ -213,6 +223,10 @@ module "s4_log_archiver" {
   ]
 
   target_log_group_arns = [] # 空でOK
+
+  # KMS
+  lambda_kms_key_arn = module.kms.lambda_key_arn
+
 }
 
 module "s3_log_archive" {
@@ -253,4 +267,13 @@ output "auth_user_pool_id" {
 output "auth_user_pool_client_id" {
   value       = module.auth.user_pool_client_id
   description = "Cognito User Pool Client ID for dev"
+}
+
+
+# ─────────────────────────────
+# KMS (Lambda環境変数暗号化)
+# ─────────────────────────────
+module "kms" {
+  source      = "../../modules/security/kms"
+  name_prefix = "${local.project}-${local.environment}"
 }

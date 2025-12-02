@@ -277,3 +277,27 @@ resource "aws_cloudwatch_log_group" "worker_log" {
   name              = "/aws/lambda/${aws_lambda_function.worker.function_name}"
   retention_in_days = 30
 }
+
+
+# KMS 復号権限（ポリシードキュメント）
+data "aws_iam_policy_document" "kms_decrypt" {
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = [var.lambda_kms_key_arn]
+  }
+}
+
+# KMS 復号権限
+resource "aws_iam_role_policy" "kms_decrypt_producer" {
+  name   = "kms-decrypt-access-producer"
+  role   = aws_iam_role.producer_role.id
+  policy = data.aws_iam_policy_document.kms_decrypt.json
+}
+
+# KMS 復号権限（Worker）※workerがあれば
+resource "aws_iam_role_policy" "kms_decrypt_worker" {
+  name   = "kms-decrypt-access-worker"
+  role   = aws_iam_role.worker_role.id
+  policy = data.aws_iam_policy_document.kms_decrypt.json
+}

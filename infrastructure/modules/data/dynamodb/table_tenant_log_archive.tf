@@ -27,7 +27,13 @@ resource "aws_dynamodb_table" "tenant_log_archive" {
     enabled = true
   }
 
+  point_in_time_recovery {
+    enabled = true
+  }
+
   tags = {
+    Project     = var.project
+    Environment = var.environment
     Module = "data-dynamodb"
     Table  = "tenant_log_archive"
   }

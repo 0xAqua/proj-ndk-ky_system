@@ -21,3 +21,8 @@ variable "target_log_group_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "lambda_kms_key_arn" {
+  description = "KMS key ARN for Lambda environment encryption"
+  type        = string
+}

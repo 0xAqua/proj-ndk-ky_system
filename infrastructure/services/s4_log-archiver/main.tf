@@ -106,6 +106,7 @@ resource "aws_lambda_function" "this" {
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
+  kms_key_arn = var.lambda_kms_key_arn
   environment {
     variables = {
       LOG_ARCHIVE_TABLE = var.log_archive_table_name
@@ -137,4 +138,19 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   function_name = aws_lambda_function.this.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.daily_schedule.arn
+}
+
+# KMS 復号権限
+data "aws_iam_policy_document" "kms_decrypt" {
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = [var.lambda_kms_key_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "kms_decrypt" {
+  name   = "kms-decrypt-access"
+  role   = aws_iam_role.archiver_role.id
+  policy = data.aws_iam_policy_document.kms_decrypt.json
 }

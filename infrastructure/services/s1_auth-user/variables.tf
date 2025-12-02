@@ -30,3 +30,8 @@ variable "api_gateway_id" {
 }
 variable "api_gateway_execution_arn" { type = string }
 variable "authorizer_id" { type = string }
+
+variable "lambda_kms_key_arn" {
+  description = "KMS key ARN for Lambda environment encryption"
+  type        = string
+}

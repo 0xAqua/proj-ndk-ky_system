@@ -104,6 +104,9 @@ resource "aws_lambda_function" "this" {
   timeout       = 10
   memory_size   = 256
 
+  kms_key_arn = var.lambda_kms_key_arn
+
+
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
@@ -161,4 +164,19 @@ resource "aws_lambda_permission" "apigw" {
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/aws/lambda/${var.name_prefix}"
   retention_in_days = 30
+}
+
+# KMS 復号権限
+data "aws_iam_policy_document" "kms_decrypt" {
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = [var.lambda_kms_key_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "kms_decrypt" {
+  name   = "kms-decrypt-access"
+  role   = aws_iam_role.this.id
+  policy = data.aws_iam_policy_document.kms_decrypt.json
 }
