@@ -30,6 +30,13 @@ module "auth" {
 
   callback_urls = ["http://localhost:3000/callback"]
   logout_urls   = ["http://localhost:3000"]
+
+  # Email OTP トリガー（Step 2で有効化）
+  # 最初の apply ではコメントアウト
+  # define_auth_lambda_arn = module.auth_challenge.define_auth_lambda_arn
+  # create_auth_lambda_arn = module.auth_challenge.create_challenge_lambda_arn
+  # verify_auth_lambda_arn = module.auth_challenge.verify_challenge_lambda_arn
+
 }
 
 # ─────────────────────────────
@@ -276,4 +283,28 @@ output "auth_user_pool_client_id" {
 module "kms" {
   source      = "../../modules/security/kms"
   name_prefix = "${local.project}-${local.environment}"
+}
+
+# ─────────────────────────────
+# Auth Challenge (Email OTP)
+# ─────────────────────────────
+module "auth_challenge" {
+  source      = "../../services/s0_auth-challenge"
+  name_prefix = "${local.project}-${local.environment}-auth"
+
+  user_pool_arn       = module.auth.user_pool_arn
+  otp_table_name      = module.dynamodb.otp_codes_table_name
+  otp_table_arn       = module.dynamodb.otp_codes_table_arn
+  sender_email        = module.ses.sender_email
+  ses_send_policy_arn = module.ses.ses_send_policy_arn
+  lambda_kms_key_arn  = module.kms.lambda_key_arn
+}
+
+# ─────────────────────────────
+# SES (Email OTP用)
+# ─────────────────────────────
+module "ses" {
+  source       = "../../modules/security/ses"
+  name_prefix  = "${local.project}-${local.environment}"
+  sender_email = "noreply@example.com"  # ← 実際のメールアドレスに変更
 }

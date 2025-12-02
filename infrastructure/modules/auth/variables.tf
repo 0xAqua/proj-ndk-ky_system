@@ -50,3 +50,24 @@ variable "logout_urls" {
     "http://localhost:3000"
   ]
 }
+
+# ─────────────────────────────
+# Email OTP カスタム認証 Lambda ARNs
+# ─────────────────────────────
+variable "define_auth_lambda_arn" {
+  description = "Define Auth Challenge Lambda ARN"
+  type        = string
+  default     = null
+}
+
+variable "create_auth_lambda_arn" {
+  description = "Create Auth Challenge Lambda ARN"
+  type        = string
+  default     = null
+}
+
+variable "verify_auth_lambda_arn" {
+  description = "Verify Auth Challenge Lambda ARN"
+  type        = string
+  default     = null
+}
