@@ -1,4 +1,4 @@
-import { VStack, Text, Input, Button, Image, Link, Field, Center, Spinner, Box } from "@chakra-ui/react";
+import { VStack, Text, Input, Button, Image, Link, Field, Center, Spinner, PinInput, HStack } from "@chakra-ui/react";
 import logo from '@/assets/logo.png';
 import { useLoginForm } from "../hooks/useLoginForm";
 
@@ -94,23 +94,32 @@ export const LoginForm = () => {
             {step === 'INPUT_OTP' && (
                 <form onSubmit={handleVerifyOtp} style={{ width: '100%' }}>
                     <VStack gap={4} width="100%">
-                        <Box w="full">
-                            <Text fontSize="xs" color="gray.500" mb={2}>
+                        <VStack w="full">
+                            <Text fontSize="xs" color="gray.500" mb={2} textAlign="center">
                                 {username} 宛に認証コードを送信しました
                             </Text>
-                            <Field.Root w="full">
-                                <Input
-                                    name="one-time-code"
-                                    autoComplete="one-time-code"
-                                    placeholder="000000"
-                                    textAlign="center"
-                                    letterSpacing="0.5em"
-                                    fontSize="lg"
-                                    value={otp}
-                                    onChange={(e) => setOtp(e.target.value)}
-                                />
+                            <Field.Root>
+                                <Center w={"full"}>
+                                    <PinInput.Root
+                                        otp
+                                        type="alphanumeric"
+                                        value={otp.split('')}
+                                        onValueChange={(e) => setOtp(e.valueAsString)}
+                                        size="lg"
+                                    >
+                                        <PinInput.HiddenInput />
+                                        <PinInput.Control>
+                                            {/* 6桁分の枠を表示 */}
+                                            <HStack gap={2}>
+                                                {[0, 1, 2, 3, 4, 5].map((id, index) => (
+                                                    <PinInput.Input key={id} index={index} />
+                                                ))}
+                                            </HStack>
+                                        </PinInput.Control>
+                                    </PinInput.Root>
+                                </Center>
                             </Field.Root>
-                        </Box>
+                        </VStack>
 
                         <Button
                             type="submit"
@@ -122,7 +131,6 @@ export const LoginForm = () => {
                             ログイン
                         </Button>
 
-                        {/* 戻るボタン（簡易リロード） */}
                         <Button
                             variant="ghost"
                             size="sm"
