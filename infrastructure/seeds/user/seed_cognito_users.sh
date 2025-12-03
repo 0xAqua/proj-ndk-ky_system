@@ -17,9 +17,20 @@ if [ ! -f "$SEED_FILE" ]; then
     exit 1
 fi
 
+# 既存ユーザー一覧を取得
+echo "Fetching existing users..."
+EXISTING_USERS=$(aws cognito-idp list-users \
+    --user-pool-id "$USER_POOL_ID" \
+    --profile "$PROFILE" \
+    --query 'Users[].Username' \
+    --output text | tr '\t' '\n')
+
 # ユーザー数を取得
 USER_COUNT=$(jq length "$SEED_FILE")
-echo "Creating $USER_COUNT users..."
+echo "Processing $USER_COUNT users from seed file..."
+
+CREATED=0
+SKIPPED=0
 
 # 各ユーザーを作成
 for i in $(seq 0 $((USER_COUNT - 1))); do
@@ -30,9 +41,16 @@ for i in $(seq 0 $((USER_COUNT - 1))); do
     FAMILY_NAME=$(jq -r ".[$i].attributes.family_name" "$SEED_FILE")
     TENANT_ID=$(jq -r ".[$i].attributes[\"custom:tenant_id\"]" "$SEED_FILE")
 
+    # 既存ユーザーかチェック
+    if echo "$EXISTING_USERS" | grep -q "^${USERNAME}$"; then
+        echo "⏭ Skipped (exists): $USERNAME"
+        ((SKIPPED++))
+        continue
+    fi
+
     echo "Creating user: $USERNAME"
 
-    # ユーザー作成（temporary-password付き）
+    # ユーザー作成
     aws cognito-idp admin-create-user \
         --user-pool-id "$USER_POOL_ID" \
         --username "$USERNAME" \
@@ -47,7 +65,7 @@ for i in $(seq 0 $((USER_COUNT - 1))); do
         --profile "$PROFILE"
 
     if [ $? -eq 0 ]; then
-        # パスワードを永続的に設定（FORCE_CHANGE_PASSWORD状態を解除）
+        # パスワードを永続的に設定
         aws cognito-idp admin-set-user-password \
             --user-pool-id "$USER_POOL_ID" \
             --username "$USERNAME" \
@@ -56,9 +74,11 @@ for i in $(seq 0 $((USER_COUNT - 1))); do
             --profile "$PROFILE"
 
         echo "✓ Created: $USERNAME"
+        ((CREATED++))
     else
         echo "✗ Failed: $USERNAME"
     fi
 done
 
-echo "Done!"
+echo ""
+echo "Done! Created: $CREATED, Skipped: $SKIPPED"
