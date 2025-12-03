@@ -69,7 +69,7 @@ def create_job(event):
         return {"statusCode": 400, "body": json.dumps({"message": "prompt is required"})}
 
     # テナントID取得
-    claims = event.request_context.authorizer.jwt.claims
+    claims = event.request_context.authorizer.jwt_claim
     tenant_id = claims.get("custom:tenant_id") or claims.get("tenant_id")
 
     job_id = str(uuid.uuid4())
