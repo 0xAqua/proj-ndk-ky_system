@@ -8,7 +8,7 @@ BUILD_DIR="$APP_DIR/dist"
 
 # 設定
 S3_BUCKET="ndk-ky-system-dev-frontend"
-CLOUDFRONT_DISTRIBUTION_ID="E3VUPOR7AKL1KY"
+CLOUDFRONT_DISTRIBUTION_ID="E2RLJ8GKQ0AK1V"
 PROFILE="proj-ndk-ky"
 
 # appディレクトリに移動してビルド
@@ -45,4 +45,4 @@ if [ "$CLOUDFRONT_DISTRIBUTION_ID" != "YOUR_DISTRIBUTION_ID" ]; then
 fi
 
 echo ""
-echo "Done! Site: https://d2eohnqgqqn6s6.cloudfront.net"
+echo "Done! Site: https://d35yoc6m1omzc3.cloudfront.net"
