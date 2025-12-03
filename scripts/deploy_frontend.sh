@@ -11,8 +11,8 @@ BUILD_DIR="$APP_DIR/dist"
 # AWS CLI profile
 PROFILE="proj-ndk-ky"
 
-# Terraform ディレクトリ（★ここを修正）
-TF_DIR="$PROJECT_ROOT/dev"
+# Terraform ディレクトリ
+TF_DIR="$PROJECT_ROOT/infrastructure/environments/dev"
 
 echo "=== Loading Terraform outputs ==="
 
