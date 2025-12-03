@@ -1,14 +1,10 @@
-// src/features/entry/components/ConstructionProcess.tsx
-
-import { Checkbox, Flex, Text, Box, VStack, Accordion, Alert, Spinner, Center } from "@chakra-ui/react";
+import { Checkbox, Flex, Text, Box, VStack, Accordion } from "@chakra-ui/react";
 import { ContentBox } from "@/features/entry/components/layout/ContentBox";
 import { MdBuild, MdChevronRight } from "react-icons/md";
-import { useConstructionMaster } from "@/features/entry/hooks/useConstructionMaster";
-import { useUserStore } from "@/stores/useUserStore";
 import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
 
 type Props = {
-    // 親から受け取るマスタデータ
+    // 親から受け取るマスタデータ (EntryFormから渡される constructions)
     masterCategories: ProcessCategory[];
     // 表示対象の種別IDリスト (ConstructionWorkUiで選ばれたもの)
     targetTypeIds: string[];
@@ -17,16 +13,17 @@ type Props = {
     onChange: (value: string[]) => void;
 };
 
-export const ConstructionProcess = ({ value = [], onChange }: Props) => {
-    // Hooksから「整形済みのデータ」と「状態」を取得
-    const { categories, isLoading, error } = useConstructionMaster();
-    // エラー表示のため、Storeから部署名を取得
-    const { departments } = useUserStore();
+// ★修正: フック呼び出しを削除し、Propsで受け取る形に変更
+export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [], onChange }: Props) => {
+
+    // ★重要: 受け取ったマスタデータの中から、選択された種別ID(targetTypeIds)に一致するものだけを抽出
+    const visibleCategories = masterCategories.filter(cat =>
+        targetTypeIds.includes(cat.id)
+    );
 
     // ──────────────────────────────────────────
-    // チェックボックス制御ロジック (UI操作)
+    // チェックボックス制御ロジック
     // ──────────────────────────────────────────
-
     const toggleProcess = (id: string) => {
         const nextValue = value.includes(id)
             ? value.filter((pid) => pid !== id)
@@ -53,38 +50,9 @@ export const ConstructionProcess = ({ value = [], onChange }: Props) => {
         onChange(nextValue);
     };
 
-    // ──────────────────────────────────────────
-    // レンダリング (UI)
-    // ──────────────────────────────────────────
-
-    if (isLoading) {
-        return (
-            <Box bg="white" w="full" borderRadius="lg" p={4}>
-                <ContentBox>
-                    <Center py={8}>
-                        <Spinner size="lg" color="blue.500" />
-                        <Text mt={4} fontSize="sm" color="gray.500">マスタデータを読み込んでいます...</Text>
-                    </Center>
-                </ContentBox>
-            </Box>
-        );
-    }
-
-    if (error) {
-        return <Text color="red.500">エラー: {error}</Text>;
-    }
-
-    // categories は Hooks が整形してくれた最終データ
-    if (categories.length === 0) {
-        return (
-            <Alert.Root status="warning" borderRadius="md">
-                <Alert.Indicator />
-                <Text fontSize="sm">
-                    選択可能な工事工程がありません。<br/>
-                    (所属部署: {departments.map(d => d.name).join(", ")})
-                </Text>
-            </Alert.Root>
-        );
+    // 表示すべきデータがない場合は何もレンダリングしない
+    if (visibleCategories.length === 0) {
+        return null;
     }
 
     return (
@@ -102,7 +70,7 @@ export const ConstructionProcess = ({ value = [], onChange }: Props) => {
                     </Text>
 
                     <Accordion.Root multiple w="full">
-                        {categories.map((category) => (
+                        {visibleCategories.map((category) => (
                             <Accordion.Item key={category.id} value={category.id}>
                                 <Accordion.ItemTrigger>
                                     <Flex justify="space-between" align="center" w="full">

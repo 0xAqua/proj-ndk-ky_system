@@ -7,10 +7,12 @@ import ConstructionDate from "@/features/entry/components/elements/ConstructionD
 // Hooks
 import { useConstructionMaster } from "@/features/entry/hooks/useConstructionMaster";
 
-// Components (パスはご提示いただいたものに合わせています)
+// Components
+// ※ファイル名はご自身の環境に合わせてください (ConstructionWorkUi -> ConstructionProject の場合あり)
 import { ConstructionProject } from "@/features/entry/components/elements/ConstructionProject";
 import { ConstructionProcess } from "@/features/entry/components/elements/ConstructionProcess";
 import { ImportantEquipment } from "@/features/entry/components/elements/ImportantEquipment";
+import { SiteCondition } from "@/features/entry/components/elements/SiteCondition"; // ★追加: 現場状況
 
 export const EntryForm = () => {
     const {
@@ -20,11 +22,13 @@ export const EntryForm = () => {
         setLoading
     } = useUserStore();
 
-    const { categories, isLoading: isMasterLoading, error } = useConstructionMaster();
+    // ★修正ポイント: categories ではなく constructions と environments を受け取る
+    const { constructions, environments, isLoading: isMasterLoading, error } = useConstructionMaster();
 
     const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
     const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]);
     const [selectedProcessIds, setSelectedProcessIds] = useState<string[]>([]);
+    const [selectedEnvIds, setSelectedEnvIds] = useState<string[]>([]); // ★追加: 現場状況用
 
     useEffect(() => {
         if (tenantId) return;
@@ -50,7 +54,8 @@ export const EntryForm = () => {
         const payload = {
             date,
             constructionTypes: selectedTypeIds,
-            processes: selectedProcessIds
+            processes: selectedProcessIds,
+            environments: selectedEnvIds // ★追加
         };
         console.log("送信データ:", payload);
     };
@@ -75,34 +80,38 @@ export const EntryForm = () => {
                 {/* 1. 日付選択 */}
                 <ConstructionDate value={date} onChange={setDate} />
 
-                {/* 2. 工事種別選択 (ConstructionProject) */}
+                {/* 2. 工事種別選択 */}
                 <ConstructionProject
-                    masterCategories={categories}
+                    masterCategories={constructions} // ★修正: constructions を渡す
                     selectedTypeIds={selectedTypeIds}
-                    onChange={(ids) => {
-                        setSelectedTypeIds(ids);
-                    }}
+                    onChange={setSelectedTypeIds}
                 />
 
-                {/* ★変更点: 工事種別が選択されていれば、以下の2つを両方表示する */}
+                {/* 工事種別が選択されていれば表示 */}
                 {selectedTypeIds.length > 0 && (
                     <>
                         {/* 3. 工事工程選択 */}
                         <ConstructionProcess
-                            masterCategories={categories}
+                            masterCategories={constructions} // ★修正: constructions を渡す
                             targetTypeIds={selectedTypeIds}
                             value={selectedProcessIds}
                             onChange={setSelectedProcessIds}
                         />
 
                         {/* 4. 注意が必要な機材 */}
-                        {/* 工程が未選択でも枠を表示させるため条件を削除 */}
                         <ImportantEquipment
-                            masterCategories={categories}
+                            masterCategories={constructions} // ★修正: constructions を渡す
                             selectedProcessIds={selectedProcessIds}
                         />
                     </>
                 )}
+
+                {/* 5. 現場状況・環境 (ここに追加) */}
+                <SiteCondition
+                    masterEnvironments={environments} // ★環境データを渡す
+                    value={selectedEnvIds}
+                    onChange={setSelectedEnvIds}
+                />
 
                 <Button colorScheme="blue" onClick={handleSubmit} mt={4} size="lg">
                     登録内容を確認
