@@ -260,6 +260,17 @@ resource "aws_apigatewayv2_route" "post_job" {
   authorizer_id      = var.authorizer_id
 }
 
+# Route定義: GET /jobs/{jobId}
+resource "aws_apigatewayv2_route" "get_job" {
+  api_id    = var.api_gateway_id
+  route_key = "GET /jobs/{jobId}"
+  target    = "integrations/${aws_apigatewayv2_integration.producer.id}"
+
+  authorization_type = "JWT"
+  authorizer_id      = var.authorizer_id
+}
+
+
 # AGWからProducer起動権限
 resource "aws_lambda_permission" "apigw_producer" {
   statement_id  = "AllowExecutionFromAPIGatewayProducer"
