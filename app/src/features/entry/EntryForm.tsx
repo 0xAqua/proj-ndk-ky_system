@@ -4,14 +4,15 @@ import { useUserStore } from "@/stores/useUserStore";
 import { api } from "@/lib/api";
 import ConstructionDate from "@/features/entry/components/elements/ConstructionDate";
 
-
+// Hooks
 import { useConstructionMaster } from "@/features/entry/hooks/useConstructionMaster";
+
+// Components (パスはご提示いただいたものに合わせています)
 import { ConstructionProject } from "@/features/entry/components/elements/ConstructionProject";
 import { ConstructionProcess } from "@/features/entry/components/elements/ConstructionProcess";
+import { ImportantEquipment } from "@/features/entry/components/elements/ImportantEquipment";
 
 export const EntryForm = () => {
-    // ユーザー情報ストア
-    // isLoadingの名前が被るので isUserLoading にリネーム
     const {
         tenantId,
         setUserData,
@@ -19,14 +20,11 @@ export const EntryForm = () => {
         setLoading
     } = useUserStore();
 
-    // ★追加: 工事マスタ取得フック
-    // isLoadingの名前が被るので isMasterLoading にリネーム
     const { categories, isLoading: isMasterLoading, error } = useConstructionMaster();
 
-    // 状態管理
     const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-    const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]); // ★追加: 工事種別ID
-    const [selectedProcessIds, setSelectedProcessIds] = useState<string[]>([]); // 名称変更: selectedProcesses -> selectedProcessIds
+    const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]);
+    const [selectedProcessIds, setSelectedProcessIds] = useState<string[]>([]);
 
     useEffect(() => {
         if (tenantId) return;
@@ -34,10 +32,8 @@ export const EntryForm = () => {
         const initData = async () => {
             setLoading(true);
             try {
-                // ユーザー情報のみ取得 (マスタはHooks側で勝手に取るのでここから削除してOK)
                 const userRes = await api.get('/me');
                 if (userRes.data) {
-                    console.log("User Data Loaded");
                     setUserData(userRes.data);
                 }
             } catch (error) {
@@ -51,14 +47,14 @@ export const EntryForm = () => {
     }, []);
 
     const handleSubmit = () => {
-        console.log("送信データ:", {
+        const payload = {
             date,
-            constructionTypes: selectedTypeIds, // 工事種別
-            processes: selectedProcessIds       // 工事工程
-        });
+            constructionTypes: selectedTypeIds,
+            processes: selectedProcessIds
+        };
+        console.log("送信データ:", payload);
     };
 
-    // ユーザー情報またはマスタデータをロード中ならスピナーを表示
     if (isUserLoading || isMasterLoading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" h="100vh">
@@ -68,44 +64,47 @@ export const EntryForm = () => {
         );
     }
 
-    // マスタ取得エラー時の表示
     if (error) {
-        return (
-            <Box maxW="600px" mx="auto" mt={10} color="red.500">
-                <Text>エラーが発生しました: {error}</Text>
-            </Box>
-        );
+        return <Box color="red.500" p={10}>エラー: {error}</Box>;
     }
 
     return (
-        <Box maxW="600px" mx="auto">
+        <Box maxW="600px" mx="auto" pb={10}>
             <VStack gap={6} align="stretch">
-                {/* 日付選択 */}
+
+                {/* 1. 日付選択 */}
                 <ConstructionDate value={date} onChange={setDate} />
 
-                {/* ★追加: 工事種別選択 */}
+                {/* 2. 工事種別選択 (ConstructionProject) */}
                 <ConstructionProject
                     masterCategories={categories}
                     selectedTypeIds={selectedTypeIds}
                     onChange={(ids) => {
                         setSelectedTypeIds(ids);
-                        // 必要であれば、種別が解除されたときに
-                        // 紐づく工程ID (selectedProcessIds) を削除する処理をここに追加できます
                     }}
                 />
 
-                {/* ★変更: 工事工程選択 */}
-                {/* 工事種別が選択されている場合のみ表示 */}
+                {/* ★変更点: 工事種別が選択されていれば、以下の2つを両方表示する */}
                 {selectedTypeIds.length > 0 && (
-                    <ConstructionProcess
-                        masterCategories={categories}     // マスタデータ
-                        targetTypeIds={selectedTypeIds}   // フィルタリング用ID
-                        value={selectedProcessIds}        // 選択値
-                        onChange={setSelectedProcessIds}  // 更新関数
-                    />
+                    <>
+                        {/* 3. 工事工程選択 */}
+                        <ConstructionProcess
+                            masterCategories={categories}
+                            targetTypeIds={selectedTypeIds}
+                            value={selectedProcessIds}
+                            onChange={setSelectedProcessIds}
+                        />
+
+                        {/* 4. 注意が必要な機材 */}
+                        {/* 工程が未選択でも枠を表示させるため条件を削除 */}
+                        <ImportantEquipment
+                            masterCategories={categories}
+                            selectedProcessIds={selectedProcessIds}
+                        />
+                    </>
                 )}
 
-                <Button colorScheme="blue" onClick={handleSubmit} mt={4}>
+                <Button colorScheme="blue" onClick={handleSubmit} mt={4} size="lg">
                     登録内容を確認
                 </Button>
             </VStack>
