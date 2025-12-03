@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { Box, Spinner, VStack, Button, Text } from "@chakra-ui/react";
-import { useUserStore } from "@/stores/useUserStore";
-import { api } from "@/lib/api";
-import ConstructionDate from "@/features/entry/components/elements/ConstructionDate";
-import { ConstructionProcess } from "@/features/entry/components/elements/ConstructionProcess";
+import { useUserStore } from "@/stores/useUserStore.ts";
+import { api } from "@/lib/api.ts";
+import ConstructionDate from "@/features/entry/components/elements/ConstructionDate.tsx";
+import { ConstructionProcess } from "@/features/entry/components/elements/ConstructionProcess.tsx";
 
 export const EntryForm = () => {
     const {
