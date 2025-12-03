@@ -32,10 +32,9 @@ module "auth" {
   logout_urls   = ["http://localhost:3000"]
 
   # Email OTP トリガー（Step 2で有効化）
-  # 最初の apply ではコメントアウト
-  # define_auth_lambda_arn = module.auth_challenge.define_auth_lambda_arn
-  # create_auth_lambda_arn = module.auth_challenge.create_challenge_lambda_arn
-  # verify_auth_lambda_arn = module.auth_challenge.verify_challenge_lambda_arn
+  define_auth_lambda_arn = module.auth_challenge.define_auth_lambda_arn
+  create_auth_lambda_arn = module.auth_challenge.create_challenge_lambda_arn
+  verify_auth_lambda_arn = module.auth_challenge.verify_challenge_lambda_arn
 
 }
 
@@ -306,5 +305,5 @@ module "auth_challenge" {
 module "ses" {
   source       = "../../modules/security/ses"
   name_prefix  = "${local.project}-${local.environment}"
-  sender_email = "noreply@example.com"  # ← 実際のメールアドレスに変更
+  sender_email = "tsuji.kodai@ndisol.com"  # Todo: どれにするか
 }
