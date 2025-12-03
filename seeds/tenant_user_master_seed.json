@@ -1,60 +1,55 @@
-{
-  "ndk-ky-system-dev-tenant-user-master": [
-    {
-      "PutRequest": {
-        "Item": {
-          "tenant_id":   { "S": "tenant-a" },
-          "user_id":     { "S": "37e4da48-c021-70f0-51c1-36b62732214c" },
-          "tenant_name": { "S": "テナントA株式会社" },
-          "domain":      { "S": "tenant-a.example.com" },
-          "departments": {
-            "M": {
-              "DEPT#1": { "S": "共通" },
-              "DEPT#3": { "S": "ネットワーク" }
-            }
-          },
-          "status":     { "S": "ACTIVE" },
-          "created_at": { "S": "2025-12-01T00:00:00Z" },
-          "updated_at": { "S": "2025-12-01T00:00:00Z" }
-        }
-      }
+[
+  {
+    "tenant_id": "tenant-a",
+    "user_id": "a7847a38-9051-70e1-6e58-ae4b4eebb2b5",
+    "tenant_name": "テナントA株式会社",
+    "domain": "tenant-a.example.com",
+    "departments": {
+      "COMMON": "共通",
+      "ACCESS": "アクセス"
     },
-    {
-      "PutRequest": {
-        "Item": {
-          "tenant_id":   { "S": "tenant-b" },
-          "user_id":     { "S": "b7742ad8-c051-701a-b559-99e0d5f4491d" },
-          "tenant_name": { "S": "テナントBホールディングス" },
-          "domain":      { "S": "tenant-b.example.com" },
-          "departments": {
-            "M": {
-              "DEPT#1": { "S": "共通" },
-              "DEPT#2": { "S": "アクセス" }
-            }
-          },
-          "status":     { "S": "ACTIVE" },
-          "created_at": { "S": "2025-12-01T00:00:00Z" },
-          "updated_at": { "S": "2025-12-01T00:00:00Z" }
-        }
-      }
+    "status": "ACTIVE",
+    "created_at": "2025-12-03T00:00:00Z",
+    "updated_at": "2025-12-03T00:00:00Z"
+  },
+  {
+    "tenant_id": "tenant-a",
+    "user_id": "a7c40a18-a0d1-7063-df5c-8faf77dc1383",
+    "tenant_name": "テナントA株式会社",
+    "domain": "tenant-a.example.com",
+    "departments": {
+      "COMMON": "共通",
+      "NETWORK": "ネットワーク",
+      "MOBILE": "モバイル"
     },
-    {
-      "PutRequest": {
-        "Item": {
-          "tenant_id":   { "S": "tenant-a" },
-          "user_id":     { "S": "27a49a68-3001-706c-56bc-eb8b273b7198" },
-          "tenant_name": { "S": "テナントA株式会社" },
-          "domain":      { "S": "tenant-a.example.com" },
-          "departments": {
-            "M": {
-              "DEPT#1": { "S": "共通" }
-            }
-          },
-          "status":     { "S": "ACTIVE" },
-          "created_at": { "S": "2025-12-01T00:00:00Z" },
-          "updated_at": { "S": "2025-12-01T00:00:00Z" }
-        }
-      }
-    }
-  ]
-}
+    "status": "ACTIVE",
+    "created_at": "2025-12-03T00:00:00Z",
+    "updated_at": "2025-12-03T00:00:00Z"
+  },
+  {
+    "tenant_id": "tenant-a",
+    "user_id": "b7d40ac8-2071-70e9-d105-914efd5f486a",
+    "tenant_name": "テナントA株式会社",
+    "domain": "tenant-a.example.com",
+    "departments": {
+      "COMMON": "共通",
+      "CIVIL": "土木"
+    },
+    "status": "ACTIVE",
+    "created_at": "2025-12-03T00:00:00Z",
+    "updated_at": "2025-12-03T00:00:00Z"
+  },
+  {
+    "tenant_id": "tenant-a",
+    "user_id": "f7041ae8-c051-70bc-b3ff-0f03b84662c5",
+    "tenant_name": "テナントA株式会社",
+    "domain": "tenant-a.example.com",
+    "departments": {
+      "COMMON": "共通",
+      "MOBILE": "モバイル"
+    },
+    "status": "ACTIVE",
+    "created_at": "2025-12-03T00:00:00Z",
+    "updated_at": "2025-12-03T00:00:00Z"
+  }
+]
