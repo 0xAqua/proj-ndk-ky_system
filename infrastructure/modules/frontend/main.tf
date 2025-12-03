@@ -76,8 +76,7 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
     }
 
     content_security_policy {
-      # SPA + API 呼び出し用にそのうちちゃんと書き換えてもOK
-      content_security_policy = "default-src 'self';"
+      content_security_policy = "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://cognito-idp.ap-northeast-1.amazonaws.com https://ctv1qq7l56.execute-api.ap-northeast-1.amazonaws.com https://d1c3o812dlf2f9.cloudfront.net; img-src 'self' data: blob:;"
       override                = true
     }
   }
@@ -92,6 +91,8 @@ resource "aws_cloudfront_distribution" "this" {
   aliases = var.alias_domain != "" ? [var.alias_domain] : []
 
   web_acl_id = var.web_acl_arn != "" ? var.web_acl_arn : null
+
+  default_root_object = "index.html"
 
   origin {
     domain_name = aws_s3_bucket.this.bucket_regional_domain_name
@@ -112,6 +113,13 @@ resource "aws_cloudfront_distribution" "this" {
     cache_policy_id             = data.aws_cloudfront_cache_policy.caching_optimized.id
     response_headers_policy_id  = aws_cloudfront_response_headers_policy.security_headers.id
   }
+
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
 
   restrictions {
     geo_restriction {
