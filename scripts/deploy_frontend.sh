@@ -2,43 +2,44 @@
 
 set -e
 
-# スクリプトの場所基準でパス解決
+# === Terraform ディレクトリ設定 ===
+TF_DIR="/Users/tsuji/NDIS/Projects/NDK/proj-ndk-ky_system/infrastructure/environments/dev"
+
+# === プロジェクト構造から app/ を検出 ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="$PROJECT_ROOT/app"
 BUILD_DIR="$APP_DIR/dist"
 
-# AWS CLI profile
 PROFILE="proj-ndk-ky"
 
-# Terraform ディレクトリ
-TF_DIR="$PROJECT_ROOT/infrastructure/environments/dev"
-
 echo "=== Loading Terraform outputs ==="
-
-CLOUDFRONT_DISTRIBUTION_ID=$(terraform -chdir="$TF_DIR" output -raw frontend_cloudfront_distribution_id)
-CLOUDFRONT_DOMAIN=$(terraform -chdir="$TF_DIR" output -raw frontend_cloudfront_domain)
 S3_BUCKET=$(terraform -chdir="$TF_DIR" output -raw frontend_bucket_name)
+CF_DIST_ID=$(terraform -chdir="$TF_DIR" output -raw frontend_cloudfront_distribution_id)
+CF_DOMAIN=$(terraform -chdir="$TF_DIR" output -raw frontend_cloudfront_domain)
 
-echo "CloudFront ID: $CLOUDFRONT_DISTRIBUTION_ID"
-echo "CloudFront Domain: $CLOUDFRONT_DOMAIN"
-echo "S3 Bucket: $S3_BUCKET"
+echo "S3_BUCKET = $S3_BUCKET"
+echo "CF_DIST_ID = $CF_DIST_ID"
+echo "CF_DOMAIN = $CF_DOMAIN"
 
-echo "=== Building frontend ==="
+echo ""
+echo "=== Building React app ==="
 cd "$APP_DIR"
 npm run build
 
+echo ""
 echo "=== Uploading to S3 ==="
 aws s3 sync "$BUILD_DIR" "s3://$S3_BUCKET" \
     --delete \
     --profile "$PROFILE"
 
-echo "=== Invalidating CloudFront cache ==="
+echo ""
+echo "=== Invalidating CloudFront ==="
 aws cloudfront create-invalidation \
-    --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+    --distribution-id "$CF_DIST_ID" \
     --paths "/*" \
     --profile "$PROFILE"
 
 echo ""
-echo "🚀 Deployment complete!"
-echo "🌐 Visit: https://$CLOUDFRONT_DOMAIN"
+echo "=== Done! ==="
+echo "Site URL: https://$CF_DOMAIN"
