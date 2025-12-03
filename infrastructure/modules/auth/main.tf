@@ -19,6 +19,12 @@ resource "aws_cognito_user_pool" "this" {
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
+  user_pool_tier = "PLUS"
+
+  user_pool_add_ons {
+    advanced_security_mode = "ENFORCED"
+  }
+
   # ─────────────────────────────
   # MFA設定
   # Email OTPはカスタム認証フローで実装するため、
