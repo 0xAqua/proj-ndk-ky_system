@@ -23,36 +23,57 @@ def create_response(status_code: int, body: dict) -> dict:
 
 def build_tree(flat_items: list) -> list:
     """
-    フラットなDynamoDBアイテムリストを階層構造(Tree)に変換する
+    フラットなDynamoDBアイテムリストを、用途別の配列を持つ階層構造(Tree)に変換する
     """
     node_map = {}
+
+    # 1. まず全ノードをマップ化（初期化）
     for item in flat_items:
         node = {
             "id": item.get("nodePath"),
-            "name": item.get("name"),
-            "type": item.get("type"),
-            "data": item,
-            "children": []
+            "title": item.get("title"),  # ★ name -> title に変更
+            "children": [],
+            "tasks": [],                 # ★ tasks用配列を追加
+            "safety_equipments": []      # ★ 安全機材用配列を追加
         }
+
+        # ハイリスクフラグなど、その他の属性も必要ならコピー
+        if "is_high_risk" in item:
+            node["is_high_risk"] = item["is_high_risk"]
+
+        # デバッグ用や詳細データ用として元データも持たせるなら
+        # node["data"] = item
+
         node_map[item.get("nodePath")] = node
 
     root_nodes = []
 
+    # 2. 親子関係の構築
     for path, node in node_map.items():
         parts = path.split("#")
 
+        # ルートノード判定 (例: DEPT#1 は要素数2)
         if len(parts) <= 2:
-            # ルートノード (Department)
             root_nodes.append(node)
         else:
-            # 親を探す: 後ろの2要素を削ったパスを作る
+            # 親を探すロジック (後ろの2要素 #KEY#ID を削る)
+            # 例: ...#PROJ#1#TASK#1 -> ...#PROJ#1
             parent_path = "#".join(parts[:-2])
             parent = node_map.get(parent_path)
 
             if parent:
-                parent["children"].append(node)
+                # ★ IDによって格納先を振り分けるロジック
+                if "TASK" in parts[-2]: # IDの最後から2番目が TASK か判定
+                    parent["tasks"].append(node)
+                elif "SEQ" in parts[-2]: # IDの最後から2番目が SEQ か判定
+                    parent["safety_equipments"].append(node)
+                else:
+                    parent["children"].append(node)
             else:
+                # 親が見つからない場合はルート扱い（念のため）
                 root_nodes.append(node)
+
+    # (オプション) 配列をID順などでソートしたい場合はここで各ノードに対してsortを行う
 
     return root_nodes
 
