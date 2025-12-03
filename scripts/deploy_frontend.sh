@@ -1,45 +1,55 @@
 #!/bin/bash
 
-set -e
+set -e  # エラーが出たら即終了（安全）
 
-# === Terraform ディレクトリ設定 ===
-TF_DIR="/Users/tsuji/NDIS/Projects/NDK/proj-ndk-ky_system/infrastructure/environments/dev"
-
-# === プロジェクト構造から app/ を検出 ===
+# ─────────────────────────────
+# パス設定
+# ─────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="$PROJECT_ROOT/app"
 BUILD_DIR="$APP_DIR/dist"
 
+# ─────────────────────────────
+# 設定（必要ならここだけ変えればOK）
+# ─────────────────────────────
+S3_BUCKET="ndk-ky-system-dev-frontend"
+CLOUDFRONT_DISTRIBUTION_ID="E2RLJ8GKQ0AK1V"
 PROFILE="proj-ndk-ky"
 
-echo "=== Loading Terraform outputs ==="
-S3_BUCKET=$(terraform -chdir="$TF_DIR" output -raw frontend_bucket_name)
-CF_DIST_ID=$(terraform -chdir="$TF_DIR" output -raw frontend_cloudfront_distribution_id)
-CF_DOMAIN=$(terraform -chdir="$TF_DIR" output -raw frontend_cloudfront_domain)
-
-echo "S3_BUCKET = $S3_BUCKET"
-echo "CF_DIST_ID = $CF_DIST_ID"
-echo "CF_DOMAIN = $CF_DOMAIN"
-
-echo ""
+# ─────────────────────────────
+# ビルド
+# ─────────────────────────────
 echo "=== Building React app ==="
 cd "$APP_DIR"
 npm run build
+echo "✓ Build complete"
 
-echo ""
-echo "=== Uploading to S3 ==="
+# ─────────────────────────────
+# S3 Upload
+# ─────────────────────────────
+echo "=== Uploading to S3 ($S3_BUCKET) ==="
 aws s3 sync "$BUILD_DIR" "s3://$S3_BUCKET" \
     --delete \
     --profile "$PROFILE"
+echo "✓ Upload complete"
 
-echo ""
-echo "=== Invalidating CloudFront ==="
+# ─────────────────────────────
+# CloudFront Invalidation
+# ─────────────────────────────
+echo "=== Invalidating CloudFront cache ==="
 aws cloudfront create-invalidation \
-    --distribution-id "$CF_DIST_ID" \
+    --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
     --paths "/*" \
     --profile "$PROFILE"
+echo "✓ Cache invalidation started"
 
+# ─────────────────────────────
+# 完了表示
+# ─────────────────────────────
+CLOUDFRONT_DOMAIN="${CLOUDFRONT_DISTRIBUTION_ID}.cloudfront.net"
 echo ""
-echo "=== Done! ==="
-echo "Site URL: https://$CF_DOMAIN"
+echo "Done!  🚀"
+echo "Frontend deployed to:"
+echo "👉 https://${CLOUDFRONT_DOMAIN}"
+echo ""
