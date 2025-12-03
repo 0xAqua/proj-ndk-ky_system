@@ -1,0 +1,348 @@
+{
+  "id": "DEPT#1",
+  "title": "共通",
+  "children": [
+    {
+      "id": "DEPT#1#TYPE#1",
+      "title": "電柱・支線",
+      "children": [
+        {
+          "id": "DEPT#1#TYPE#1#PROJ#1",
+          "title": "電柱新設",
+          "tasks": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#TASK#1",
+              "title": "保安施設の設置・撤去"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#TASK#2",
+              "title": "重機類の設置"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#TASK#3",
+              "title": "建柱（掘削、建入れ、埋戻し）"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#TASK#4",
+              "title": "昇柱"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#TASK#5",
+              "title": "電力設備防護"
+            }
+          ],
+          "equipments": [],
+          "safety_equipments": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#1",
+              "title": "絶縁用保護具",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#2",
+              "title": "穴掘建柱車",
+              "is_high_risk": true
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#3",
+              "title": "高所作業車",
+              "is_high_risk": true
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#4",
+              "title": "輪止め・ジャッキベース",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#5",
+              "title": "梯子",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#6",
+              "title": "玉掛け用ワイヤ",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#7",
+              "title": "削岩機",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#8",
+              "title": "ディスクグラインダー",
+              "is_high_risk": true
+            }
+          ]
+        },
+        {
+          "id": "DEPT#1#TYPE#1#PROJ#2",
+          "title": "電柱撤去",
+          "tasks": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#TASK#1",
+              "title": "保安施設の設置・撤去"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#TASK#2",
+              "title": "重機類の設置"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#TASK#3",
+              "title": "昇柱"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#TASK#4",
+              "title": "撤去（掘削、抜柱、埋戻し）"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#TASK#5",
+              "title": "電力設備防護"
+            }
+          ],
+          "equipments": [],
+          "safety_equipments": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#1",
+              "title": "絶縁用保護具",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#2",
+              "title": "穴掘建柱車",
+              "is_high_risk": true
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#3",
+              "title": "高所作業車",
+              "is_high_risk": true
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#4",
+              "title": "輪止め・ジャッキベース",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#5",
+              "title": "抜柱機",
+              "is_high_risk": true
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#6",
+              "title": "梯子",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#7",
+              "title": "玉掛け用ワイヤ",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#8",
+              "title": "削岩機",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#9",
+              "title": "ディスクグラインダー",
+              "is_high_risk": true
+            }
+          ]
+        },
+        {
+          "id": "DEPT#1#TYPE#1#PROJ#3",
+          "title": "上部支線新設",
+          "tasks": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#3#TASK#1",
+              "title": "保安施設の設置・撤去"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#3#TASK#2",
+              "title": "昇柱"
+            }
+          ],
+          "equipments": [],
+          "safety_equipments": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#1",
+              "title": "絶縁用保護具",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#2",
+              "title": "高所作業車",
+              "is_high_risk": true
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#3",
+              "title": "車輪止め・ジャッキベース",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#4",
+              "title": "梯子",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#5",
+              "title": "張線器（シメラー）",
+              "is_high_risk": true
+            }
+          ]
+        },
+        {
+          "id": "DEPT#1#TYPE#1#PROJ#4",
+          "title": "上部支線撤去",
+          "tasks": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#TASK#1",
+              "title": "保安施設用器具類の設置"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#TASK#2",
+              "title": "準備"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#TASK#3",
+              "title": "支線ガードの取外し"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#TASK#4",
+              "title": "支線の取外し"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#TASK#5",
+              "title": "整理"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#TASK#6",
+              "title": "保安施設用器具類の撤去"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#TASK#7",
+              "title": "写真撮影"
+            }
+          ],
+          "equipments": [],
+          "safety_equipments": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#1",
+              "title": "絶縁用保護具",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#2",
+              "title": "高所作業車",
+              "is_high_risk": true
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#3",
+              "title": "輪止め・ジャッキベース",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#4",
+              "title": "梯子",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#5",
+              "title": "張線器（シメラー）",
+              "is_high_risk": true
+            }
+          ]
+        },
+        {
+          "id": "DEPT#1#TYPE#1#PROJ#5",
+          "title": "下部支線新設",
+          "tasks": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#5#TASK#1",
+              "title": "保安施設の設置・撤去"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#5#TASK#2",
+              "title": "掘削"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#5#TASK#3",
+              "title": "下部支線設置"
+            }
+          ],
+          "equipments": [],
+          "safety_equipments": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#5#SEQ#1",
+              "title": "削岩機",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#5#SEQ#2",
+              "title": "ディスクグラインダー",
+              "is_high_risk": true
+            }
+          ]
+        },
+        {
+          "id": "DEPT#1#TYPE#1#PROJ#6",
+          "title": "下部支線撤去",
+          "tasks": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#6#TASK#1",
+              "title": "保安施設の設置・撤去"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#6#TASK#2",
+              "title": "掘削"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#6#TASK#3",
+              "title": "撤去"
+            }
+          ],
+          "equipments": [],
+          "safety_equipments": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#6#SEQ#1",
+              "title": "削岩機",
+              "is_high_risk": false
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#6#SEQ#2",
+              "title": "ディスクグラインダー",
+              "is_high_risk": true
+            }
+          ]
+        },
+        {
+          "id": "DEPT#1#TYPE#1#PROJ#7",
+          "title": "舗装破砕復旧",
+          "tasks": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#7#TASK#1",
+              "title": "舗装破砕､復旧"
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#7#TASK#2",
+              "title": "転圧工"
+            }
+          ],
+          "equipments": [],
+          "safety_equipments": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#7#SEQ#1",
+              "title": "ディスクグラインダー",
+              "is_high_risk": true
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#7#SEQ#2",
+              "title": "ランマー",
+              "is_high_risk": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
