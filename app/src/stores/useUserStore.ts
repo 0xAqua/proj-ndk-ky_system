@@ -23,15 +23,33 @@ export const useUserStore = create<UserState>((set) => ({
     isLoading: false,
 
     setUserData: (data) => {
-        const rawDepts = data.tenantUser?.departments || {};
+        // ★デバッグログ1: APIから渡ってきた生のデータを見る
+        console.group("🔍 [Store Debug] setUserData called");
+        console.log("Raw Data:", data);
+
+        // データ構造のチェック
+        const directDepts = data.departments;
+        const nestedDepts = data.tenantUser?.departments;
+
+        console.log("Check data.departments:", directDepts);
+        console.log("Check data.tenantUser.departments:", nestedDepts);
+
+        // データの取得（優先順位: 直下 > tenantUser配下 > 空）
+        const rawDepts = directDepts || nestedDepts || {};
+
         const formattedDepts: Department[] = Object.entries(rawDepts).map(([key, value]) => ({
             id: key,
             name: String(value)
         }));
 
+        // ★デバッグログ2: 整形後の部署データを見る
+        console.log("Formatted Departments:", formattedDepts);
+        console.groupEnd();
+
         set({
-            tenantId: data.tenantId,
-            userId: data.userId,
+            // snake_case対応: tenant_id が来ても tenantId に入れる
+            tenantId: data.tenant_id || data.tenantId,
+            userId: data.user_id || data.userId,
             departments: formattedDepts,
         });
     },
