@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { signIn, confirmSignIn, getCurrentUser } from "aws-amplify/auth";
 
 // 画面のステップ管理用
-export type LoginStep = 'INPUT_EMAIL' | 'INPUT_OTP';
+export type LoginStep = 'INPUT_CREDENTIALS' | 'INPUT_OTP';
 
 export const useLoginForm = () => {
-    // ステート
-    const [step, setStep] = useState<LoginStep>('INPUT_EMAIL');
+    // ステート管理
+    const [step, setStep] = useState<LoginStep>('INPUT_CREDENTIALS');
     const [username, setUsername] = useState("");
-    const [otp, setOtp] = useState(""); // パスワードの代わりにOTP
+    const [password, setPassword] = useState(""); // パスワード復活
+    const [otp, setOtp] = useState("");
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -33,11 +34,12 @@ export const useLoginForm = () => {
         void checkAuth();
     }, [navigate]);
 
-    // 2. メールアドレス送信処理 (Step 1)
-    const handleSendEmail = async (e: React.FormEvent) => {
+    // 2. ログイン処理 (Step 1: ID/PASS認証)
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!username) {
-            setError("メールアドレスを入力してください。");
+
+        if (!username || !password) {
+            setError("メールアドレスとパスワードを入力してください。");
             return;
         }
 
@@ -45,35 +47,40 @@ export const useLoginForm = () => {
         setError(null);
 
         try {
-            // カスタム認証フローを開始
+            // パスワード認証 + カスタムフローを開始
             const { nextStep } = await signIn({
                 username,
-                password: "DUMMY_PASSWORD", // ★ここを追加！何でもOKです
+                password,
                 options: {
-                    authFlowType: "CUSTOM_AUTH"
+                    // "CUSTOM_WITH_SRP" = パスワード認証後にLambdaへバトンタッチ
+                    authFlowType: "CUSTOM_WITH_SRP"
                 }
             });
 
-            // 次のステップが「カスタムチャレンジ（OTP入力）」ならOK
+            // パスワードが合っていれば、LambdaがOTPを発行してこのステータスになる
             if (nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE') {
                 setStep('INPUT_OTP'); // 画面をOTP入力へ切り替え
-                console.log("OTP sent, waiting for input...");
+                console.log("Password verified, OTP sent.");
             } else {
-                setError("予期せぬログインステータスです: " + nextStep.signInStep);
+                console.error("Unexpected step:", nextStep.signInStep);
+                setError("予期せぬログインステータスです。");
             }
+
         } catch (err: any) {
             console.error("Sign in failed:", err);
-            if (err.name === "UserNotFoundException") {
+            if (err.name === "NotAuthorizedException") {
+                setError("メールアドレスまたはパスワードが間違っています。");
+            } else if (err.name === "UserNotFoundException") {
                 setError("ユーザーが見つかりません。");
             } else {
-                setError("メール送信に失敗しました。");
+                setError("ログインに失敗しました。ネットワーク状況などを確認してください。");
             }
         } finally {
             setIsLoading(false);
         }
     };
 
-    // 3. OTP検証処理 (Step 2)
+    // 3. OTP検証処理 (Step 2: OTP認証)
     const handleVerifyOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!otp) {
@@ -105,15 +112,14 @@ export const useLoginForm = () => {
     };
 
     return {
-        step,           // 今どっちの画面か
-        username,
-        setUsername,
-        otp,            // パスワードの代わりに公開
-        setOtp,
+        step,
+        username, setUsername,
+        password, setPassword,
+        otp, setOtp,
         isLoading,
         error,
-        handleSendEmail, // メール送信ボタン用
-        handleVerifyOtp, // OTP送信ボタン用
+        handleLogin,    // Step 1用
+        handleVerifyOtp, // Step 2用
         isCheckingSession
     };
 };

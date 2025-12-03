@@ -6,8 +6,9 @@ export const LoginForm = () => {
     const {
         step,
         username, setUsername,
+        password, setPassword,
         otp, setOtp,
-        handleSendEmail,
+        handleLogin,
         handleVerifyOtp,
         isLoading,
         error,
@@ -33,8 +34,8 @@ export const LoginForm = () => {
                 <Text fontSize="sm" color="gray.600">
                     危険予知システムへようこそ
                 </Text>
-                {step === 'INPUT_EMAIL' ? (
-                    <Text fontSize="sm" color="gray.600">メールアドレスを入力して認証コードを受け取ってください</Text>
+                {step === 'INPUT_CREDENTIALS' ? (
+                    <Text fontSize="sm" color="gray.600">ログイン情報を入力してください</Text>
                 ) : (
                     <Text fontSize="sm" color="gray.600">メールに届いた6桁のコードを入力してください</Text>
                 )}
@@ -48,10 +49,10 @@ export const LoginForm = () => {
             )}
 
             {/* ───────────────────────────── */}
-            {/* Step 1: メール入力フォーム */}
+            {/* Step 1: ID/PASS入力フォーム */}
             {/* ───────────────────────────── */}
-            {step === 'INPUT_EMAIL' && (
-                <form onSubmit={handleSendEmail} style={{ width: '100%' }}>
+            {step === 'INPUT_CREDENTIALS' && (
+                <form onSubmit={handleLogin} style={{ width: '100%' }}>
                     <VStack gap={4} width="100%">
                         <Field.Root w="full">
                             <Input
@@ -63,14 +64,25 @@ export const LoginForm = () => {
                             />
                         </Field.Root>
 
+                        <Field.Root w="full">
+                            <Input
+                                name="password"
+                                type="password"
+                                autoComplete="current-password"
+                                placeholder="パスワード"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
+                        </Field.Root>
+
                         <Button
                             type="submit"
                             w="full"
                             colorPalette="blue"
                             loading={isLoading}
-                            loadingText="送信中..."
+                            loadingText="認証中..."
                         >
-                            認証コードを送信
+                            次へ
                         </Button>
                     </VStack>
                 </form>
@@ -83,9 +95,8 @@ export const LoginForm = () => {
                 <form onSubmit={handleVerifyOtp} style={{ width: '100%' }}>
                     <VStack gap={4} width="100%">
                         <Box w="full">
-                            {/* メールアドレスの確認表示（親切設計） */}
                             <Text fontSize="xs" color="gray.500" mb={2}>
-                                {username} 宛に送信しました
+                                {username} 宛に認証コードを送信しました
                             </Text>
                             <Field.Root w="full">
                                 <Input
@@ -93,7 +104,7 @@ export const LoginForm = () => {
                                     autoComplete="one-time-code"
                                     placeholder="000000"
                                     textAlign="center"
-                                    letterSpacing="0.5em" // 数字を見やすく
+                                    letterSpacing="0.5em"
                                     fontSize="lg"
                                     value={otp}
                                     onChange={(e) => setOtp(e.target.value)}
@@ -106,30 +117,31 @@ export const LoginForm = () => {
                             w="full"
                             colorPalette="blue"
                             loading={isLoading}
-                            loadingText="認証中..."
+                            loadingText="確認中..."
                         >
                             ログイン
                         </Button>
 
-                        {/* メアド入力に戻るボタン */}
+                        {/* 戻るボタン（簡易リロード） */}
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.location.reload()} // 簡易的にリロードでリセット
+                            onClick={() => window.location.reload()}
                             disabled={isLoading}
                         >
-                            メールアドレスを修正
+                            戻る
                         </Button>
                     </VStack>
                 </form>
             )}
 
-            {/* フッターリンク (パスワードをお忘れですか？は不要になるので削除か変更) */}
-            <Text textAlign="left" mt={2} fontSize="sm">
-                <Link color="blue.500" href="#">
-                    アカウントをお持ちでない場合
-                </Link>
-            </Text>
+            {step === 'INPUT_CREDENTIALS' && (
+                <Text textAlign="left" mt={2} fontSize="sm">
+                    <Link color="blue.500" href="#">
+                        パスワードをお忘れですか？
+                    </Link>
+                </Text>
+            )}
         </VStack>
     );
 };
