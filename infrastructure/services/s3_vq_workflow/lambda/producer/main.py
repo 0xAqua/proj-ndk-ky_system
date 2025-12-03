@@ -17,9 +17,86 @@ sqs = boto3.client("sqs")
 secrets = boto3.client("secretsmanager") # ★追加
 
 TABLE_NAME = os.environ["JOB_TABLE_NAME"]
-QUEUE_URL = os.environ["JOB_QUEUE_URL"]
+QUEUE_URL = os.environ["SQS_QUEUE_URL"]
 
-# ... (lambda_handler, create_job, get_job_status は変更なし) ...
+@tracer.capture_lambda_handler
+@event_source(data_class=APIGatewayProxyEventV2)
+@logger.inject_lambda_context
+def lambda_handler(event: APIGatewayProxyEventV2, context):
+
+    method = event.request_context.http.method
+    path = event.raw_path
+
+    # ログ出力 (デバッグ用)
+    logger.info(f"Received {method} {path}")
+
+    # ──────────────────────────────────────────────
+    # 1. POST /jobs : ジョブ登録 (受付)
+    # ──────────────────────────────────────────────
+    if method == "POST" and path.endswith("/jobs"):
+        return create_job(event)
+
+    # ──────────────────────────────────────────────
+    # 2. GET /jobs/{jobId} : 状況確認
+    # ──────────────────────────────────────────────
+    elif method == "GET" and "/jobs/" in path:
+        job_id = path.split("/")[-1] # URLの最後を取得
+        if not job_id:
+            return {"statusCode": 400, "body": json.dumps({"message": "Missing job ID"})}
+        return get_job_status(event, job_id)
+
+    # ──────────────────────────────────────────────
+    # 3. POST /webhook : 結果受取 (外部APIからのコールバック)
+    # ──────────────────────────────────────────────
+    elif method == "POST" and path.endswith("/webhook"):
+        return handle_webhook(event)
+
+    else:
+        return {"statusCode": 404, "body": json.dumps({"message": "Not Found"})}
+
+
+def create_job(event):
+    """受付処理: JobID発行 -> DB保存 -> SQS送信"""
+    body = json.loads(event.body or "{}")
+    prompt = body.get("prompt")
+
+    if not prompt:
+        return {"statusCode": 400, "body": json.dumps({"message": "prompt is required"})}
+
+    # テナントID取得
+    claims = event.request_context.authorizer.jwt.claims
+    tenant_id = claims.get("custom:tenant_id") or claims.get("tenant_id")
+
+    job_id = str(uuid.uuid4())
+    timestamp = int(time.time())
+
+    # DynamoDBへ保存 (初期状態 PENDING)
+    table = dynamodb.Table(TABLE_NAME)
+    item = {
+        "tenant_id": tenant_id,
+        "job_id": job_id,
+        "status": "PENDING",
+        "input_prompt": prompt,
+        "created_at": timestamp,
+        "updated_at": timestamp
+    }
+    table.put_item(Item=item)
+
+    # SQSへ送信
+    message_body = {
+        "tenant_id": tenant_id,
+        "job_id": job_id,
+        "input_prompt": prompt
+    }
+    sqs.send_message(QueueUrl=QUEUE_URL, MessageBody=json.dumps(message_body))
+
+    logger.info(f"Job created: {job_id}")
+
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps({"jobId": job_id, "message": "Job accepted"})
+    }
 
 def get_vq_secrets(tenant_id):
     """Secrets Managerからキーを取得"""
