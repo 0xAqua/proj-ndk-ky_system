@@ -91,12 +91,11 @@ resource "aws_cognito_user_pool_client" "web" {
   name         = "${local.name_prefix}-web-client"
   user_pool_id = aws_cognito_user_pool.this.id
 
-  # カスタム認証（Email OTP）を有効化
+  # パスワード認証(SRP)と、カスタム認証(OTP)の両方を許可します
   explicit_auth_flows = [
-    "ALLOW_USER_PASSWORD_AUTH",
-    "ALLOW_REFRESH_TOKEN_AUTH",
     "ALLOW_USER_SRP_AUTH",
-    "ALLOW_CUSTOM_AUTH"  # ★ Email OTP に必須
+    "ALLOW_CUSTOM_AUTH",
+    "ALLOW_REFRESH_TOKEN_AUTH"
   ]
 
   supported_identity_providers         = ["COGNITO"]
