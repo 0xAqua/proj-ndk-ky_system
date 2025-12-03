@@ -103,6 +103,48 @@ def create_job(event):
         "body": json.dumps({"jobId": job_id, "message": "Job accepted"})
     }
 
+def get_job_status(event, job_id):
+    """ジョブの状態を取得"""
+    # テナントID取得
+    claims = event.request_context.authorizer.jwt_claim
+    tenant_id = claims.get("custom:tenant_id") or claims.get("tenant_id")
+
+    if not tenant_id:
+        return {"statusCode": 400, "body": json.dumps({"message": "Missing tenant_id"})}
+
+    table = dynamodb.Table(TABLE_NAME)
+
+    try:
+        response = table.get_item(
+            Key={
+                "tenant_id": tenant_id,
+                "job_id": job_id
+            }
+        )
+
+        item = response.get("Item")
+        if not item:
+            return {"statusCode": 404, "body": json.dumps({"message": "Job not found"})}
+
+        # Decimal を int/float に変換（JSON シリアライズ用）
+        result = {
+            "jobId": item.get("job_id"),
+            "status": item.get("status"),
+            "result": item.get("result"),
+            "createdAt": int(item.get("created_at", 0)),
+            "updatedAt": int(item.get("updated_at", 0))
+        }
+
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps(result)
+        }
+
+    except Exception as e:
+        logger.exception("Failed to get job status")
+        return {"statusCode": 500, "body": json.dumps({"message": "Internal Server Error"})}
+
 def get_vq_secrets(tenant_id):
     """Secrets Managerからキーを取得"""
     secret_name = f"ndk-ky/dev/{tenant_id}/vq-key"
