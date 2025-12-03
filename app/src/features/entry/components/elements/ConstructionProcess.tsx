@@ -3,11 +3,16 @@
 import { Checkbox, Flex, Text, Box, VStack, Accordion, Alert, Spinner, Center } from "@chakra-ui/react";
 import { ContentBox } from "@/features/entry/components/layout/ContentBox";
 import { MdBuild, MdChevronRight } from "react-icons/md";
-// 必要な型とHookをインポート
 import { useConstructionMaster } from "@/features/entry/hooks/useConstructionMaster";
 import { useUserStore } from "@/stores/useUserStore";
+import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
 
 type Props = {
+    // 親から受け取るマスタデータ
+    masterCategories: ProcessCategory[];
+    // 表示対象の種別IDリスト (ConstructionWorkUiで選ばれたもの)
+    targetTypeIds: string[];
+    // 選択された工程ID (実際に保存する値)
     value: string[];
     onChange: (value: string[]) => void;
 };
