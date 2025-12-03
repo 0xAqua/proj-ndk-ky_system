@@ -2,19 +2,32 @@ import boto3
 import json
 from boto3.dynamodb.conditions import Key
 
-# 設定
-# ユーザーマスタのテーブル名命名規則から推測（違っていれば修正してください）
-TABLE_NAME = 'ndk-ky-dev-tenant-construction-master'
+# ==========================================
+# 設定: 診断結果に基づく正しい値
+# ==========================================
+PROFILE_NAME = 'proj-ndk-ky'
+REGION = 'ap-northeast-1'
+TABLE_NAME = 'ndk-ky-system-dev-tenant-construction-master'
 JSON_FILE = '../seeds/table_tenant_construction_master.json'
+# ==========================================
 
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(TABLE_NAME)
+print(f"--- 処理開始: {TABLE_NAME} ---")
+
+# 1. セッションとリソースの初期化
+try:
+    session = boto3.Session(profile_name=PROFILE_NAME)
+    dynamodb = session.resource('dynamodb', region_name=REGION)
+    table = dynamodb.Table(TABLE_NAME)
+    print("✅ AWSセッション確立成功")
+except Exception as e:
+    print(f"❌ AWS接続エラー: {e}")
+    exit(1)
 
 def flatten_data(node, tenant_id, flat_list):
     """
     ネストされたJSONノードを再帰的にフラットなリストに変換する
     """
-    # 自分のデータをリストに追加（id -> nodePath にリネーム）
+    # 自分のデータをリストに追加
     item = {
         'tenant_id': tenant_id,
         'nodePath': node['id'],
@@ -40,9 +53,8 @@ def flatten_data(node, tenant_id, flat_list):
     # safety_equipments があればそれぞれ処理
     if 'safety_equipments' in node:
         for eq in node['safety_equipments']:
-            # DynamoDB上で区別しやすいようType属性などを足すのもアリですが、
-            # とりあえず今回はフラット化のみ行います
             flatten_data(eq, tenant_id, flat_list)
+
 
 def delete_tenant_data(tenant_id):
     """
@@ -50,10 +62,14 @@ def delete_tenant_data(tenant_id):
     """
     print(f"テナントID: {tenant_id} の既存データを検索中...")
 
-    # Queryを使ってテナントのデータを取得
-    response = table.query(
-        KeyConditionExpression=Key('tenant_id').eq(tenant_id)
-    )
+    try:
+        response = table.query(
+            KeyConditionExpression=Key('tenant_id').eq(tenant_id)
+        )
+    except Exception as e:
+        print(f"❌ Queryエラー: {e}")
+        raise e
+
     items = response.get('Items', [])
 
     if not items:
@@ -74,8 +90,12 @@ def delete_tenant_data(tenant_id):
 
 def main():
     print(f"[{JSON_FILE}] を読み込み中...")
-    with open(JSON_FILE, 'r', encoding='utf-8') as f:
-        source_data = json.load(f)
+    try:
+        with open(JSON_FILE, 'r', encoding='utf-8') as f:
+            source_data = json.load(f)
+    except FileNotFoundError:
+        print("❌ JSONファイルが見つかりません。パスを確認してください。")
+        return
 
     tenant_id = source_data['tenant_id']
     root_nodes = source_data['data']
@@ -95,7 +115,10 @@ def main():
         for item in flat_items:
             batch.put_item(Item=item)
 
-    print("登録完了！")
+    print("✅ 登録完了！")
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"❌ 処理中断: {e}")

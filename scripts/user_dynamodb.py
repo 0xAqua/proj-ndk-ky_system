@@ -1,33 +1,47 @@
 import boto3
 import json
 
-# 設定：テーブル名
-TABLE_NAME = 'ndk-ky-dev-tenant-user-master'
+# ==========================================
+# 設定: 診断結果からコピーした正確な値
+# ==========================================
+PROFILE_NAME = 'proj-ndk-ky'
+REGION = 'ap-northeast-1'
+TABLE_NAME = 'ndk-ky-system-dev-tenant-user-master'  # 診断結果の通り
 JSON_FILE = '../seeds/tenant_user_master_seed.json'
+# ==========================================
 
-# DynamoDBリソースの初期化
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(TABLE_NAME)
+print(f"--- 処理開始: {TABLE_NAME} ---")
+
+# 1. プロファイルを指定してセッションを作成（これが重要）
+try:
+    session = boto3.Session(profile_name=PROFILE_NAME)
+    # セッションからリソースを作成
+    dynamodb = session.resource('dynamodb', region_name=REGION)
+    table = dynamodb.Table(TABLE_NAME)
+    print("✅ AWSセッション確立成功")
+except Exception as e:
+    print(f"❌ AWS接続エラー: {e}")
+    exit(1)
 
 def truncate_table():
-    """テーブルの全データを削除する"""
-    print(f"[{TABLE_NAME}] 既存データをスキャン中...")
+    print("既存データをスキャン中...")
+    try:
+        # scan実行
+        scan = table.scan()
+    except Exception as e:
+        print(f"❌ Scanエラー: {e}")
+        print("考えられる原因: プロファイル設定、リージョン、テーブル名の不一致")
+        raise e
 
-    # 全件スキャン（データ量が多い場合は注意が必要ですが、マスタならこれでOK）
-    scan = table.scan()
     items = scan.get('Items', [])
-
     if not items:
         print("削除対象のデータはありません。")
         return
 
     print(f"{len(items)} 件のデータを削除します...")
 
-    # batch_writerを使って効率的に削除
     with table.batch_writer() as batch:
         for item in items:
-            # プライマリキーを指定して削除（今回のキー構成に合わせて調整）
-            # ここでは tenant_id と user_id が複合キー（PK/SK）と想定
             batch.delete_item(
                 Key={
                     'tenant_id': item['tenant_id'],
@@ -37,26 +51,24 @@ def truncate_table():
     print("削除完了。")
 
 def import_data():
-    """JSONデータをインポートする"""
-    print(f"[{JSON_FILE}] データを読み込み中...")
-
-    with open(JSON_FILE, 'r', encoding='utf-8') as f:
-        users = json.load(f)
+    print(f"[{JSON_FILE}] を読み込み中...")
+    try:
+        with open(JSON_FILE, 'r', encoding='utf-8') as f:
+            users = json.load(f)
+    except FileNotFoundError:
+        print("❌ JSONファイルが見つかりません。パスを確認してください。")
+        return
 
     print(f"{len(users)} 件のデータを登録します...")
 
-    # batch_writerを使って効率的にPut
     with table.batch_writer() as batch:
         for user in users:
-            # Boto3が自動的にPythonの辞書型をDynamoDB JSON形式に変換してくれます
             batch.put_item(Item=user)
-
-    print("登録完了！")
+    print("✅ 登録完了！")
 
 if __name__ == '__main__':
-    # 実行
     try:
         truncate_table()
         import_data()
     except Exception as e:
-        print(f"エラーが発生しました: {e}")
+        print(f"❌ 処理中断: {e}")
