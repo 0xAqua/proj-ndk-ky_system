@@ -166,7 +166,9 @@ data "aws_iam_policy_document" "worker_policy" {
   statement { # Secrets Manager Read (API Key)
     effect    = "Allow"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = ["${var.vq_secret_arn}*"]
+    resources = [
+      "arn:aws:secretsmanager:${var.region}:*:secret:${var.name_prefix}/*/vq-key*"
+    ]
   }
 }
 
