@@ -57,6 +57,11 @@ def lambda_handler(event: APIGatewayProxyEventV2, context):
 
 def create_job(event):
     """受付処理: JobID発行 -> DB保存 -> SQS送信"""
+    # デバッグ: authorizer の中身を確認
+    logger.info(f"Authorizer: {event.request_context.authorizer}")
+    logger.info(f"Authorizer raw: {event.request_context.authorizer._data}")
+
+
     body = json.loads(event.body or "{}")
     prompt = body.get("prompt")
 
