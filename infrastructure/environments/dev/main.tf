@@ -28,8 +28,15 @@ module "auth" {
   project     = local.project
   environment = local.environment
 
-  callback_urls = ["http://localhost:3000/callback"]
-  logout_urls   = ["http://localhost:3000"]
+  callback_urls = [
+    "http://localhost:3000/callback",
+    "https://${module.frontend.cloudfront_domain}/callback"
+  ]
+
+  logout_urls = [
+    "http://localhost:3000",
+    "https://${module.frontend.cloudfront_domain}"
+  ]
 
   # Email OTP トリガー（Step 2で有効化）
   define_auth_lambda_arn = module.auth_challenge.define_auth_lambda_arn
