@@ -193,6 +193,7 @@ resource "aws_lambda_function" "producer" {
       JOB_TABLE_NAME = var.job_table_name
       SQS_QUEUE_URL  = aws_sqs_queue.main.url
       EXTERNAL_API_BASE_URL = var.external_api_base_url
+      WEBHOOK_BASE_URL      = "${var.api_endpoint}/webhook"
     }
   }
 

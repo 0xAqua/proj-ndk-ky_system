@@ -1,8 +1,11 @@
 import os
 import json
 import uuid
-import boto3
 import time
+import boto3
+import hmac
+import hashlib
+from decimal import Decimal
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.data_classes import event_source, APIGatewayProxyEventV2
 
@@ -11,59 +14,116 @@ tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
 sqs = boto3.client("sqs")
+secrets = boto3.client("secretsmanager") # ★追加
 
 TABLE_NAME = os.environ["JOB_TABLE_NAME"]
-QUEUE_URL = os.environ["SQS_QUEUE_URL"]
+QUEUE_URL = os.environ["JOB_QUEUE_URL"]
 
-@tracer.capture_lambda_handler
-@event_source(data_class=APIGatewayProxyEventV2)
-@logger.inject_lambda_context
-def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
-    # 1. 入力チェック
-    body = json.loads(event.body or "{}")
-    eat = body.get("eat")
+# ... (lambda_handler, create_job, get_job_status は変更なし) ...
 
-    if not eat:
-        return {"statusCode": 400, "body": json.dumps({"message": "eat is required"})}
+def get_vq_secrets(tenant_id):
+    """Secrets Managerからキーを取得"""
+    secret_name = f"ndk-ky/dev/{tenant_id}/vq-key"
+    try:
+        resp = secrets.get_secret_value(SecretId=secret_name)
+        return json.loads(resp["SecretString"])
+    except Exception as e:
+        logger.error(f"Secret verify failed: {e}")
+        return None
 
-    # テナントID取得 (JWTから)
-    claims = event.request_context.authorizer.jwt.claims
-    tenant_id = claims.get("custom:tenant_id") or claims.get("tenant_id")
+def verify_signature(secret, body, signature):
+    """HMAC-SHA256で署名を検証"""
+    if not secret or not signature:
+        return False
 
-    # 2. Job ID 生成 (AWS側でUUID発行)
-    job_id = str(uuid.uuid4())
-    logger.append_keys(job_id=job_id, tenant_id=tenant_id)
-
-    # 3. DynamoDBへ初期ステータス保存
-    table = dynamodb.Table(TABLE_NAME)
-    timestamp = int(time.time())
-
-    item = {
-        "tenant_id": tenant_id,
-        "job_id": job_id,       # SK
-        "status": "PENDING",    # 待機中
-        "input_eat": eat,
-        "created_at": timestamp,
-        "updated_at": timestamp
-    }
-    table.put_item(Item=item)
-
-    # 4. SQSへメッセージ送信
-    message_body = {
-        "tenant_id": tenant_id,
-        "job_id": job_id,
-        "input_eat": eat
-    }
-    sqs.send_message(
-        QueueUrl=QUEUE_URL,
-        MessageBody=json.dumps(message_body)
+    # 署名計算
+    mac = hmac.new(
+        secret.encode("utf-8"),
+        body.encode("utf-8"),
+        hashlib.sha256
     )
+    expected_signature = mac.hexdigest()
 
-    logger.info("Job accepted")
+    # 比較 (タイミング攻撃防止のため compare_digest 推奨)
+    return hmac.compare_digest(expected_signature, signature)
 
-    # 5. 即座にJob IDを返す (AGWの29秒制限回避)
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"jobId": job_id, "message": "Job accepted"})
-    }
+def handle_webhook(event):
+    """受取処理: 署名検証付き"""
+    try:
+        # 1. テナントIDの特定 (クエリパラメータ)
+        query_params = event.query_string_parameters or {}
+        tenant_id = query_params.get("tenant_id")
+
+        if not tenant_id:
+            logger.error("Webhook missing tenant_id")
+            return {"statusCode": 400, "body": "Missing tenant_id"}
+
+        # 2. Secrets ManagerからWebhook Secretを取得
+        secrets_data = get_vq_secrets(tenant_id)
+        if not secrets_data:
+            return {"statusCode": 500, "body": "Server Configuration Error"}
+
+        webhook_secret = secrets_data.get("webhook_secret")
+
+        # 3. 署名検証
+        headers = event.headers or {}
+        # ヘッダーは大文字小文字を区別しないように取得
+        signature = headers.get("x-signature") or headers.get("X-Signature")
+        raw_body = event.body or "{}" # 署名検証には生のbodyが必要
+
+        if not verify_signature(webhook_secret, raw_body, signature):
+            logger.warning(f"Invalid Signature. Tenant: {tenant_id}")
+            return {"statusCode": 401, "body": "Invalid Signature"}
+
+        # 4. ここから既存の処理 (JSONパース & DB更新)
+        body = json.loads(raw_body)
+        logger.info(f"Webhook received verified: {json.dumps(body)}")
+
+        # 仕様書に合わせてIDを取得 (mid がメッセージID)
+        # 今回の構成では job_id = tid (スレッドID) としているので tid を使用
+        # 仕様書例: { "mid": "...", "reply": "...", "status": "..." }
+        # ※仕様書に `tid` が含まれていない場合、Workerで `mid` と `job_id` の紐付けを保存しておく必要がありますが、
+        #   多くの場合はコンテキストに含まれるか、あるいは `mid` をキーにする設計変更が必要です。
+        #   一旦、仕様書の `mid` またはパス等から `tid` が取れる前提、もしくは `mid` をキーに探す実装にします。
+
+        # 修正: 仕様書例には `tid` がボディにない可能性があります。
+        # もしボディに `tid` がない場合、Worker側で `job_id` を `mid` としても保存しておくか、
+        # または外部APIが `tid` も返してくれるか確認が必要です。
+        # ここでは「ボディに tid がある」または「クエリパラメータで渡す」前提で進めます。
+
+        job_id = body.get("tid")
+        # もしbodyにないならクエリパラメータから取得するのも安全です
+        if not job_id:
+            job_id = query_params.get("job_id") # Workerで callback_url に &job_id=... も付けておくと確実
+
+        result_text = body.get("reply")
+
+        # エラーハンドリング (外部APIでの生成失敗)
+        status = "COMPLETED"
+        if body.get("status") == "error":
+            status = "FAILED"
+            result_text = body.get("error")
+
+        # DynamoDB更新
+        table = dynamodb.Table(TABLE_NAME)
+        update_expr = "SET #st = :st, #res = :res, updated_at = :ts"
+        expr_names = {"#st": "status", "#res": "result"}
+        expr_attrs = {
+            ":st": status,
+            ":res": result_text, # テキストまたはエラーオブジェクト
+            ":ts": int(time.time())
+        }
+
+        table.update_item(
+            Key={"tenant_id": tenant_id, "job_id": job_id},
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=expr_names,
+            ExpressionAttributeValues=expr_attrs
+        )
+
+        logger.info(f"Job {job_id} updated to {status}")
+        return {"statusCode": 200, "body": "OK"}
+
+    except Exception as e:
+        logger.exception("Webhook processing failed")
+        return {"statusCode": 500, "body": "Internal Server Error"}

@@ -18,12 +18,11 @@ secrets = boto3.client("secretsmanager")
 TABLE_NAME = os.environ["JOB_TABLE_NAME"]
 # 設定値: https://ndis.questella.biz
 API_BASE_URL = os.environ.get("EXTERNAL_API_BASE_URL", "https://ndis.questella.biz")
+# Webhook URL (Terraformで渡している値)
+WEBHOOK_BASE_URL = os.environ.get("WEBHOOK_BASE_URL", "http://localhost:3000/webhook")
 
 def get_vq_secrets(tenant_id):
-    """
-    Secrets Managerから認証情報を取得
-    戻り値: {"api_key": "...", "login_id": "..."}
-    """
+    """Secrets Managerから認証情報を取得"""
     secret_name = f"ndk-ky/dev/{tenant_id}/vq-key"
     try:
         resp = secrets.get_secret_value(SecretId=secret_name)
@@ -51,8 +50,7 @@ def get_auth_token(api_key, login_id):
     try:
         with urllib.request.urlopen(req, timeout=10) as res:
             body = json.loads(res.read().decode("utf-8"))
-            # 仕様書例: { "token": "...", "expires_in": 900 }
-            token = body.get("token")
+            token = body.get("token") or body.get("access_token")
             if not token:
                 raise ValueError(f"Token not found in response: {body}")
             return token
@@ -64,7 +62,7 @@ def get_auth_token(api_key, login_id):
         logger.exception("Authentication Request Error")
         raise e
 
-def send_message_to_vq(token, prompt, job_id):
+def send_message_to_vq(token, prompt, job_id, tenant_id):
     """
     2. メッセージ送信API (/public-api/v1/message/{tid}) を叩く
     """
@@ -73,23 +71,26 @@ def send_message_to_vq(token, prompt, job_id):
     url = f"{API_BASE_URL}/public-api/v1/message/{tid}"
     logger.info(f"Sending message to {url}")
 
+    # ★修正: callback_url に job_id も含める (Webhook側での特定用)
+    callback_url = f"{WEBHOOK_BASE_URL}?tenant_id={tenant_id}&job_id={job_id}"
+
     payload = {
         "message": prompt,
-        # Callbackが必要な場合はここで指定 (API GatewayのURLなど)
-        # "callback_url": "https://your-api-gateway/webhook"
+        "callback_url": callback_url
     }
 
     data = json.dumps(payload).encode("utf-8")
+
+    # ★修正: ヘッダーを X-Auth-Token に変更
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}"
+        "X-Auth-Token": f"Bearer {token}"
     }
 
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
 
     try:
         with urllib.request.urlopen(req, timeout=30) as res:
-            # 仕様書例: { "tid": "...", "mid": "...", "status": "accepted" }
             return json.loads(res.read().decode("utf-8"))
 
     except urllib.error.HTTPError as e:
@@ -107,7 +108,6 @@ def update_job_status(tenant_id, job_id, status, api_response=None):
     expr_attrs = {":st": status, ":ts": int(time.time())}
     expr_names = {"#st": "status"}
 
-    # APIからのレスポンス(midなど)があれば保存しておく
     if api_response:
         update_expr += ", #res = :res"
         expr_attrs[":res"] = api_response
@@ -140,7 +140,6 @@ def lambda_handler(event: SQSEvent, context):
 
         tenant_id = body.get("tenant_id")
         job_id = body.get("job_id")
-        # Producer側で "input_prompt" というキーで送っている想定
         prompt = body.get("input_prompt")
 
         logger.append_keys(job_id=job_id, tenant_id=tenant_id)
@@ -170,19 +169,17 @@ def lambda_handler(event: SQSEvent, context):
             token = get_auth_token(api_key, login_id)
 
             # -------------------------------------------------
-            # Step 3: メッセージ送信 (非同期受付)
+            # Step 3: メッセージ送信 (ヘッダー修正済み)
             # -------------------------------------------------
-            api_response = send_message_to_vq(token, prompt, job_id)
+            api_response = send_message_to_vq(token, prompt, job_id, tenant_id)
 
             # -------------------------------------------------
             # Step 4: 結果保存 (SENTステータスへ)
             # -------------------------------------------------
-            # ここでDBには "status": "SENT" と、APIからの受付レスポンスが入ります
             update_job_status(tenant_id, job_id, "SENT", api_response)
 
             logger.info("Message successfully sent to VQ API")
 
         except Exception as e:
             logger.exception("Process failed. SQS will retry.")
-            # 例外を上げることで、SQSの可視性タイムアウト後にリトライされる
             raise e

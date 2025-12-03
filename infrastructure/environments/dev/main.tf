@@ -242,6 +242,7 @@ module "s3_vq_workflow" {
 
   # 外部API
   external_api_base_url = "https://ndis.questella.biz"
+  api_endpoint = module.api_gateway.api_endpoint
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn

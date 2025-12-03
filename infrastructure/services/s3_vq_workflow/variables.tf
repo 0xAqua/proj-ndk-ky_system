@@ -56,3 +56,8 @@ variable "external_api_base_url" {
   description = "Base URL for the external VQ API (e.g. https://ndis.questella.biz)"
   type        = string
 }
+
+variable "api_endpoint" {
+  description = "The base URL of the API Gateway"
+  type        = string
+}
