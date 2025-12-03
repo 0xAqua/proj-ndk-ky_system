@@ -8,7 +8,7 @@ BUILD_DIR="$APP_DIR/dist"
 
 # 設定
 S3_BUCKET="ndk-ky-system-dev-frontend"
-CLOUDFRONT_DISTRIBUTION_ID="YOUR_DISTRIBUTION_ID"  # ← ここに取得したID入れて
+CLOUDFRONT_DISTRIBUTION_ID="E3VUPOR7AKL1KY"
 PROFILE="proj-ndk-ky"
 
 # appディレクトリに移動してビルド
