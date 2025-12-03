@@ -240,6 +240,9 @@ module "s3_vq_workflow" {
   # ★追加: シークレット情報を渡す
   vq_secret_arn = module.secrets.secret_arn_prefix
 
+  # 外部API
+  external_api_base_url = "https://ndis.questella.biz"
+
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
 }

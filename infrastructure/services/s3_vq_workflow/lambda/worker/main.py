@@ -2,6 +2,8 @@ import os
 import json
 import boto3
 import time
+import urllib.request
+import urllib.error
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.data_classes import event_source, SQSEvent
@@ -11,77 +13,176 @@ tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
 secrets = boto3.client("secretsmanager")
-TABLE_NAME = os.environ["JOB_TABLE_NAME"]
 
-def get_vq_api_key(tenant_id):
-    """Secrets ManagerからテナントごとのAPIキーを取得"""
-    # 設計に合わせてパスを調整してください
+# 環境変数
+TABLE_NAME = os.environ["JOB_TABLE_NAME"]
+# 設定値: https://ndis.questella.biz
+API_BASE_URL = os.environ.get("EXTERNAL_API_BASE_URL", "https://ndis.questella.biz")
+
+def get_vq_secrets(tenant_id):
+    """
+    Secrets Managerから認証情報を取得
+    戻り値: {"api_key": "...", "login_id": "..."}
+    """
     secret_name = f"ndk-ky/dev/{tenant_id}/vq-key"
     try:
         resp = secrets.get_secret_value(SecretId=secret_name)
-        return json.loads(resp["SecretString"])["api_key"]
-    except ClientError:
-        logger.exception("Secret retrieval failed")
-        raise # システムエラーなのでリトライさせる
+        return json.loads(resp["SecretString"])
+    except ClientError as e:
+        logger.exception(f"Secret retrieval failed for {secret_name}")
+        raise e
 
-def call_vq_api(api_key, eat_value):
-    """VQシステムへの連携 (擬似コード)"""
-    # ここで requests.post(...) などを行う
-    # タイムアウトや500エラーの場合は Exception を raise すること！
-    time.sleep(2) # 処理時間のシミュレーション
-    return f"VQ Result for {eat_value}"
+def get_auth_token(api_key, login_id):
+    """
+    1. 認証API (/public-api/v1/auth) を叩いてトークンを取得
+    """
+    url = f"{API_BASE_URL}/public-api/v1/auth"
+    logger.info(f"Authenticating with {url}")
+
+    payload = {
+        "api_key": api_key,
+        "login_id": login_id
+    }
+    data = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as res:
+            body = json.loads(res.read().decode("utf-8"))
+            # 仕様書例: { "token": "...", "expires_in": 900 }
+            token = body.get("token")
+            if not token:
+                raise ValueError(f"Token not found in response: {body}")
+            return token
+
+    except urllib.error.HTTPError as e:
+        logger.error(f"Auth Failed: {e.code} - {e.read().decode('utf-8')}")
+        raise e
+    except Exception as e:
+        logger.exception("Authentication Request Error")
+        raise e
+
+def send_message_to_vq(token, prompt, job_id):
+    """
+    2. メッセージ送信API (/public-api/v1/message/{tid}) を叩く
+    """
+    # job_id をそのまま tid (スレッドID) として使う
+    tid = job_id
+    url = f"{API_BASE_URL}/public-api/v1/message/{tid}"
+    logger.info(f"Sending message to {url}")
+
+    payload = {
+        "message": prompt,
+        # Callbackが必要な場合はここで指定 (API GatewayのURLなど)
+        # "callback_url": "https://your-api-gateway/webhook"
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as res:
+            # 仕様書例: { "tid": "...", "mid": "...", "status": "accepted" }
+            return json.loads(res.read().decode("utf-8"))
+
+    except urllib.error.HTTPError as e:
+        logger.error(f"Message Send Failed: {e.code} - {e.read().decode('utf-8')}")
+        raise e
+    except Exception as e:
+        logger.exception("Message Request Error")
+        raise e
+
+def update_job_status(tenant_id, job_id, status, api_response=None):
+    """DynamoDBのステータス更新"""
+    table = dynamodb.Table(TABLE_NAME)
+
+    update_expr = "SET #st = :st, updated_at = :ts"
+    expr_attrs = {":st": status, ":ts": int(time.time())}
+    expr_names = {"#st": "status"}
+
+    # APIからのレスポンス(midなど)があれば保存しておく
+    if api_response:
+        update_expr += ", #res = :res"
+        expr_attrs[":res"] = api_response
+        expr_names["#res"] = "api_response"
+
+    try:
+        table.update_item(
+            Key={"tenant_id": tenant_id, "job_id": job_id},
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=expr_names,
+            ExpressionAttributeValues=expr_attrs
+        )
+    except ClientError:
+        logger.exception("DynamoDB update failed")
+        raise
 
 @tracer.capture_lambda_handler
 @event_source(data_class=SQSEvent)
 @logger.inject_lambda_context
 def lambda_handler(event: SQSEvent, context):
+    """
+    SQSトリガーで実行されるメイン処理
+    """
     for record in event.records:
-        body = json.loads(record.body)
+        try:
+            body = json.loads(record.body)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in SQS body")
+            continue
+
         tenant_id = body.get("tenant_id")
         job_id = body.get("job_id")
-        eat = body.get("input_eat")
+        # Producer側で "input_prompt" というキーで送っている想定
+        prompt = body.get("input_prompt")
 
         logger.append_keys(job_id=job_id, tenant_id=tenant_id)
+        logger.info("Starting VQ integration process")
 
         try:
-            # 1. バリデーション (リトライさせないパターン)
-            if not eat or not tenant_id:
-                # これは「アプリ仕様のエラー」なので、リトライしても直らない。
-                # Exceptionを上げずに、ステータスをFAILEDにして正常終了(return)し、
-                # SQSからメッセージを消す。
-                logger.error("Invalid input format. Stopping retry.")
-                update_status(tenant_id, job_id, "FAILED", "Invalid input")
+            # バリデーション
+            if not prompt or not tenant_id or not job_id:
+                logger.error("Missing required fields")
+                if tenant_id and job_id:
+                    update_job_status(tenant_id, job_id, "FAILED", {"error": "Invalid input"})
                 return
 
-                # 2. VQ連携 (時間がかかる処理)
-            api_key = get_vq_api_key(tenant_id)
-            result = call_vq_api(api_key, eat) # 失敗したらここでExceptionが出る想定
+            # -------------------------------------------------
+            # Step 1: Secrets Managerからキー取得
+            # -------------------------------------------------
+            secrets_data = get_vq_secrets(tenant_id)
+            api_key = secrets_data.get("api_key")
+            login_id = secrets_data.get("login_id")
 
-            # 3. 成功時更新
-            update_status(tenant_id, job_id, "COMPLETED", result)
-            logger.info("Job completed successfully")
+            if not api_key or not login_id:
+                raise ValueError("api_key or login_id not found in Secrets Manager")
+
+            # -------------------------------------------------
+            # Step 2: 認証してトークン取得
+            # -------------------------------------------------
+            token = get_auth_token(api_key, login_id)
+
+            # -------------------------------------------------
+            # Step 3: メッセージ送信 (非同期受付)
+            # -------------------------------------------------
+            api_response = send_message_to_vq(token, prompt, job_id)
+
+            # -------------------------------------------------
+            # Step 4: 結果保存 (SENTステータスへ)
+            # -------------------------------------------------
+            # ここでDBには "status": "SENT" と、APIからの受付レスポンスが入ります
+            update_job_status(tenant_id, job_id, "SENT", api_response)
+
+            logger.info("Message successfully sent to VQ API")
 
         except Exception as e:
-            logger.exception("System error occurred. SQS will retry this message.")
-            # ★ここで例外を再度発生させると、Lambdaは「失敗」とみなされ、
-            # SQSの VisibilityTimeout 後に再試行(リトライ)される。
-            # 3回失敗するとDLQへ行く。
+            logger.exception("Process failed. SQS will retry.")
+            # 例外を上げることで、SQSの可視性タイムアウト後にリトライされる
             raise e
-
-def update_status(tenant_id, job_id, status, result=None):
-    table = dynamodb.Table(TABLE_NAME)
-    update_expr = "SET #st = :st, updated_at = :ts"
-    expr_attrs = {":st": status, ":ts": int(time.time())}
-    expr_names = {"#st": "status"} # statusは予約語の可能性があるため
-
-    if result:
-        update_expr += ", #res = :res"
-        expr_attrs[":res"] = result
-        expr_names["#res"] = "result"
-
-    table.update_item(
-        Key={"tenant_id": tenant_id, "job_id": job_id},
-        UpdateExpression=update_expr,
-        ExpressionAttributeNames=expr_names,
-        ExpressionAttributeValues=expr_attrs
-    )

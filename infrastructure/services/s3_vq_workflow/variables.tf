@@ -51,3 +51,8 @@ variable "lambda_kms_key_arn" {
   description = "KMS key ARN for Lambda environment encryption"
   type        = string
 }
+
+variable "external_api_base_url" {
+  description = "Base URL for the external VQ API (e.g. https://ndis.questella.biz)"
+  type        = string
+}
