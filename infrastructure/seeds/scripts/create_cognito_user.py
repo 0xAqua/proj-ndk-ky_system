@@ -6,7 +6,7 @@ import os
 REGION = "ap-northeast-1"
 PROFILE = "proj-ndk-ky"
 USER_POOL_ID = "ap-northeast-1_VYRzAWYI0"
-JSON_FILE = "../cognito_user_seed.json"
+JSON_FILE = "../user/cognito_user_seed.json"
 
 def create_users():
     session = boto3.Session(profile_name=PROFILE, region_name=REGION)

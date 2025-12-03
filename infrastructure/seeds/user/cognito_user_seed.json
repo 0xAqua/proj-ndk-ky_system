@@ -1,0 +1,46 @@
+[
+  {
+    "username": "yazama.takako@ndisol.com",
+    "password": "Ky#Yzm_8472!",
+    "attributes": {
+      "email": "yazama.takako@ndisol.com",
+      "email_verified": "true",
+      "given_name": "貴子",
+      "family_name": "矢座間",
+      "custom:tenant_id": "tenant-a"
+    }
+  },
+  {
+    "username": "suzuki.kousuke@ndisol.com",
+    "password": "Ky#Szk_3691!",
+    "attributes": {
+      "email": "suzuki.kousuke@ndisol.com",
+      "email_verified": "true",
+      "given_name": "宏輔",
+      "family_name": "鈴木",
+      "custom:tenant_id": "tenant-a"
+    }
+  },
+  {
+    "username": "ogura.ayaka@ndisol.com",
+    "password": "Ky#Ogr_5284!",
+    "attributes": {
+      "email": "ogura.ayaka@ndisol.com",
+      "email_verified": "true",
+      "given_name": "彩香",
+      "family_name": "小倉",
+      "custom:tenant_id": "tenant-a"
+    }
+  },
+  {
+    "username": "tsuji.kodai@ndisol.com",
+    "password": "Ky#Tsj_7139!",
+    "attributes": {
+      "email": "tsuji.kodai@ndisol.com",
+      "email_verified": "true",
+      "given_name": "航大",
+      "family_name": "辻",
+      "custom:tenant_id": "tenant-a"
+    }
+  }
+]
