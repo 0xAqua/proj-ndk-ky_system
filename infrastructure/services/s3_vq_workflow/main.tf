@@ -115,9 +115,9 @@ resource "aws_iam_role_policy_attachment" "producer_xray" {
 }
 
 data "aws_iam_policy_document" "producer_policy" {
-  statement { # DynamoDB Put
+  statement { # DynamoDB Put/Get
     effect    = "Allow"
-    actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem"]
+    actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"]
     resources = [var.job_table_arn]
   }
   statement { # SQS Send
