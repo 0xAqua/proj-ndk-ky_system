@@ -1,5 +1,0 @@
-aws cognito-idp list-users \
-    --user-pool-id ap-northeast-1_VYRzAWYI0 \
-    --profile proj-ndk-ky \
-    --output table \
-    --query "Users[].{Username:Username, Email:Attributes[?Name=='email'].Value|[0], Sub:Attributes[?Name=='sub'].Value|[0]}"
