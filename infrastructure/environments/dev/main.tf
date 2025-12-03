@@ -133,6 +133,26 @@ module "cdn" {
 }
 
 # ─────────────────────────────
+# 8-2. Frontend (S3 + CloudFront)
+# ─────────────────────────────
+module "frontend" {
+  source      = "../../modules/frontend"
+  name_prefix = "${local.project}-${local.environment}"
+
+  # まだ独自ドメインも ACM も使わないので空でOK
+  acm_certificate_arn = ""
+  alias_domain        = ""
+
+  # WAF 共有したければここで付与
+  web_acl_arn = module.waf.web_acl_arn
+
+  tags = {
+    Project     = local.project
+    Environment = local.environment
+  }
+}
+
+# ─────────────────────────────
 # 9. DNSレコード登録 (API用サブドメイン)
 # ★これも忘れずにコメントアウトしてください！
 # ─────────────────────────────
@@ -163,6 +183,16 @@ output "api_endpoint_custom" {
 
 output "cloudfront_domain" {
   value = module.cdn.cloudfront_domain_name
+}
+
+output "frontend_bucket_name" {
+  description = "S3 bucket for frontend static files"
+  value       = module.frontend.bucket_name
+}
+
+output "frontend_cloudfront_domain" {
+  description = "CloudFront domain for frontend SPA"
+  value       = module.frontend.cloudfront_domain
 }
 
 # ★これもコメントアウト（module.dnsがないため）
@@ -307,3 +337,4 @@ module "ses" {
   name_prefix  = "${local.project}-${local.environment}"
   sender_email = "tsuji.kodai@ndisol.com"  # Todo: どれにするか
 }
+
