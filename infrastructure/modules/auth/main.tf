@@ -31,10 +31,10 @@ resource "aws_cognito_user_pool" "this" {
   # Passkey (WebAuthn) 設定
   # ドメイン取得後に有効化
   # ─────────────────────────────
-  # web_authn_configuration {
-  #   relying_party_id   = "your-domain.com"
-  #   user_verification  = "preferred"
-  # }
+  web_authn_configuration {
+    relying_party_id  = "localhost"
+    user_verification = "preferred"
+  }
 
   # パスワードポリシー（強化済み）
   password_policy {
@@ -54,6 +54,18 @@ resource "aws_cognito_user_pool" "this" {
     string_attribute_constraints {
       min_length = 1
       max_length = 64
+    }
+  }
+
+  # パスキー登録済みかどうかを管理するフラグ (0:未登録, 1:登録済)
+  schema {
+    name                = "has_passkey"
+    attribute_data_type = "Number"
+    mutable             = true
+    required            = false
+    number_attribute_constraints {
+      min_value = 0
+      max_value = 1
     }
   }
 
@@ -95,7 +107,8 @@ resource "aws_cognito_user_pool_client" "web" {
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
     "ALLOW_CUSTOM_AUTH",
-    "ALLOW_REFRESH_TOKEN_AUTH"
+    "ALLOW_REFRESH_TOKEN_AUTH",
+    "ALLOW_USER_AUTH"
   ]
 
   supported_identity_providers         = ["COGNITO"]
@@ -128,6 +141,7 @@ resource "aws_cognito_user_pool_client" "web" {
     "name",
     "family_name",
     "given_name",
+    "custom:has_passkey"
   ]
 
   read_attributes = [
@@ -136,7 +150,8 @@ resource "aws_cognito_user_pool_client" "web" {
     "name",
     "family_name",
     "given_name",
-    "custom:tenant_id"
+    "custom:tenant_id",
+    "custom:has_passkey"
   ]
 }
 
@@ -147,3 +162,5 @@ resource "aws_cognito_user_pool_domain" "this" {
   domain       = "${local.name_prefix}-auth"
   user_pool_id = aws_cognito_user_pool.this.id
 }
+
+
