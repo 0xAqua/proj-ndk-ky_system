@@ -11,17 +11,19 @@ BUILD_DIR="$APP_DIR/dist"
 # AWS CLI profile
 PROFILE="proj-ndk-ky"
 
+# Terraform ディレクトリ（★ここを修正）
+TF_DIR="$PROJECT_ROOT/dev"
+
 echo "=== Loading Terraform outputs ==="
-# Terraform の出力値から自動取得
-CLOUDFRONT_DISTRIBUTION_ID=$(terraform -chdir="$PROJECT_ROOT/infra/dev" output -raw frontend_cloudfront_distribution_id)
-CLOUDFRONT_DOMAIN=$(terraform -chdir="$PROJECT_ROOT/infra/dev" output -raw frontend_cloudfront_domain)
-S3_BUCKET=$(terraform -chdir="$PROJECT_ROOT/infra/dev" output -raw frontend_bucket_name)
+
+CLOUDFRONT_DISTRIBUTION_ID=$(terraform -chdir="$TF_DIR" output -raw frontend_cloudfront_distribution_id)
+CLOUDFRONT_DOMAIN=$(terraform -chdir="$TF_DIR" output -raw frontend_cloudfront_domain)
+S3_BUCKET=$(terraform -chdir="$TF_DIR" output -raw frontend_bucket_name)
 
 echo "CloudFront ID: $CLOUDFRONT_DISTRIBUTION_ID"
 echo "CloudFront Domain: $CLOUDFRONT_DOMAIN"
 echo "S3 Bucket: $S3_BUCKET"
 
-# app をビルド
 echo "=== Building frontend ==="
 cd "$APP_DIR"
 npm run build
