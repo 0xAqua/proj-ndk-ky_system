@@ -9,7 +9,7 @@ tracer = Tracer()
 def lambda_handler(event, context):
     """
     Define Auth Challenge Lambda (2要素認証版)
-    Flow: Password (SRP) -> Custom Challenge (Email OTP) -> Tokens
+    Flow: SRP_A -> PASSWORD_VERIFIER -> CUSTOM_CHALLENGE -> Tokens
     """
     response = event.get("response", {})
     request = event.get("request", {})
@@ -17,33 +17,36 @@ def lambda_handler(event, context):
 
     logger.info(f"Session length: {len(session)}")
 
-    # 1. 最初のアクセス、またはSRP認証の途中
-    # セッションが空、または最後のチャレンジがSRP関連の場合は、Cognito標準のSRPフローを継続させる
+    # 1. 未開始 -> SRP_A (SRPフロー開始)
     if len(session) == 0:
-        # まだ何も始まっていない -> SRP認証へ
-        logger.info("Phase 1: Start SRP Auth")
+        logger.info("Phase 0: Start SRP_A")
         response["issueTokens"] = False
         response["failAuthentication"] = False
         response["challengeName"] = "SRP_A"
 
-    elif session[-1].get("challengeName") in ["SRP_A", "PASSWORD_VERIFIER"]:
-        # SRP認証の計算中、またはパスワード検証直後
+    # 2. SRP_A 成功 -> PASSWORD_VERIFIER (パスワード検証へ)
+    elif session[-1].get("challengeName") == "SRP_A":
+        logger.info("Phase 1: SRP_A completed -> Next PASSWORD_VERIFIER")
+        response["issueTokens"] = False
+        response["failAuthentication"] = False
+        response["challengeName"] = "PASSWORD_VERIFIER"
+
+    # 3. PASSWORD_VERIFIER 成功 -> CUSTOM_CHALLENGE (OTPへ)
+    elif session[-1].get("challengeName") == "PASSWORD_VERIFIER":
         if session[-1].get("challengeResult") == True:
-            # パスワード認証成功！ -> 次はカスタムOTPへ進む
-            logger.info("Phase 2: Password Verified - Presenting Custom Challenge (OTP)")
+            logger.info("Phase 2: Password verified -> Next CUSTOM_CHALLENGE")
             response["issueTokens"] = False
             response["failAuthentication"] = False
             response["challengeName"] = "CUSTOM_CHALLENGE"
         else:
-            # パスワード間違いなど
-            logger.info("Phase 1: SRP Failed")
+            logger.info("Phase 2: Password failed")
             response["issueTokens"] = False
-            response["failAuthentication"] = False # クライアントに再試行させるためFalseのままが多いが、ここはお任せ
+            response["failAuthentication"] = True
 
-    # 2. OTP入力後
+    # 4. CUSTOM_CHALLENGE 判定
     elif session[-1].get("challengeName") == "CUSTOM_CHALLENGE":
         if session[-1].get("challengeResult") == True:
-            # OTP正解！ -> トークン発行（ログイン成功）
+            # OTP正解！ -> トークン発行
             logger.info("Phase 3: OTP Succeeded - Issuing tokens")
             response["issueTokens"] = True
             response["failAuthentication"] = False
@@ -51,7 +54,7 @@ def lambda_handler(event, context):
             # OTP間違い
             logger.info("Phase 3: OTP Failed")
             response["issueTokens"] = False
-            response["failAuthentication"] = True # ここで失敗確定させる
+            response["failAuthentication"] = True
 
     else:
         # 想定外の状態
