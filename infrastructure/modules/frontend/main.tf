@@ -11,7 +11,7 @@ resource "aws_s3_bucket" "this" {
   })
 }
 
-# バケットはフル private + OAI 経由でのみアクセスさせる想定
+# バケットはフル private + OAC 経由でのみアクセスさせる想定
 resource "aws_s3_bucket_public_access_block" "this" {
   bucket = aws_s3_bucket.this.id
 
@@ -21,12 +21,18 @@ resource "aws_s3_bucket_public_access_block" "this" {
   restrict_public_buckets = true
 }
 
-# CloudFront から S3 へのアクセス用
-resource "aws_cloudfront_origin_access_identity" "this" {
-  comment = "${var.name_prefix}-frontend-oai"
+# ─────────────────────────────
+# OAC（Origin Access Control）- 新方式
+# ─────────────────────────────
+resource "aws_cloudfront_origin_access_control" "this" {
+  name                              = "${var.name_prefix}-frontend-oac"
+  description                       = "OAC for ${var.name_prefix} frontend"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
 }
 
-# OAI からだけ読めるようにするポリシー
+# OAC 用の S3 バケットポリシー
 resource "aws_s3_bucket_policy" "this" {
   bucket = aws_s3_bucket.this.id
 
@@ -34,15 +40,24 @@ resource "aws_s3_bucket_policy" "this" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "AllowCloudFrontServicePrincipalReadOnly"
         Effect = "Allow"
         Principal = {
-          AWS = aws_cloudfront_origin_access_identity.this.iam_arn
+          Service = "cloudfront.amazonaws.com"
         }
-        Action   = ["s3:GetObject"]
+        Action   = "s3:GetObject"
         Resource = "${aws_s3_bucket.this.arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.this.arn
+          }
+        }
       }
     ]
   })
+
+  # CloudFront distribution が先に作成される必要がある
+  depends_on = [aws_cloudfront_distribution.this]
 }
 
 # キャッシュポリシー（Managed）
@@ -50,7 +65,7 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
 }
 
-# セキュリティヘッダー（API用と同じノリ）
+# セキュリティヘッダー
 resource "aws_cloudfront_response_headers_policy" "security_headers" {
   name = "${var.name_prefix}-frontend-security-headers"
 
@@ -95,12 +110,9 @@ resource "aws_cloudfront_distribution" "this" {
   default_root_object = "index.html"
 
   origin {
-    domain_name = aws_s3_bucket.this.bucket_regional_domain_name
-    origin_id   = "S3FrontendOrigin"
-
-    s3_origin_config {
-      origin_access_identity = aws_cloudfront_origin_access_identity.this.cloudfront_access_identity_path
-    }
+    domain_name              = aws_s3_bucket.this.bucket_regional_domain_name
+    origin_id                = "S3FrontendOrigin"
+    origin_access_control_id = aws_cloudfront_origin_access_control.this.id
   }
 
   default_cache_behavior {
@@ -110,16 +122,23 @@ resource "aws_cloudfront_distribution" "this" {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
 
-    cache_policy_id             = data.aws_cloudfront_cache_policy.caching_optimized.id
-    response_headers_policy_id  = aws_cloudfront_response_headers_policy.security_headers.id
+    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_optimized.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id
   }
 
+  # SPA用: 403 -> /index.html
   custom_error_response {
     error_code         = 403
     response_code      = 200
     response_page_path = "/index.html"
   }
 
+  # SPA用: 404 -> /index.html
+  custom_error_response {
+    error_code         = 404
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
 
   restrictions {
     geo_restriction {
@@ -135,7 +154,4 @@ resource "aws_cloudfront_distribution" "this" {
     ssl_support_method       = var.acm_certificate_arn != "" ? "sni-only" : null
     minimum_protocol_version = var.acm_certificate_arn != "" ? "TLSv1.2_2021" : null
   }
-
-  # SPAでルーティングする場合、ここに 403/404 -> /index.html の
-  # custom_error_response を後から足してもOK
 }
