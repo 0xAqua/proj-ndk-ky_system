@@ -12,7 +12,8 @@ import { useConstructionMaster } from "@/features/entry/hooks/useConstructionMas
 import { ConstructionProject } from "@/features/entry/components/elements/ConstructionProject";
 import { ConstructionProcess } from "@/features/entry/components/elements/ConstructionProcess";
 import { ImportantEquipment } from "@/features/entry/components/elements/ImportantEquipment";
-import { SiteCondition } from "@/features/entry/components/elements/SiteCondition"; // ★追加: 現場状況
+import { SiteCondition } from "@/features/entry/components/elements/SiteCondition";
+import {buildConstructionPrompt} from "@/features/entry/services/promptBuilder.ts"; // ★追加: 現場状況
 
 export const EntryForm = () => {
     const {
@@ -29,6 +30,7 @@ export const EntryForm = () => {
     const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]);
     const [selectedProcessIds, setSelectedProcessIds] = useState<string[]>([]);
     const [selectedEnvIds, setSelectedEnvIds] = useState<string[]>([]); // ★追加: 現場状況用
+
 
     useEffect(() => {
         if (tenantId) return;
@@ -50,14 +52,40 @@ export const EntryForm = () => {
         void initData();
     }, []);
 
-    const handleSubmit = () => {
-        const payload = {
+    // 送信ハンドラ
+    const handleSubmit = async () => {
+        // 1. プロンプト（入力内容テキスト）を生成
+        const promptText = buildConstructionPrompt({
             date,
-            constructionTypes: selectedTypeIds,
-            processes: selectedProcessIds,
-            environments: selectedEnvIds // ★追加
-        };
-        console.log("送信データ:", payload);
+            constructions: constructions,
+            environments,
+            selectedTypeIds,
+            selectedProcessIds,
+            selectedEnvIds
+        });
+
+        // ログで確認してみましょう！
+        console.log("生成されたプロンプト:\n", promptText);
+
+        // 2. Lambdaへ送信 (APIコール)
+        /*
+        setLoading(true);
+        try {
+            await api.post('/prediction', { // エンドポイント例
+                prompt: promptText,
+                // ID等の生データも必要なら一緒に送る
+                metadata: {
+                   date,
+                   processIds: selectedProcessIds
+                }
+            });
+            alert("送信しました！");
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+        */
     };
 
     if (isUserLoading || isMasterLoading) {
