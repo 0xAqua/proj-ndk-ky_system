@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from '@/pages/LoginPage';
 import { EntryPage } from "@/pages/EntryPage";
+import { ResultPage } from "@/pages/ResultPage";
 import { AuthGuard } from '@/features/auth/components/AuthGuard';
 
 export const AppRoutes = () => {
@@ -18,6 +19,16 @@ export const AppRoutes = () => {
                 element={
                     <AuthGuard>
                         <EntryPage />
+                    </AuthGuard>
+                }
+            />
+
+            {/* 結果表示画面 (URLパラメータ :jobId を受け取る) */}
+            <Route
+                path="/result/:jobId"
+                element={
+                    <AuthGuard>
+                        <ResultPage />
                     </AuthGuard>
                 }
             />

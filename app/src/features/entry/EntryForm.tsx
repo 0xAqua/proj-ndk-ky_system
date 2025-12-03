@@ -1,21 +1,26 @@
 import { useState, useEffect } from "react";
+// 画面遷移用
+import { useNavigate } from "react-router-dom";
+
 import { Box, Spinner, VStack, Button, Text } from "@chakra-ui/react";
 import { useUserStore } from "@/stores/useUserStore";
 import { api } from "@/lib/api";
 import ConstructionDate from "@/features/entry/components/elements/ConstructionDate";
 
-// Hooks
+// Hooks & Services
 import { useConstructionMaster } from "@/features/entry/hooks/useConstructionMaster";
+import { buildConstructionPrompt } from "@/features/entry/services/promptBuilder";
 
 // Components
-// ※ファイル名はご自身の環境に合わせてください (ConstructionWorkUi -> ConstructionProject の場合あり)
 import { ConstructionProject } from "@/features/entry/components/elements/ConstructionProject";
 import { ConstructionProcess } from "@/features/entry/components/elements/ConstructionProcess";
 import { ImportantEquipment } from "@/features/entry/components/elements/ImportantEquipment";
 import { SiteCondition } from "@/features/entry/components/elements/SiteCondition";
-import {buildConstructionPrompt} from "@/features/entry/services/promptBuilder.ts"; // ★追加: 現場状況
 
 export const EntryForm = () => {
+    const navigate = useNavigate();
+    // const toast = useToast(); // ★削除 (v3では使えません)
+
     const {
         tenantId,
         setUserData,
@@ -23,18 +28,20 @@ export const EntryForm = () => {
         setLoading
     } = useUserStore();
 
-    // ★修正ポイント: categories ではなく constructions と environments を受け取る
     const { constructions, environments, isLoading: isMasterLoading, error } = useConstructionMaster();
 
+    // 状態管理
     const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
     const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]);
     const [selectedProcessIds, setSelectedProcessIds] = useState<string[]>([]);
-    const [selectedEnvIds, setSelectedEnvIds] = useState<string[]>([]); // ★追加: 現場状況用
+    const [selectedEnvIds, setSelectedEnvIds] = useState<string[]>([]);
 
+    // 送信中のローディング状態
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // 初期化処理
     useEffect(() => {
         if (tenantId) return;
-
         const initData = async () => {
             setLoading(true);
             try {
@@ -48,44 +55,61 @@ export const EntryForm = () => {
                 setLoading(false);
             }
         };
-
         void initData();
     }, []);
 
-    // 送信ハンドラ
+    // ──────────────────────────────────────────
+    // 送信ハンドラ (API連携)
+    // ──────────────────────────────────────────
     const handleSubmit = async () => {
-        // 1. プロンプト（入力内容テキスト）を生成
-        const promptText = buildConstructionPrompt({
-            date,
-            constructions: constructions,
-            environments,
-            selectedTypeIds,
-            selectedProcessIds,
-            selectedEnvIds
-        });
-
-        // ログで確認してみましょう！
-        console.log("生成されたプロンプト:\n", promptText);
-
-        // 2. Lambdaへ送信 (APIコール)
-        /*
-        setLoading(true);
-        try {
-            await api.post('/prediction', { // エンドポイント例
-                prompt: promptText,
-                // ID等の生データも必要なら一緒に送る
-                metadata: {
-                   date,
-                   processIds: selectedProcessIds
-                }
-            });
-            alert("送信しました！");
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
+        // バリデーション (簡易)
+        if (selectedTypeIds.length === 0 || selectedProcessIds.length === 0) {
+            // ★変更: toast -> alert
+            alert("【入力不足】\n工事種別と工程を選択してください。");
+            return;
         }
-        */
+
+        setIsSubmitting(true);
+
+        try {
+            // 1. プロンプト生成
+            const promptText = buildConstructionPrompt({
+                date,
+                constructions, // constructionsを渡す
+                environments,
+                selectedTypeIds,
+                selectedProcessIds,
+                selectedEnvIds
+            });
+
+            console.log("Sending Prompt:", promptText);
+
+            // 2. API送信 (Producer Lambdaへ)
+            // ※エンドポイントは '/jobs' や '/prediction' などAPI Gatewayの設定に合わせてください
+            // ここでは '/jobs' と仮定しています
+            const res = await api.post('/jobs', {
+                prompt: promptText
+            });
+
+            const { jobId } = res.data;
+
+            if (!jobId) {
+                throw new Error("Job ID not returned");
+            }
+
+            // ★変更: toast -> alert
+            // alert("受付完了: AIによる解析を開始しました。");
+
+            // 3. 結果画面へ遷移 (Job IDを持っていく)
+            navigate(`/result/${jobId}`);
+
+        } catch (e) {
+            console.error("Submission failed:", e);
+            // ★変更: toast -> alert
+            alert("【送信エラー】\nサーバーへの送信に失敗しました。");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (isUserLoading || isMasterLoading) {
@@ -104,44 +128,43 @@ export const EntryForm = () => {
     return (
         <Box maxW="600px" mx="auto" pb={10}>
             <VStack gap={6} align="stretch">
-
-                {/* 1. 日付選択 */}
                 <ConstructionDate value={date} onChange={setDate} />
 
-                {/* 2. 工事種別選択 */}
                 <ConstructionProject
-                    masterCategories={constructions} // ★修正: constructions を渡す
+                    masterCategories={constructions}
                     selectedTypeIds={selectedTypeIds}
                     onChange={setSelectedTypeIds}
                 />
 
-                {/* 工事種別が選択されていれば表示 */}
                 {selectedTypeIds.length > 0 && (
                     <>
-                        {/* 3. 工事工程選択 */}
                         <ConstructionProcess
-                            masterCategories={constructions} // ★修正: constructions を渡す
+                            masterCategories={constructions}
                             targetTypeIds={selectedTypeIds}
                             value={selectedProcessIds}
                             onChange={setSelectedProcessIds}
                         />
-
-                        {/* 4. 注意が必要な機材 */}
                         <ImportantEquipment
-                            masterCategories={constructions} // ★修正: constructions を渡す
+                            masterCategories={constructions}
                             selectedProcessIds={selectedProcessIds}
                         />
                     </>
                 )}
 
-                {/* 5. 現場状況・環境 (ここに追加) */}
                 <SiteCondition
-                    masterEnvironments={environments} // ★環境データを渡す
+                    masterEnvironments={environments}
                     value={selectedEnvIds}
                     onChange={setSelectedEnvIds}
                 />
 
-                <Button colorScheme="blue" onClick={handleSubmit} mt={4} size="lg">
+                <Button
+                    colorScheme="blue"
+                    onClick={handleSubmit}
+                    mt={4}
+                    size="lg"
+                    loading={isSubmitting} // Chakra v3なら isLoading ではなく loading かもしれません
+                    loadingText="送信中..."
+                >
                     登録内容を確認
                 </Button>
             </VStack>
