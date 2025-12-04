@@ -5,11 +5,20 @@ resource "aws_apigatewayv2_api" "this" {
 
   # CORS設定 (フロントエンドからのアクセス許可)
   cors_configuration {
-    allow_origins = ["*"] # 本番時は "https://example.com" 等に制限推奨
+    allow_origins = [
+      "http://localhost:3000",                  # ローカル開発用
+      "https://d1w3ij4j3pi58j.cloudfront.net"   # デプロイ環境用 (Terraform Outputの値を指定)
+    ]
+
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allow_headers = ["Content-Type", "Authorization"]
-    # allow_credentials = true  # 追加推奨
-    # max_age           = 300   # プリフライトキャッシュ
+
+    # ★変更: AWSの標準的なヘッダーも追加しておく
+    allow_headers = ["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"]
+
+    # ★変更: コメントアウトを外して有効化 (Cookieや認証ヘッダーを通すために必要)
+    allow_credentials = true
+
+    max_age           = 300
   }
 }
 
