@@ -37,6 +37,10 @@ resource "aws_cognito_user_pool" "this" {
   # Passkey (WebAuthn) 設定
   # ドメイン取得後に有効化
   # ─────────────────────────────
+  sign_in_policy {
+    allowed_first_auth_factors = ["PASSWORD", "WEB_AUTHN", "EMAIL_OTP"]
+  }
+
   web_authn_configuration {
     relying_party_id  = var.webauthn_relying_party_id
     user_verification = "preferred"
