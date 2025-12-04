@@ -78,7 +78,7 @@ export const ImportantEquipment = ({ masterCategories, selectedProcessIds }: Pro
                     {hasItems ? (
                         <>
                             <Text fontSize="xs" color="gray.500">
-                                選択した工程に基づき、以下の機材の使用時は特に注意してください。
+                                選択した工事工程に基づき、以下の機材の使用時は特に注意してください。
                             </Text>
                             <Flex gap={2} wrap="wrap">
                                 {visibleEquipments.map((equipment) => (
@@ -114,7 +114,7 @@ export const ImportantEquipment = ({ masterCategories, selectedProcessIds }: Pro
                         >
                             <MdInfoOutline color="gray" />
                             <Text fontSize="xs" color="gray.500">
-                                上記で工程を選択すると、必要な機材が表示されます。
+                                上記で工事工程を選択すると、必要な機材が表示されます。
                             </Text>
                         </Flex>
                     )}
