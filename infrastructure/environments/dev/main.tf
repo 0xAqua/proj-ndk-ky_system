@@ -43,6 +43,7 @@ module "auth" {
   create_auth_lambda_arn = module.auth_challenge.create_challenge_lambda_arn
   verify_auth_lambda_arn = module.auth_challenge.verify_challenge_lambda_arn
 
+  webauthn_relying_party_id = module.frontend.cloudfront_domain
 }
 
 # ─────────────────────────────

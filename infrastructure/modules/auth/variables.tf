@@ -72,3 +72,8 @@ variable "verify_auth_lambda_arn" {
   default     = null
 }
 
+
+variable "webauthn_relying_party_id" {
+  description = "WebAuthn Relying Party ID (frontend domain)"
+  type        = string
+}

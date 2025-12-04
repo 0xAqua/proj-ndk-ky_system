@@ -27,18 +27,18 @@ resource "aws_cognito_user_pool" "this" {
 
   # ─────────────────────────────
   # MFA設定
-  # Email OTPはカスタム認証フローで実装するため、
-  # Cognito標準のMFAはOFFのまま
   # ─────────────────────────────
-  mfa_configuration = "OFF"
+  mfa_configuration = "OPTIONAL"
 
-
+  software_token_mfa_configuration {
+    enabled = true
+  }
   # ─────────────────────────────
   # Passkey (WebAuthn) 設定
   # ドメイン取得後に有効化
   # ─────────────────────────────
   web_authn_configuration {
-    relying_party_id  = "localhost"
+    relying_party_id  = var.webauthn_relying_party_id
     user_verification = "preferred"
   }
 
