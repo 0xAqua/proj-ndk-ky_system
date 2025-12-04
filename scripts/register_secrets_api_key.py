@@ -8,9 +8,13 @@ from botocore.exceptions import ClientError
 PROFILE_NAME = 'proj-ndk-ky'
 REGION = 'ap-northeast-1'
 JSON_FILE = '../seeds/secrets_api_key_seed.json'
+
+# ★重要: Terraformで作成したシークレット名に合わせてください
+# 以前のログによると "ndk-ky-system-dev/vq-credentials" でした
+TARGET_SECRET_NAME = 'ndk-ky-system-dev/vq-credentials'
 # ==========================================
 
-print(f"--- Secrets Manager登録開始 (Profile: {PROFILE_NAME}) ---")
+print(f"--- Secrets Manager一括登録 (Profile: {PROFILE_NAME}) ---")
 
 try:
     session = boto3.Session(profile_name=PROFILE_NAME)
@@ -23,46 +27,31 @@ except Exception as e:
 def register_secrets():
     try:
         with open(JSON_FILE, 'r', encoding='utf-8') as f:
-            tenants = json.load(f)
+            tenants = json.load(f) # リストとして読み込む
     except FileNotFoundError:
-        print("❌ JSONファイルが見つかりません。パスを確認してください。")
+        print("❌ JSONファイルが見つかりません。")
         return
 
-    print(f"{len(tenants)} 件のシークレットを処理します...")
+    # テナントリスト全体を1つのJSON文字列にする
+    secret_string = json.dumps(tenants, ensure_ascii=False)
 
-    for item in tenants:
-        tenant_id = item['tenant_id']
-        secret_data = item['secret_data']
-        description = item.get('description', '')
+    print(f"ターゲット: {TARGET_SECRET_NAME}")
+    print(f"データ件数: {len(tenants)} 件のテナント設定をまとめて更新します...")
 
-        # シークレット名 (命名規則: ndk-ky/dev/{tenant_id}/vq-key)
-        secret_name = f"ndk-ky/dev/{tenant_id}/vq-key"
-        secret_string = json.dumps(secret_data)
+    try:
+        # 既存のシークレットの「値」を上書き更新する
+        client.put_secret_value(
+            SecretId=TARGET_SECRET_NAME,
+            SecretString=secret_string
+        )
+        print(f"  -> ✅ 更新成功: シークレットに全テナントの設定を保存しました")
 
-        print(f"処理中: {secret_name} ...")
-
-        try:
-            # 1. 作成を試みる
-            client.create_secret(
-                Name=secret_name,
-                Description=description,
-                SecretString=secret_string
-            )
-            print(f"  -> ✅ 新規作成しました")
-
-        except ClientError as e:
-            if e.response['Error']['Code'] == 'ResourceExistsException':
-                # 2. 既にある場合は値を更新する
-                try:
-                    client.put_secret_value(
-                        SecretId=secret_name,
-                        SecretString=secret_string
-                    )
-                    print(f"  -> 🔄 既存のシークレットを更新しました")
-                except Exception as update_error:
-                    print(f"  -> ❌ 更新エラー: {update_error}")
-            else:
-                print(f"  -> ❌ 作成エラー: {e}")
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == 'ResourceNotFoundException':
+            print(f"  -> ❌ エラー: シークレット '{TARGET_SECRET_NAME}' が見つかりません。Terraformで作成されているか確認してください。")
+        else:
+            print(f"  -> ❌ AWSエラー: {e}")
 
     print("--- 処理完了 ---")
 
