@@ -282,8 +282,8 @@ module "s3_log_archive" {
   source      = "../../modules/data/s3"
   project     = local.project
   environment = local.environment
+  suffix      = "-v2"
 }
-
 # ─────────────────────────────
 # 13. 監査ログ (CloudTrail)
 # ─────────────────────────────
@@ -291,8 +291,7 @@ module "cloudtrail" {
   source = "../../modules/security/cloudtrail"
 
   name_prefix    = "${local.project}-${local.environment}"
-  # 作成済みのS3バケット名を渡す
-  s3_bucket_name = module.s3_log_archive.log_archive_bucket_name
+  s3_bucket_name = module.s3_log_archive.bucket_name
 }
 
 # ─────────────────────────────
