@@ -243,7 +243,7 @@ module "s3_vq_workflow" {
   env = local.environment  # これを追加
 
   # 外部API
-  external_api_base_url = "https://ndis.questella.biz"
+  external_api_base_url = "https://ndknet.questella.biz"
   api_endpoint = module.api_gateway.api_endpoint
 
   # KMS
