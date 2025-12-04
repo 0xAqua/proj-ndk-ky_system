@@ -126,7 +126,7 @@ export const EntryForm = () => {
     }
 
     return (
-        <Box maxW="600px" mx={2} pb={10}>
+        <Box maxW="600px" mx={"auto"} pb={10}>
             <VStack gap={4} align="stretch">
                 <ConstructionDate value={date} onChange={setDate} />
 

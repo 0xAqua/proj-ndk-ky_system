@@ -126,7 +126,7 @@ export const ImportantEquipment = ({ masterCategories, selectedProcessIds }: Pro
             <Dialog.Root open={isModalOpen} onOpenChange={(e) => setIsModalOpen(e.open)} size="lg">
                 <Dialog.Backdrop />
                 <Dialog.Positioner>
-                    <Dialog.Content>
+                    <Dialog.Content m={4}>
                         <Dialog.Header>
                             <Dialog.Title>使用機材一覧</Dialog.Title>
                             <Dialog.CloseTrigger asChild>
