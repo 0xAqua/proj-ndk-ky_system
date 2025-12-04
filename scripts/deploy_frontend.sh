@@ -14,7 +14,7 @@ BUILD_DIR="$APP_DIR/dist"
 # 設定（必要ならここだけ変えればOK）
 # ─────────────────────────────
 S3_BUCKET="ndk-ky-system-dev-frontend"
-CLOUDFRONT_DISTRIBUTION_ID="E2RLJ8GKQ0AK1V"
+CLOUDFRONT_DISTRIBUTION_ID="E3UXMAT7CK782E"
 PROFILE="proj-ndk-ky"
 
 # ─────────────────────────────
