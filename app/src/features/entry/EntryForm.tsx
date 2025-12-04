@@ -91,7 +91,7 @@ export const EntryForm = () => {
                 message: promptText
             });
 
-            const { jobId } = res.data;
+            const { job_id: jobId } = res.data;
 
             if (!jobId) {
                 throw new Error("Job ID not returned");
