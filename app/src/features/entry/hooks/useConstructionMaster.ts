@@ -1,70 +1,97 @@
+// src/features/entry/hooks/useConstructionMaster.ts
+
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useUserStore } from "@/stores/useUserStore";
 
-// UIコンポーネントが期待するデータ型（最終構造）
+// 型定義 (ProcessCategory を再利用しますが、環境用としても使えます)
+export type ConstructionTask = { id: string; title: string; };
+export type SafetyEquipment = { id: string; title: string; is_high_risk: boolean; };
+
 export type ProcessCategory = {
-    id: string;    // 工事種別ID (ConstructionType)
-    name: string;  // 工事種別名
+    id: string;
+    name: string;
     processes: {
-        id: string;    // 工程ID (ConstructionProject)
-        label: string; // 工程名
+        id: string;
+        label: string;
+        tasks: ConstructionTask[];
+        safety_equipments: SafetyEquipment[];
     }[];
+    // ★追加: 環境データ用の階層保持のため children も持てるようにしておく
+    children?: ProcessCategory[];
 };
 
 export const useConstructionMaster = () => {
     const { departments } = useUserStore();
 
-    const [categories, setCategories] = useState<ProcessCategory[]>([]);
+    // ★変更: 2つのカテゴリに分けて管理
+    const [constructions, setConstructions] = useState<ProcessCategory[]>([]);
+    const [environments, setEnvironments] = useState<ProcessCategory[]>([]);
+
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // 部署情報がなければロードしない
         if (departments.length === 0) return;
 
         const fetchMaster = async () => {
             setIsLoading(true);
             try {
-                // 1. APIからデータ(ツリー構造)を取得
                 const res = await api.get('/construction-master');
                 const rawTree = res.data;
 
-                // 2. ★構造化とフィルタリングの実行★ (Hooksの責務)
-                const myDeptIds = departments.map(d => d.id);
-                const formattedCategories: ProcessCategory[] = [];
+                const myDeptNames = departments.map(d => d.name);
 
-                rawTree.forEach((deptNode: any) => {
-                    // 部署IDが一致しないノードはスキップ (フィルタリング)
-                    if (!myDeptIds.includes(deptNode.id)) return;
+                const tempConstructions: ProcessCategory[] = [];
+                const tempEnvironments: ProcessCategory[] = [];
 
-                    // 部署の下にある「工事種別 (Type)」をループ
-                    deptNode.children?.forEach((typeNode: any) => {
+                rawTree.forEach((rootNode: any) => {
+                    // A. 環境系データ (IDが ENV で始まる)
+                    if (rootNode.id.startsWith("ENV")) {
+                        // 環境データはそのままの構造で保存（中項目の階層などを維持するため整形ロジックは用途によるが、一旦そのままマッピング）
+                        // ここでは、UI側で使いやすいように階層を整えます
+                        const envCategory: ProcessCategory = {
+                            id: rootNode.id,
+                            name: rootNode.title,
+                            processes: [], // 環境系はprocessesを使わないが型合わせのため
+                            children: rootNode.children?.map((mid: any) => ({
+                                id: mid.id,
+                                name: mid.title,
+                                processes: mid.children?.map((item: any) => ({
+                                    id: item.id,
+                                    label: item.title,
+                                    tasks: [],
+                                    safety_equipments: []
+                                })) || []
+                            })) || []
+                        };
+                        tempEnvironments.push(envCategory);
+                        return;
+                    }
 
-                        // その下の「工程 (Project)」を抽出してリスト化
-                        // Project/Taskノードのみを対象とする (機材を排除)
-                        const processes = typeNode.children
-                            ?.filter((childNode: any) =>
-                                childNode.type === 'ConstructionProject' || childNode.type === 'Task'
-                            )
-                            .map((projNode: any) => ({
-                                id: projNode.id,    // nodePath IDを使用
-                                label: projNode.name
+                    // B. 工事系データ (部署フィルタリングあり)
+                    if (myDeptNames.includes(rootNode.title)) {
+                        rootNode.children?.forEach((typeNode: any) => {
+                            const processes = typeNode.children?.map((projNode: any) => ({
+                                id: projNode.id,
+                                label: projNode.title,
+                                tasks: projNode.tasks || [],
+                                safety_equipments: projNode.safety_equipments || []
                             })) || [];
 
-                        // 工程がある場合のみ、カテゴリとして追加
-                        if (processes.length > 0) {
-                            formattedCategories.push({
-                                id: typeNode.id,
-                                name: typeNode.name,
-                                processes: processes
-                            });
-                        }
-                    });
+                            if (processes.length > 0) {
+                                tempConstructions.push({
+                                    id: typeNode.id,
+                                    name: typeNode.title,
+                                    processes: processes
+                                });
+                            }
+                        });
+                    }
                 });
 
-                console.log("Formatted Master Data:", formattedCategories);
-                setCategories(formattedCategories);
+                setConstructions(tempConstructions);
+                setEnvironments(tempEnvironments);
 
             } catch (err) {
                 console.error("マスタデータの取得に失敗しました:", err);
@@ -75,8 +102,8 @@ export const useConstructionMaster = () => {
         };
 
         void fetchMaster();
-    }, [departments]); // 部署情報が変わったら再実行
+    }, [departments]);
 
-    // 画面側はこれをそのまま受け取る
-    return { categories, isLoading, error };
+    // 戻り値を分ける
+    return { constructions, environments, isLoading, error };
 };

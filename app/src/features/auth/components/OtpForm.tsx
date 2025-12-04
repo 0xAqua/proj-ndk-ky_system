@@ -1,5 +1,5 @@
 import { VStack, Text, Button, Field, Center, PinInput, HStack } from "@chakra-ui/react";
-import React from "react";
+import React, { useMemo } from "react";
 
 type Props = {
     username: string;
@@ -18,6 +18,11 @@ export const OtpForm = ({
                             onSubmit,
                             onBack
                         }: Props) => {
+    // 文字列を配列に変換（メモ化して安定させる）
+    const pinValue = useMemo(() => {
+        return otp.padEnd(6, '').slice(0, 6).split('');
+    }, [otp]);
+
     return (
         <form onSubmit={onSubmit} style={{ width: '100%' }}>
             <VStack gap={4} width="100%">
@@ -30,15 +35,19 @@ export const OtpForm = ({
                             <PinInput.Root
                                 otp
                                 type="alphanumeric"
-                                value={otp.split('')}
-                                onValueChange={(e) => onOtpChange(e.valueAsString)}
+                                value={pinValue}
+                                onValueChange={(details) => {
+                                    // details.valueAsString を使う（Chakra v3）
+                                    const newValue = details.valueAsString ?? details.value.join('');
+                                    onOtpChange(newValue);
+                                }}
                                 size="lg"
                             >
                                 <PinInput.HiddenInput />
                                 <PinInput.Control>
                                     <HStack gap={2}>
-                                        {[0, 1, 2, 3, 4, 5].map((id, index) => (
-                                            <PinInput.Input key={id} index={index} />
+                                        {[0, 1, 2, 3, 4, 5].map((index) => (
+                                            <PinInput.Input key={index} index={index} />
                                         ))}
                                     </HStack>
                                 </PinInput.Control>
