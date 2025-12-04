@@ -1,5 +1,5 @@
 import { VStack, Text, Button, Field, Center, PinInput, HStack } from "@chakra-ui/react";
-import React, { useMemo } from "react";
+import React, { useState, useEffect } from "react";
 
 type Props = {
     username: string;
@@ -18,10 +18,23 @@ export const OtpForm = ({
                             onSubmit,
                             onBack
                         }: Props) => {
-    // 文字列を配列に変換（メモ化して安定させる）
-    const pinValue = useMemo(() => {
-        return otp.padEnd(6, '').slice(0, 6).split('');
+    // 内部では配列で管理（公式推奨）
+    const [pinValue, setPinValue] = useState<string[]>(["", "", "", "", "", ""]);
+
+    // 親のotpが変わったら配列に反映
+    useEffect(() => {
+        const arr = otp.split('').slice(0, 6);
+        const padded = [...arr, ...Array(6 - arr.length).fill('')];
+        setPinValue(padded);
     }, [otp]);
+
+    const handleValueChange = (details: { value: string[] }) => {
+        // undefined を空文字に変換
+        const safeValue = details.value.map(v => v ?? '');
+        setPinValue(safeValue);
+        // 親には文字列で渡す
+        onOtpChange(safeValue.join(''));
+    };
 
     return (
         <form onSubmit={onSubmit} style={{ width: '100%' }}>
@@ -36,11 +49,7 @@ export const OtpForm = ({
                                 otp
                                 type="alphanumeric"
                                 value={pinValue}
-                                onValueChange={(details) => {
-                                    // details.valueAsString を使う（Chakra v3）
-                                    const newValue = details.valueAsString ?? details.value.join('');
-                                    onOtpChange(newValue);
-                                }}
+                                onValueChange={handleValueChange}
                                 size="lg"
                             >
                                 <PinInput.HiddenInput />
