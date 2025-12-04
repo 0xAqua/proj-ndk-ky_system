@@ -18,14 +18,14 @@ sqs      = boto3.client('sqs')
 secrets  = boto3.client('secretsmanager')
 
 def get_vq_credentials(target_tenant_id):
-    """(Producerと同じロジック)"""
+    """Producerと同じ認証情報取得ロジック"""
     try:
         resp = secrets.get_secret_value(SecretId=VQ_SECRET_ARN)
         secret_json = json.loads(resp.get('SecretString'))
         if isinstance(secret_json, list):
             target_config = next(
                 (item for item in secret_json if item.get("tenant_id") == target_tenant_id), None)
-            if not target_config: raise Exception(f"Tenant config not found: {target_tenant_id}")
+            if not target_config: raise Exception(f"Tenant config not found for id: {target_tenant_id}")
             return target_config['secret_data']
         else:
             return secret_json.get('secret_data', secret_json)
@@ -39,22 +39,25 @@ def get_auth_token(api_key, login_id):
     return resp.json().get('token')
 
 def is_valid_content(content):
-    """簡易バリデーション: JSONとしてパースでき、空でないか"""
+    """JSONとしてパースでき、かつ空でないかを検証"""
     if not content: return False
     try:
         parsed = json.loads(content)
-        return True if isinstance(parsed, list) and len(parsed) > 0 else False
+        # 配列またはオブジェクトであり、中身があること
+        if isinstance(parsed, (list, dict)) and len(parsed) > 0:
+            return True
+        return False
     except:
         return False
 
 def recreate_job(creds, old_job_item, tenant_id):
-    """JSON不正時にジョブを作り直す"""
+    """JSONが不正だった場合にジョブを作り直す"""
     print(f"Re-creating job for old tid: {old_job_item['tid']}")
 
     token = get_auth_token(creds['api_key'], creds['login_id'])
 
     headers = {
-        "X-Auth-Token": f"Bearer {token}",
+        "X-Auth-Token": f"Bearer {token}", # ★Bearer付与
         "Content-Type": "application/json"
     }
 
@@ -73,7 +76,7 @@ def recreate_job(creds, old_job_item, tenant_id):
 
     print(f"New ID acquired: {new_tid}")
 
-    # DB更新 (Job IDは変えず、tid/midを更新)
+    # DynamoDB更新 (tid/midを新しいものに書き換え)
     table.update_item(
         Key={'job_id': old_job_item['job_id']},
         UpdateExpression="set tid=:t, mid=:m, #st=:s, updated_at=:u, retry_count=if_not_exists(retry_count, :zero) + :inc",
@@ -84,7 +87,7 @@ def recreate_job(creds, old_job_item, tenant_id):
         }
     )
 
-    # 新しいSQSメッセージを送信 (★tenant_id も忘れず引き継ぐ)
+    # 新しいSQSメッセージを送信 (Worker自身へ再送)
     sqs.send_message(
         QueueUrl=SQS_QUEUE_URL,
         MessageBody=json.dumps({
@@ -122,13 +125,13 @@ def lambda_handler(event, context):
 
             # 2. ポーリング (GET)
             url = f"{MESSAGE_API_URL}/{tid}/{mid}"
+            headers = {"X-Auth-Token": f"Bearer {token}"} # ★Bearer付与
 
-            headers = {"X-Auth-Token": f"Bearer {token}"}
             resp = requests.get(url, headers=headers)
-
             resp.raise_for_status()
             data = resp.json()
 
+            # ステータス確認 (processing / done)
             status = data.get('status')
 
             if status != 'done':
@@ -152,7 +155,7 @@ def lambda_handler(event, context):
                     }
                 )
             else:
-                # 失敗: やり直し
+                # 失敗: やり直し (Re-create)
                 print("Validation FAILED. Re-creating...")
                 resp = table.get_item(Key={'job_id': job_id})
                 if 'Item' in resp:
@@ -160,7 +163,8 @@ def lambda_handler(event, context):
 
         except Exception as e:
             if "Job not finished yet" in str(e):
-                raise e # SQSリトライさせる
+                # ポーリング継続のための正常な再試行フロー
+                raise e
             else:
                 print(f"Worker Error: {e}")
-                raise e # 予期せぬエラーもリトライ（要件次第でDLQへ）
+                raise e # 予期せぬエラーもリトライさせる

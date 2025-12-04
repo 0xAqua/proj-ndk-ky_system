@@ -3,6 +3,7 @@ import json
 import time
 import boto3
 import requests
+from decimal import Decimal
 from botocore.exceptions import ClientError
 
 # 環境変数
@@ -18,13 +19,22 @@ table    = dynamodb.Table(JOB_TABLE_NAME)
 sqs      = boto3.client('sqs')
 secrets  = boto3.client('secretsmanager')
 
+# DynamoDBのDecimal型をJSON変換するためのヘルパー
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super(DecimalEncoder, self).default(obj)
+
+# ---------------------------------------------------
+# 共通関数
+# ---------------------------------------------------
 def get_vq_credentials(target_tenant_id):
-    """Secrets ManagerからテナントIDに一致する認証情報を取得"""
+    """Secrets Managerからテナントごとの認証情報を取得"""
     try:
         resp = secrets.get_secret_value(SecretId=VQ_SECRET_ARN)
         secret_json = json.loads(resp.get('SecretString'))
 
-        # 配列から tenant_id が一致するものを探す
         if isinstance(secret_json, list):
             target_config = next(
                 (item for item in secret_json if item.get("tenant_id") == target_tenant_id),
@@ -34,49 +44,48 @@ def get_vq_credentials(target_tenant_id):
                 raise Exception(f"Tenant config not found for id: {target_tenant_id}")
             return target_config['secret_data']
         else:
-            # 配列でない場合のフォールバック
             return secret_json.get('secret_data', secret_json)
     except Exception as e:
         print(f"Failed to get secret: {e}")
         raise e
 
 def get_auth_token(api_key, login_id):
-    """VQ認証トークン取得"""
+    """VQ API認証トークン取得"""
     resp = requests.post(AUTH_API_URL, json={"api_key": api_key, "login_id": login_id})
     resp.raise_for_status()
     return resp.json().get('token')
 
-def lambda_handler(event, context):
+# ---------------------------------------------------
+# POST: ジョブ作成処理
+# ---------------------------------------------------
+def handle_post(event, context):
     try:
-        print("Processing Producer Request")
+        print("Processing POST Request")
 
-        # 1. 入力とユーザー情報の取得
         body = json.loads(event.get('body', '{}'))
         input_message = body.get('message')
 
         # Cognitoからユーザー情報取得
         claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
         user_id = claims.get('sub', 'unknown')
-        tenant_id = claims.get('custom:tenant_id')
+        tenant_id = claims.get('custom:tenant_id') # ★修正済み
 
         if not tenant_id:
-            # テナントIDがないと課金先不明になるのでエラーにする
-            return {"statusCode": 400, "body": json.dumps({"error": "Missing tenant_id (custom:id) in token"})}
+            return {"statusCode": 400, "body": json.dumps({"error": "Missing custom:tenant_id in token"})}
 
-        # 2. テナントIDを使って認証情報を取得
+        # 認証情報の取得
         creds = get_vq_credentials(tenant_id)
         api_key  = creds['api_key']
         login_id = creds['login_id']
-        model_id = creds['model_id'] # Secret内のmodel_idを使用
+        model_id = creds['model_id']
 
-        # 3. VQ Token取得 & Message API (POST)
+        # VQ API実行
         token = get_auth_token(api_key, login_id)
 
         headers = {
-            "X-Auth-Token": f"Bearer {token}",
+            "X-Auth-Token": f"Bearer {token}", # ★Bearer付与
             "Content-Type": "application/json"
         }
-
         payload = {
             "message": input_message,
             "model_id": model_id,
@@ -91,10 +100,10 @@ def lambda_handler(event, context):
         mid = vq_data.get('mid')
         job_id = tid  # 今回はtidを主キーとする
 
-        # 4. DynamoDBへ登録 (tenant_idも保存)
+        # DynamoDB登録
         item = {
             'job_id': job_id,
-            'tenant_id': tenant_id, # ★ここに追加！後でフィルタ可能に
+            'tenant_id': tenant_id,
             'user_id': user_id,
             'tid': tid,
             'mid': mid,
@@ -105,22 +114,76 @@ def lambda_handler(event, context):
         }
         table.put_item(Item=item)
 
-        # 5. SQSへ送信 (Workerへtenant_idを引き継ぐ)
+        # SQS送信 (Workerへ)
         sqs.send_message(
             QueueUrl=SQS_QUEUE_URL,
             MessageBody=json.dumps({
                 'job_id': job_id,
                 'tid': tid,
                 'mid': mid,
-                'tenant_id': tenant_id # ★Workerへの伝言
+                'tenant_id': tenant_id
             })
         )
 
         return {
             "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"job_id": job_id, "message": "Job accepted"})
         }
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"POST Error: {e}")
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+
+# ---------------------------------------------------
+# GET: ジョブ取得処理
+# ---------------------------------------------------
+def handle_get(event, context):
+    try:
+        print("Processing GET Request")
+
+        job_id = event.get('pathParameters', {}).get('jobId')
+        if not job_id:
+            return {"statusCode": 400, "body": json.dumps({"error": "Missing jobId parameter"})}
+
+        claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
+        tenant_id = claims.get('custom:tenant_id')
+
+        # DynamoDBから取得
+        resp = table.get_item(Key={'job_id': job_id})
+        item = resp.get('Item')
+
+        if not item:
+            return {"statusCode": 404, "body": json.dumps({"error": "Job not found"})}
+
+        # セキュリティチェック: 自テナントのデータのみ許可
+        if tenant_id and item.get('tenant_id') != tenant_id:
+            print(f"Access Denied: User tenant {tenant_id} tried to access Job tenant {item.get('tenant_id')}")
+            return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
+
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps(item, cls=DecimalEncoder)
+        }
+
+    except Exception as e:
+        print(f"GET Error: {e}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+
+# ---------------------------------------------------
+# メインハンドラ
+# ---------------------------------------------------
+def lambda_handler(event, context):
+    # HTTPメソッド判定
+    http_method = event.get('requestContext', {}).get('http', {}).get('method')
+
+    if http_method == 'GET':
+        return handle_get(event, context)
+    elif http_method == 'POST':
+        return handle_post(event, context)
+    else:
+        return {
+            "statusCode": 405,
+            "body": json.dumps({"error": f"Method {http_method} not allowed"})
+        }
