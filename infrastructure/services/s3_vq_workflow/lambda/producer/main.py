@@ -57,7 +57,7 @@ def lambda_handler(event, context):
         # Cognitoからユーザー情報取得
         claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
         user_id = claims.get('sub', 'unknown')
-        tenant_id = claims.get('custom:id') # ★テナントID取得
+        tenant_id = claims.get('custom:tenant_id')
 
         if not tenant_id:
             # テナントIDがないと課金先不明になるのでエラーにする
