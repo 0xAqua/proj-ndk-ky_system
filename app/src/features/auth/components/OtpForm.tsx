@@ -30,8 +30,13 @@ export const OtpForm = ({
                             <PinInput.Root
                                 otp
                                 type="alphanumeric"
-                                value={otp.split('')}
-                                onValueChange={(e) => onOtpChange(e.valueAsString)}
+                                value={Array(6).fill('').map((_, i) => otp[i] || '')}
+                                onValueChange={(e) => {
+                                    const cleanValue = e.value
+                                        .map(v => v ?? '')
+                                        .join('');
+                                    onOtpChange(cleanValue);
+                                }}
                                 size="lg"
                             >
                                 <PinInput.HiddenInput />
