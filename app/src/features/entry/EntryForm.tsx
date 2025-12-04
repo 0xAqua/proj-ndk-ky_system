@@ -88,7 +88,7 @@ export const EntryForm = () => {
             // ※エンドポイントは '/jobs' や '/prediction' などAPI Gatewayの設定に合わせてください
             // ここでは '/jobs' と仮定しています
             const res = await api.post('/jobs', {
-                prompt: promptText
+                message: promptText
             });
 
             const { jobId } = res.data;
