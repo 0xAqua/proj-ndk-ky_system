@@ -52,7 +52,11 @@ def recreate_job(creds, old_job_item, tenant_id):
     print(f"Re-creating job for old tid: {old_job_item['tid']}")
 
     token = get_auth_token(creds['api_key'], creds['login_id'])
-    headers = {"X-Auth-Token": token, "Content-Type": "application/json"}
+
+    headers = {
+        "X-Auth-Token": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
 
     payload = {
         "message": old_job_item.get('input_message'),
@@ -118,7 +122,10 @@ def lambda_handler(event, context):
 
             # 2. ポーリング (GET)
             url = f"{MESSAGE_API_URL}/{tid}/{mid}"
-            resp = requests.get(url, headers={"X-Auth-Token": token})
+
+            headers = {"X-Auth-Token": f"Bearer {token}"}
+            resp = requests.get(url, headers=headers)
+
             resp.raise_for_status()
             data = resp.json()
 

@@ -72,7 +72,11 @@ def lambda_handler(event, context):
         # 3. VQ Token取得 & Message API (POST)
         token = get_auth_token(api_key, login_id)
 
-        headers = {"X-Auth-Token": token, "Content-Type": "application/json"}
+        headers = {
+            "X-Auth-Token": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
         payload = {
             "message": input_message,
             "model_id": model_id,
