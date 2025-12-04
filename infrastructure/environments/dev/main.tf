@@ -240,6 +240,7 @@ module "s3_vq_workflow" {
 
   # ★追加: シークレット情報を渡す
   vq_secret_arn = module.secrets.secret_arn_prefix
+  env = local.environment  # これを追加
 
   # 外部API
   external_api_base_url = "https://ndis.questella.biz"

@@ -61,3 +61,8 @@ variable "api_endpoint" {
   description = "The base URL of the API Gateway"
   type        = string
 }
+
+variable "env" {
+  description = "Environment (dev, stg, prod)"
+  type        = string
+}
