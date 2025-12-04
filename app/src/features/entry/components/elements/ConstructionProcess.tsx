@@ -53,7 +53,7 @@ export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [
     };
 
     return (
-        <Box bg="white" w="full" borderRadius="lg">
+        <Box bg="white" w="full" p={2} borderRadius="lg">
             <ContentBox>
                 <VStack align="start" gap={3} w="full">
                     {/* ── ヘッダーエリア ── */}
