@@ -1,69 +1,189 @@
 import os
 import json
-import uuid
-import boto3
 import time
-from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.utilities.data_classes import event_source, APIGatewayProxyEventV2
+import boto3
+import requests
+from decimal import Decimal
+from botocore.exceptions import ClientError
 
-logger = Logger()
-tracer = Tracer()
+# 環境変数
+JOB_TABLE_NAME  = os.environ.get('JOB_TABLE_NAME')
+SQS_QUEUE_URL   = os.environ.get('SQS_QUEUE_URL')
+AUTH_API_URL    = os.environ.get('AUTH_API_URL')
+MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
+CALLBACK_URL    = os.environ.get('CALLBACK_URL')
+VQ_SECRET_ARN   = os.environ.get('VQ_SECRET_ARN')
 
-dynamodb = boto3.resource("dynamodb")
-sqs = boto3.client("sqs")
+dynamodb = boto3.resource('dynamodb')
+table    = dynamodb.Table(JOB_TABLE_NAME)
+sqs      = boto3.client('sqs')
+secrets  = boto3.client('secretsmanager')
 
-TABLE_NAME = os.environ["JOB_TABLE_NAME"]
-QUEUE_URL = os.environ["SQS_QUEUE_URL"]
+# DynamoDBのDecimal型をJSON変換するためのヘルパー
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super(DecimalEncoder, self).default(obj)
 
-@tracer.capture_lambda_handler
-@event_source(data_class=APIGatewayProxyEventV2)
-@logger.inject_lambda_context
-def lambda_handler(event: APIGatewayProxyEventV2):
-    # 1. 入力チェック
-    body = json.loads(event.body or "{}")
-    eat = body.get("eat")
+# ---------------------------------------------------
+# 共通関数
+# ---------------------------------------------------
+def get_vq_credentials(target_tenant_id):
+    try:
+        resp = secrets.get_secret_value(SecretId=VQ_SECRET_ARN)
+        secret_json = json.loads(resp.get('SecretString'))
 
-    if not eat:
-        return {"statusCode": 400, "body": json.dumps({"message": "eat is required"})}
+        if isinstance(secret_json, list):
+            target_config = next(
+                (item for item in secret_json if item.get("tenant_id") == target_tenant_id),
+                None
+            )
+            if not target_config:
+                raise Exception(f"Tenant config not found for id: {target_tenant_id}")
+            return target_config['secret_data']
+        else:
+            return secret_json.get('secret_data', secret_json)
+    except Exception as e:
+        print(f"Failed to get secret: {e}")
+        raise e
 
-    # テナントID取得 (JWTから)
-    claims = event.request_context.authorizer.jwt.claims
-    tenant_id = claims.get("custom:tenant_id") or claims.get("tenant_id")
+def get_auth_token(api_key, login_id):
+    resp = requests.post(AUTH_API_URL, json={"api_key": api_key, "login_id": login_id})
+    resp.raise_for_status()
+    return resp.json().get('token')
 
-    # 2. Job ID 生成 (AWS側でUUID発行)
-    job_id = str(uuid.uuid4())
-    logger.append_keys(job_id=job_id, tenant_id=tenant_id)
+# ---------------------------------------------------
+# POST: ジョブ作成処理 (既存ロジック)
+# ---------------------------------------------------
+def handle_post(event, context):
+    try:
+        print("Processing POST Request")
 
-    # 3. DynamoDBへ初期ステータス保存
-    table = dynamodb.Table(TABLE_NAME)
-    timestamp = int(time.time())
+        body = json.loads(event.get('body', '{}'))
+        input_message = body.get('message')
 
-    item = {
-        "tenant_id": tenant_id,
-        "job_id": job_id,       # SK
-        "status": "PENDING",    # 待機中
-        "input_eat": eat,
-        "created_at": timestamp,
-        "updated_at": timestamp
-    }
-    table.put_item(Item=item)
+        claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
+        user_id = claims.get('sub', 'unknown')
+        tenant_id = claims.get('custom:tenant_id')
 
-    # 4. SQSへメッセージ送信
-    message_body = {
-        "tenant_id": tenant_id,
-        "job_id": job_id,
-        "input_eat": eat
-    }
-    sqs.send_message(
-        QueueUrl=QUEUE_URL,
-        MessageBody=json.dumps(message_body)
-    )
+        if not tenant_id:
+            return {"statusCode": 400, "body": json.dumps({"error": "Missing custom:tenant_id in token"})}
 
-    logger.info("Job accepted")
+        # 認証 & VQ送信
+        creds = get_vq_credentials(tenant_id)
+        api_key  = creds['api_key']
+        login_id = creds['login_id']
+        model_id = creds['model_id']
 
-    # 5. 即座にJob IDを返す (AGWの29秒制限回避)
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"jobId": job_id, "message": "Job accepted"})
-    }
+        token = get_auth_token(api_key, login_id)
+
+        headers = {
+            "X-Auth-Token": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "message": input_message,
+            "model_id": model_id,
+            "callback_url": CALLBACK_URL
+        }
+
+        vq_resp = requests.post(MESSAGE_API_URL, json=payload, headers=headers)
+        vq_resp.raise_for_status()
+        vq_data = vq_resp.json()
+
+        tid = vq_data.get('tid')
+        mid = vq_data.get('mid')
+        job_id = tid
+
+        # DB登録
+        item = {
+            'job_id': job_id,
+            'tenant_id': tenant_id,
+            'user_id': user_id,
+            'tid': tid,
+            'mid': mid,
+            'input_message': input_message,
+            'status': 'PENDING',
+            'created_at': int(time.time()),
+            'updated_at': int(time.time())
+        }
+        table.put_item(Item=item)
+
+        # SQS送信
+        sqs.send_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MessageBody=json.dumps({
+                'job_id': job_id,
+                'tid': tid,
+                'mid': mid,
+                'tenant_id': tenant_id
+            })
+        )
+
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"job_id": job_id, "message": "Job accepted"})
+        }
+
+    except Exception as e:
+        print(f"POST Error: {e}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+
+# ---------------------------------------------------
+# GET: ジョブ取得処理 (★新規追加)
+# ---------------------------------------------------
+def handle_get(event, context):
+    try:
+        print("Processing GET Request")
+
+        # 1. パスパラメータからID取得
+        job_id = event.get('pathParameters', {}).get('jobId')
+        if not job_id:
+            return {"statusCode": 400, "body": json.dumps({"error": "Missing jobId parameter"})}
+
+        # 2. テナントID取得 (セキュリティチェック用)
+        claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
+        tenant_id = claims.get('custom:tenant_id')
+
+        # 3. DynamoDBから取得
+        # キー構成変更に対応 (PK: job_id)
+        resp = table.get_item(Key={'job_id': job_id})
+        item = resp.get('Item')
+
+        if not item:
+            return {"statusCode": 404, "body": json.dumps({"error": "Job not found"})}
+
+        # 4. セキュリティ: 別テナントのデータは見せない
+        if tenant_id and item.get('tenant_id') != tenant_id:
+            print(f"Access Denied: User tenant {tenant_id} tried to access Job tenant {item.get('tenant_id')}")
+            return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
+
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            # DecimalEncoderを使って数値をJSON化
+            "body": json.dumps(item, cls=DecimalEncoder)
+        }
+
+    except Exception as e:
+        print(f"GET Error: {e}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+
+# ---------------------------------------------------
+# メインハンドラ (ルーティング)
+# ---------------------------------------------------
+def lambda_handler(event, context):
+    # HTTP API v2 のメソッド取得方法
+    http_method = event.get('requestContext', {}).get('http', {}).get('method')
+
+    if http_method == 'GET':
+        return handle_get(event, context)
+    elif http_method == 'POST':
+        return handle_post(event, context)
+    else:
+        return {
+            "statusCode": 405,
+            "body": json.dumps({"error": f"Method {http_method} not allowed"})
+        }
