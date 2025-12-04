@@ -43,6 +43,7 @@ module "auth" {
   create_auth_lambda_arn = module.auth_challenge.create_challenge_lambda_arn
   verify_auth_lambda_arn = module.auth_challenge.verify_challenge_lambda_arn
 
+  webauthn_relying_party_id = module.frontend.cloudfront_domain
 }
 
 # ─────────────────────────────
@@ -238,10 +239,11 @@ module "s3_vq_workflow" {
   authorizer_id             = module.api_gateway.authorizer_id
 
   # ★追加: シークレット情報を渡す
-  vq_secret_arn = module.secrets.secret_arn_prefix
+  vq_secret_arn = module.secrets.vq_secret_arn
+  env = local.environment  # これを追加
 
   # 外部API
-  external_api_base_url = "https://ndis.questella.biz"
+  external_api_base_url = "https://ndknet.questella.biz"
   api_endpoint = module.api_gateway.api_endpoint
 
   # KMS
@@ -280,8 +282,8 @@ module "s3_log_archive" {
   source      = "../../modules/data/s3"
   project     = local.project
   environment = local.environment
+  suffix      = "-v2"
 }
-
 # ─────────────────────────────
 # 13. 監査ログ (CloudTrail)
 # ─────────────────────────────
@@ -289,8 +291,7 @@ module "cloudtrail" {
   source = "../../modules/security/cloudtrail"
 
   name_prefix    = "${local.project}-${local.environment}"
-  # 作成済みのS3バケット名を渡す
-  s3_bucket_name = module.s3_log_archive.log_archive_bucket_name
+  s3_bucket_name = module.s3_log_archive.bucket_name
 }
 
 # ─────────────────────────────

@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # 設定
-USER_POOL_ID="ap-northeast-1_VYRzAWYI0"
+USER_POOL_ID=$(terraform -chdir=../infrastructure/environments/dev output -raw auth_user_pool_id)
 PROFILE="proj-ndk-ky"
-SEED_FILE="cognito_user_seed.json"
+SEED_FILE="../seeds/cognito_user_seed.json"
 
 # jqがインストールされているか確認
 if ! command -v jq &> /dev/null; then

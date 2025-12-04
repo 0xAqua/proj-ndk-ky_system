@@ -1,0 +1,29 @@
+Terraformではできません。 手動申請が必要です。
+ただ、申請自体は簡単で5分程度で終わります。
+
+申請方法（AWSコンソール）:
+
+SES → Account dashboard → Request production access
+以下を入力：
+
+Mail type: Transactional（認証メールなので）
+Website URL: サービスのURL
+Use case description: 例↓
+
+
+
+This is a multi-tenant SaaS application.
+We send authentication emails (OTP/verification codes) to users during sign-in.
+Expected volume: ~100 emails/day initially.
+We handle bounces and complaints through SNS notifications.
+
+送信して待つ（通常24時間以内、最大72時間）
+
+
+AWS CLIでも申請可能:
+bashaws sesv2 put-account-details \
+  --mail-type TRANSACTIONAL \
+  --website-url "https://your-domain.com" \
+  --use-case-description "Authentication emails for SaaS application" \
+  --production-access-enabled \
+  --profile proj-ndk-ky

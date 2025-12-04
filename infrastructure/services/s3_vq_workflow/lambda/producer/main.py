@@ -1,253 +1,126 @@
 import os
 import json
-import uuid
 import time
 import boto3
-import hmac
-import hashlib
-from decimal import Decimal
-from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.utilities.data_classes import event_source, APIGatewayProxyEventV2
+import requests
+from botocore.exceptions import ClientError
 
-logger = Logger()
-tracer = Tracer()
+# 環境変数
+JOB_TABLE_NAME  = os.environ.get('JOB_TABLE_NAME')
+SQS_QUEUE_URL   = os.environ.get('SQS_QUEUE_URL')
+AUTH_API_URL    = os.environ.get('AUTH_API_URL')
+MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
+CALLBACK_URL    = os.environ.get('CALLBACK_URL')
+VQ_SECRET_ARN   = os.environ.get('VQ_SECRET_ARN')
 
-dynamodb = boto3.resource("dynamodb")
-sqs = boto3.client("sqs")
-secrets = boto3.client("secretsmanager") # ★追加
+dynamodb = boto3.resource('dynamodb')
+table    = dynamodb.Table(JOB_TABLE_NAME)
+sqs      = boto3.client('sqs')
+secrets  = boto3.client('secretsmanager')
 
-TABLE_NAME = os.environ["JOB_TABLE_NAME"]
-QUEUE_URL = os.environ["SQS_QUEUE_URL"]
-
-@tracer.capture_lambda_handler
-@event_source(data_class=APIGatewayProxyEventV2)
-@logger.inject_lambda_context
-def lambda_handler(event: APIGatewayProxyEventV2, context):
-
-    method = event.request_context.http.method
-    path = event.raw_path
-
-    # ログ出力 (デバッグ用)
-    logger.info(f"Received {method} {path}")
-
-    # ──────────────────────────────────────────────
-    # 1. POST /jobs : ジョブ登録 (受付)
-    # ──────────────────────────────────────────────
-    if method == "POST" and path.endswith("/jobs"):
-        return create_job(event)
-
-    # ──────────────────────────────────────────────
-    # 2. GET /jobs/{jobId} : 状況確認
-    # ──────────────────────────────────────────────
-    elif method == "GET" and "/jobs/" in path:
-        job_id = path.split("/")[-1] # URLの最後を取得
-        if not job_id:
-            return {"statusCode": 400, "body": json.dumps({"message": "Missing job ID"})}
-        return get_job_status(event, job_id)
-
-    # ──────────────────────────────────────────────
-    # 3. POST /webhook : 結果受取 (外部APIからのコールバック)
-    # ──────────────────────────────────────────────
-    elif method == "POST" and path.endswith("/webhook"):
-        return handle_webhook(event)
-
-    else:
-        return {"statusCode": 404, "body": json.dumps({"message": "Not Found"})}
-
-
-def create_job(event):
-    """受付処理: JobID発行 -> DB保存 -> SQS送信"""
-    # デバッグ: authorizer の中身を確認
-    logger.info(f"Authorizer: {event.request_context.authorizer}")
-    logger.info(f"Authorizer raw: {event.request_context.authorizer._data}")
-
-
-    body = json.loads(event.body or "{}")
-    prompt = body.get("prompt")
-
-    if not prompt:
-        return {"statusCode": 400, "body": json.dumps({"message": "prompt is required"})}
-
-    # テナントID取得
-    claims = event.request_context.authorizer.jwt_claim
-    tenant_id = claims.get("custom:tenant_id") or claims.get("tenant_id")
-
-    job_id = str(uuid.uuid4())
-    timestamp = int(time.time())
-
-    # DynamoDBへ保存 (初期状態 PENDING)
-    table = dynamodb.Table(TABLE_NAME)
-    item = {
-        "tenant_id": tenant_id,
-        "job_id": job_id,
-        "status": "PENDING",
-        "input_prompt": prompt,
-        "created_at": timestamp,
-        "updated_at": timestamp
-    }
-    table.put_item(Item=item)
-
-    # SQSへ送信
-    message_body = {
-        "tenant_id": tenant_id,
-        "job_id": job_id,
-        "input_prompt": prompt
-    }
-    sqs.send_message(QueueUrl=QUEUE_URL, MessageBody=json.dumps(message_body))
-
-    logger.info(f"Job created: {job_id}")
-
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"jobId": job_id, "message": "Job accepted"})
-    }
-
-def get_job_status(event, job_id):
-    """ジョブの状態を取得"""
-    # テナントID取得
-    claims = event.request_context.authorizer.jwt_claim
-    tenant_id = claims.get("custom:tenant_id") or claims.get("tenant_id")
-
-    if not tenant_id:
-        return {"statusCode": 400, "body": json.dumps({"message": "Missing tenant_id"})}
-
-    table = dynamodb.Table(TABLE_NAME)
-
+def get_vq_credentials(target_tenant_id):
+    """Secrets ManagerからテナントIDに一致する認証情報を取得"""
     try:
-        response = table.get_item(
-            Key={
-                "tenant_id": tenant_id,
-                "job_id": job_id
-            }
-        )
+        resp = secrets.get_secret_value(SecretId=VQ_SECRET_ARN)
+        secret_json = json.loads(resp.get('SecretString'))
 
-        item = response.get("Item")
-        if not item:
-            return {"statusCode": 404, "body": json.dumps({"message": "Job not found"})}
+        # 配列から tenant_id が一致するものを探す
+        if isinstance(secret_json, list):
+            target_config = next(
+                (item for item in secret_json if item.get("tenant_id") == target_tenant_id),
+                None
+            )
+            if not target_config:
+                raise Exception(f"Tenant config not found for id: {target_tenant_id}")
+            return target_config['secret_data']
+        else:
+            # 配列でない場合のフォールバック
+            return secret_json.get('secret_data', secret_json)
+    except Exception as e:
+        print(f"Failed to get secret: {e}")
+        raise e
 
-        # Decimal を int/float に変換（JSON シリアライズ用）
-        result = {
-            "jobId": item.get("job_id"),
-            "status": item.get("status"),
-            "result": item.get("result"),
-            "createdAt": int(item.get("created_at", 0)),
-            "updatedAt": int(item.get("updated_at", 0))
+def get_auth_token(api_key, login_id):
+    """VQ認証トークン取得"""
+    resp = requests.post(AUTH_API_URL, json={"api_key": api_key, "login_id": login_id})
+    resp.raise_for_status()
+    return resp.json().get('token')
+
+def lambda_handler(event, context):
+    try:
+        print("Processing Producer Request")
+
+        # 1. 入力とユーザー情報の取得
+        body = json.loads(event.get('body', '{}'))
+        input_message = body.get('message')
+
+        # Cognitoからユーザー情報取得
+        claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
+        user_id = claims.get('sub', 'unknown')
+        tenant_id = claims.get('custom:tenant_id')
+
+        if not tenant_id:
+            # テナントIDがないと課金先不明になるのでエラーにする
+            return {"statusCode": 400, "body": json.dumps({"error": "Missing tenant_id (custom:id) in token"})}
+
+        # 2. テナントIDを使って認証情報を取得
+        creds = get_vq_credentials(tenant_id)
+        api_key  = creds['api_key']
+        login_id = creds['login_id']
+        model_id = creds['model_id'] # Secret内のmodel_idを使用
+
+        # 3. VQ Token取得 & Message API (POST)
+        token = get_auth_token(api_key, login_id)
+
+        headers = {
+            "X-Auth-Token": f"Bearer {token}",
+            "Content-Type": "application/json"
         }
+
+        payload = {
+            "message": input_message,
+            "model_id": model_id,
+            "callback_url": CALLBACK_URL
+        }
+
+        vq_resp = requests.post(MESSAGE_API_URL, json=payload, headers=headers)
+        vq_resp.raise_for_status()
+        vq_data = vq_resp.json()
+
+        tid = vq_data.get('tid')
+        mid = vq_data.get('mid')
+        job_id = tid  # 今回はtidを主キーとする
+
+        # 4. DynamoDBへ登録 (tenant_idも保存)
+        item = {
+            'job_id': job_id,
+            'tenant_id': tenant_id, # ★ここに追加！後でフィルタ可能に
+            'user_id': user_id,
+            'tid': tid,
+            'mid': mid,
+            'input_message': input_message,
+            'status': 'PENDING',
+            'created_at': int(time.time()),
+            'updated_at': int(time.time())
+        }
+        table.put_item(Item=item)
+
+        # 5. SQSへ送信 (Workerへtenant_idを引き継ぐ)
+        sqs.send_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MessageBody=json.dumps({
+                'job_id': job_id,
+                'tid': tid,
+                'mid': mid,
+                'tenant_id': tenant_id # ★Workerへの伝言
+            })
+        )
 
         return {
             "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps(result)
+            "body": json.dumps({"job_id": job_id, "message": "Job accepted"})
         }
 
     except Exception as e:
-        logger.exception("Failed to get job status")
-        return {"statusCode": 500, "body": json.dumps({"message": "Internal Server Error"})}
-
-def get_vq_secrets(tenant_id):
-    """Secrets Managerからキーを取得"""
-    secret_name = f"ndk-ky/dev/{tenant_id}/vq-key"
-    try:
-        resp = secrets.get_secret_value(SecretId=secret_name)
-        return json.loads(resp["SecretString"])
-    except Exception as e:
-        logger.error(f"Secret verify failed: {e}")
-        return None
-
-def verify_signature(secret, body, signature):
-    """HMAC-SHA256で署名を検証"""
-    if not secret or not signature:
-        return False
-
-    # 署名計算
-    mac = hmac.new(
-        secret.encode("utf-8"),
-        body.encode("utf-8"),
-        hashlib.sha256
-    )
-    expected_signature = mac.hexdigest()
-
-    # 比較 (タイミング攻撃防止のため compare_digest 推奨)
-    return hmac.compare_digest(expected_signature, signature)
-
-def handle_webhook(event):
-    """受取処理: 署名検証付き"""
-    try:
-        # 1. テナントIDの特定 (クエリパラメータ)
-        query_params = event.query_string_parameters or {}
-        tenant_id = query_params.get("tenant_id")
-
-        if not tenant_id:
-            logger.error("Webhook missing tenant_id")
-            return {"statusCode": 400, "body": "Missing tenant_id"}
-
-        # 2. Secrets ManagerからWebhook Secretを取得
-        secrets_data = get_vq_secrets(tenant_id)
-        if not secrets_data:
-            return {"statusCode": 500, "body": "Server Configuration Error"}
-
-        webhook_secret = secrets_data.get("webhook_secret")
-
-        # 3. 署名検証
-        headers = event.headers or {}
-        # ヘッダーは大文字小文字を区別しないように取得
-        signature = headers.get("x-signature") or headers.get("X-Signature")
-        raw_body = event.body or "{}" # 署名検証には生のbodyが必要
-
-        if not verify_signature(webhook_secret, raw_body, signature):
-            logger.warning(f"Invalid Signature. Tenant: {tenant_id}")
-            return {"statusCode": 401, "body": "Invalid Signature"}
-
-        # 4. ここから既存の処理 (JSONパース & DB更新)
-        body = json.loads(raw_body)
-        logger.info(f"Webhook received verified: {json.dumps(body)}")
-
-        # 仕様書に合わせてIDを取得 (mid がメッセージID)
-        # 今回の構成では job_id = tid (スレッドID) としているので tid を使用
-        # 仕様書例: { "mid": "...", "reply": "...", "status": "..." }
-        # ※仕様書に `tid` が含まれていない場合、Workerで `mid` と `job_id` の紐付けを保存しておく必要がありますが、
-        #   多くの場合はコンテキストに含まれるか、あるいは `mid` をキーにする設計変更が必要です。
-        #   一旦、仕様書の `mid` またはパス等から `tid` が取れる前提、もしくは `mid` をキーに探す実装にします。
-
-        # 修正: 仕様書例には `tid` がボディにない可能性があります。
-        # もしボディに `tid` がない場合、Worker側で `job_id` を `mid` としても保存しておくか、
-        # または外部APIが `tid` も返してくれるか確認が必要です。
-        # ここでは「ボディに tid がある」または「クエリパラメータで渡す」前提で進めます。
-
-        job_id = body.get("tid")
-        # もしbodyにないならクエリパラメータから取得するのも安全です
-        if not job_id:
-            job_id = query_params.get("job_id") # Workerで callback_url に &job_id=... も付けておくと確実
-
-        result_text = body.get("reply")
-
-        # エラーハンドリング (外部APIでの生成失敗)
-        status = "COMPLETED"
-        if body.get("status") == "error":
-            status = "FAILED"
-            result_text = body.get("error")
-
-        # DynamoDB更新
-        table = dynamodb.Table(TABLE_NAME)
-        update_expr = "SET #st = :st, #res = :res, updated_at = :ts"
-        expr_names = {"#st": "status", "#res": "result"}
-        expr_attrs = {
-            ":st": status,
-            ":res": result_text, # テキストまたはエラーオブジェクト
-            ":ts": int(time.time())
-        }
-
-        table.update_item(
-            Key={"tenant_id": tenant_id, "job_id": job_id},
-            UpdateExpression=update_expr,
-            ExpressionAttributeNames=expr_names,
-            ExpressionAttributeValues=expr_attrs
-        )
-
-        logger.info(f"Job {job_id} updated to {status}")
-        return {"statusCode": 200, "body": "OK"}
-
-    except Exception as e:
-        logger.exception("Webhook processing failed")
-        return {"statusCode": 500, "body": "Internal Server Error"}
+        print(f"Error: {e}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
