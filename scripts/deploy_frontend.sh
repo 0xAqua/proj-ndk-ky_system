@@ -23,16 +23,22 @@ PROFILE="proj-ndk-ky"
 # ─────────────────────────────
 echo "=== Building React app ==="
 cd "$APP_DIR"
+rm -rf dist
 npm run build
 echo "✓ Build complete"
 
 # ─────────────────────────────
-# S3 Upload
+# S3 を完全に空にしてからアップロード
 # ─────────────────────────────
+echo "=== Clearing S3 bucket ==="
+aws s3 rm "s3://$S3_BUCKET" --recursive --profile "$PROFILE"
+echo "✓ S3 cleared"
+
 echo "=== Uploading to S3 ($S3_BUCKET) ==="
-aws s3 sync "$BUILD_DIR" "s3://$S3_BUCKET" \
-    --delete \
-    --profile "$PROFILE"
+aws s3 cp "$BUILD_DIR" "s3://$S3_BUCKET" \
+    --recursive \
+    --profile "$PROFILE" \
+    --cache-control "no-cache, no-store, must-revalidate"
 echo "✓ Upload complete"
 
 # ─────────────────────────────
