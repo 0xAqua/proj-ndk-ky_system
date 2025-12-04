@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # エラーが出たら即終了（安全）
+set -e
 
 # ─────────────────────────────
 # パス設定
@@ -11,10 +11,11 @@ APP_DIR="$PROJECT_ROOT/app"
 BUILD_DIR="$APP_DIR/dist"
 
 # ─────────────────────────────
-# 設定（必要ならここだけ変えればOK）
+# 設定
 # ─────────────────────────────
 S3_BUCKET="ndk-ky-system-dev-frontend"
 CLOUDFRONT_DISTRIBUTION_ID="E2RLJ8GKQ0AK1V"
+CLOUDFRONT_DOMAIN="d35yoc6m1omzc3.cloudfront.net"
 PROFILE="proj-ndk-ky"
 
 # ─────────────────────────────
@@ -35,19 +36,29 @@ aws s3 sync "$BUILD_DIR" "s3://$S3_BUCKET" \
 echo "✓ Upload complete"
 
 # ─────────────────────────────
-# CloudFront Invalidation
+# CloudFront Invalidation（完了まで待つ）
 # ─────────────────────────────
 echo "=== Invalidating CloudFront cache ==="
-aws cloudfront create-invalidation \
+INVALIDATION_ID=$(aws cloudfront create-invalidation \
     --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
     --paths "/*" \
+    --profile "$PROFILE" \
+    --query "Invalidation.Id" \
+    --output text)
+
+echo "Invalidation started: $INVALIDATION_ID"
+echo "Waiting for completion... (1-2 min)"
+
+aws cloudfront wait invalidation-completed \
+    --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+    --id "$INVALIDATION_ID" \
     --profile "$PROFILE"
-echo "✓ Cache invalidation started"
+
+echo "✓ Cache invalidation completed"
 
 # ─────────────────────────────
 # 完了表示
 # ─────────────────────────────
-CLOUDFRONT_DOMAIN="${CLOUDFRONT_DISTRIBUTION_ID}.cloudfront.net"
 echo ""
 echo "Done!  🚀"
 echo "Frontend deployed to:"
