@@ -221,6 +221,7 @@ resource "aws_lambda_function" "worker" {
     variables = {
       JOB_TABLE_NAME = var.job_table_name
       VQ_SECRET_ARN  = var.vq_secret_arn
+      EXTERNAL_API_BASE_URL = var.external_api_base_url
     }
   }
 
