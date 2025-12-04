@@ -1,6 +1,6 @@
 import { Checkbox, Flex, Text, Box, VStack, Accordion } from "@chakra-ui/react";
 import { ContentBox } from "@/features/entry/components/layout/ContentBox";
-import { MdBuild, MdChevronRight } from "react-icons/md";
+import { MdBuild, MdChevronRight, MdInfoOutline } from "react-icons/md";
 import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
 
 type Props = {
@@ -13,13 +13,15 @@ type Props = {
     onChange: (value: string[]) => void;
 };
 
-// ★修正: フック呼び出しを削除し、Propsで受け取る形に変更
 export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [], onChange }: Props) => {
 
-    // ★重要: 受け取ったマスタデータの中から、選択された種別ID(targetTypeIds)に一致するものだけを抽出
+    // 選択された種別ID(targetTypeIds)に一致するものだけを抽出
     const visibleCategories = masterCategories.filter(cat =>
         targetTypeIds.includes(cat.id)
     );
+
+    // 表示データの有無
+    const hasCategories = visibleCategories.length > 0;
 
     // ──────────────────────────────────────────
     // チェックボックス制御ロジック
@@ -50,69 +52,90 @@ export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [
         onChange(nextValue);
     };
 
-    // 表示すべきデータがない場合は何もレンダリングしない
-    if (visibleCategories.length === 0) {
-        return null;
-    }
-
     return (
         <Box bg="white" w="full" borderRadius="lg">
             <ContentBox>
                 <VStack align="start" gap={3} w="full">
+                    {/* ── ヘッダーエリア ── */}
                     <Flex align="center" gap={2}>
-                        <MdBuild size={16} color="#007AFF" />
-                        <Text fontWeight="bold" fontSize="sm">工事工程</Text>
-                        <Text color="red.500" fontSize="sm">*</Text>
+                        <MdBuild size={16} color={hasCategories ? "#007AFF" : "gray"} />
+                        <Text fontWeight="bold" fontSize="sm" color={hasCategories ? "black" : "gray.500"}>
+                            工事工程
+                        </Text>
+                        <Text color={hasCategories ? "red.500" : "gray.400"} fontSize="sm">*</Text>
                     </Flex>
 
-                    <Text fontSize="xs" color="gray.500">
-                        実施する工事の工程を選択してください。
-                    </Text>
+                    {/* ── コンテンツエリア ── */}
+                    {hasCategories ? (
+                        <>
+                            <Text fontSize="xs" color="gray.500">
+                                実施する工事の工程を選択してください。
+                            </Text>
 
-                    <Accordion.Root multiple w="full">
-                        {visibleCategories.map((category) => (
-                            <Accordion.Item key={category.id} value={category.id}>
-                                <Accordion.ItemTrigger>
-                                    <Flex justify="space-between" align="center" w="full">
-                                        <Flex align="center" gap={2}>
-                                            <Checkbox.Root
-                                                checked={isCategoryChecked(category.processes)}
-                                                onCheckedChange={() => toggleCategory(category.processes)}
-                                                colorPalette="blue"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <Checkbox.HiddenInput />
-                                                <Checkbox.Control />
-                                            </Checkbox.Root>
-                                            <Text fontWeight="medium" fontSize="sm">{category.name}</Text>
-                                        </Flex>
-                                        <Accordion.ItemIndicator>
-                                            <MdChevronRight />
-                                        </Accordion.ItemIndicator>
-                                    </Flex>
-                                </Accordion.ItemTrigger>
+                            <Accordion.Root multiple w="full">
+                                {visibleCategories.map((category) => (
+                                    <Accordion.Item key={category.id} value={category.id}>
+                                        <Accordion.ItemTrigger>
+                                            <Flex justify="space-between" align="center" w="full">
+                                                <Flex align="center" gap={2}>
+                                                    <Checkbox.Root
+                                                        checked={isCategoryChecked(category.processes)}
+                                                        onCheckedChange={() => toggleCategory(category.processes)}
+                                                        colorPalette="blue"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <Checkbox.HiddenInput />
+                                                        <Checkbox.Control />
+                                                    </Checkbox.Root>
+                                                    <Text fontWeight="medium" fontSize="sm">{category.name}</Text>
+                                                </Flex>
+                                                <Accordion.ItemIndicator>
+                                                    <MdChevronRight />
+                                                </Accordion.ItemIndicator>
+                                            </Flex>
+                                        </Accordion.ItemTrigger>
 
-                                <Accordion.ItemContent>
-                                    <Box p={2} pl={8} bg="gray.50" borderRadius="md" mt={1}>
-                                        <VStack align="start" gap={4}>
-                                            {category.processes.map((process) => (
-                                                <Checkbox.Root
-                                                    key={process.id}
-                                                    checked={value.includes(process.id)}
-                                                    onCheckedChange={() => toggleProcess(process.id)}
-                                                    colorPalette="blue"
-                                                >
-                                                    <Checkbox.HiddenInput />
-                                                    <Checkbox.Control />
-                                                    <Checkbox.Label fontSize="sm">{process.label}</Checkbox.Label>
-                                                </Checkbox.Root>
-                                            ))}
-                                        </VStack>
-                                    </Box>
-                                </Accordion.ItemContent>
-                            </Accordion.Item>
-                        ))}
-                    </Accordion.Root>
+                                        <Accordion.ItemContent>
+                                            <Box p={2} pl={8} bg="gray.50" borderRadius="md" mt={1}>
+                                                <VStack align="start" gap={4}>
+                                                    {category.processes.map((process) => (
+                                                        <Checkbox.Root
+                                                            key={process.id}
+                                                            checked={value.includes(process.id)}
+                                                            onCheckedChange={() => toggleProcess(process.id)}
+                                                            colorPalette="blue"
+                                                        >
+                                                            <Checkbox.HiddenInput />
+                                                            <Checkbox.Control />
+                                                            <Checkbox.Label fontSize="sm">{process.label}</Checkbox.Label>
+                                                        </Checkbox.Root>
+                                                    ))}
+                                                </VStack>
+                                            </Box>
+                                        </Accordion.ItemContent>
+                                    </Accordion.Item>
+                                ))}
+                            </Accordion.Root>
+                        </>
+                    ) : (
+                        // 空状態 - 案内ボックス
+                        <Flex
+                            w="full"
+                            bg="gray.50"
+                            p={3}
+                            borderRadius="md"
+                            align="center"
+                            justify="center"
+                            gap={2}
+                            border="1px dashed"
+                            borderColor="gray.200"
+                        >
+                            <MdInfoOutline color="gray" />
+                            <Text fontSize="xs" color="gray.500">
+                                上記で工事種別を選択すると、工程が表示されます。
+                            </Text>
+                        </Flex>
+                    )}
                 </VStack>
             </ContentBox>
         </Box>

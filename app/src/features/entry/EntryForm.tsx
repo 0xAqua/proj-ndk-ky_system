@@ -126,8 +126,8 @@ export const EntryForm = () => {
     }
 
     return (
-        <Box maxW="600px" mx="auto" pb={10}>
-            <VStack gap={6} align="stretch">
+        <Box maxW="600px" mx={2} pb={10}>
+            <VStack gap={4} align="stretch">
                 <ConstructionDate value={date} onChange={setDate} />
 
                 <ConstructionProject
@@ -136,20 +136,16 @@ export const EntryForm = () => {
                     onChange={setSelectedTypeIds}
                 />
 
-                {selectedTypeIds.length > 0 && (
-                    <>
-                        <ConstructionProcess
-                            masterCategories={constructions}
-                            targetTypeIds={selectedTypeIds}
-                            value={selectedProcessIds}
-                            onChange={setSelectedProcessIds}
-                        />
-                        <ImportantEquipment
-                            masterCategories={constructions}
-                            selectedProcessIds={selectedProcessIds}
-                        />
-                    </>
-                )}
+                <ConstructionProcess
+                    masterCategories={constructions}
+                    targetTypeIds={selectedTypeIds}
+                    value={selectedProcessIds}
+                    onChange={setSelectedProcessIds}
+                />
+                <ImportantEquipment
+                    masterCategories={constructions}
+                    selectedProcessIds={selectedProcessIds}
+                />
 
                 <SiteCondition
                     masterEnvironments={environments}
