@@ -1,185 +1,159 @@
 import os
 import json
-import boto3
 import time
-import urllib.request
-import urllib.error
-from botocore.exceptions import ClientError
-from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.utilities.data_classes import event_source, SQSEvent
-
-logger = Logger()
-tracer = Tracer()
-
-dynamodb = boto3.resource("dynamodb")
-secrets = boto3.client("secretsmanager")
+import boto3
+import requests
 
 # 環境変数
-TABLE_NAME = os.environ["JOB_TABLE_NAME"]
-# 設定値: https://ndis.questella.biz
-API_BASE_URL = os.environ.get("EXTERNAL_API_BASE_URL", "https://ndis.questella.biz")
-# Webhook URL (Terraformで渡している値)
-WEBHOOK_BASE_URL = os.environ.get("WEBHOOK_BASE_URL", "http://localhost:3000/webhook")
+JOB_TABLE_NAME  = os.environ.get('JOB_TABLE_NAME')
+SQS_QUEUE_URL   = os.environ.get('SQS_QUEUE_URL')
+AUTH_API_URL    = os.environ.get('AUTH_API_URL')
+MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
+CALLBACK_URL    = os.environ.get('CALLBACK_URL')
+VQ_SECRET_ARN   = os.environ.get('VQ_SECRET_ARN')
 
-def get_vq_secrets(tenant_id):
-    """Secrets Managerから認証情報を取得"""
-    secret_name = f"ndk-ky/dev/{tenant_id}/vq-key"
+dynamodb = boto3.resource('dynamodb')
+table    = dynamodb.Table(JOB_TABLE_NAME)
+sqs      = boto3.client('sqs')
+secrets  = boto3.client('secretsmanager')
+
+def get_vq_credentials(target_tenant_id):
+    """(Producerと同じロジック)"""
     try:
-        resp = secrets.get_secret_value(SecretId=secret_name)
-        return json.loads(resp["SecretString"])
-    except ClientError as e:
-        logger.exception(f"Secret retrieval failed for {secret_name}")
+        resp = secrets.get_secret_value(SecretId=VQ_SECRET_ARN)
+        secret_json = json.loads(resp.get('SecretString'))
+        if isinstance(secret_json, list):
+            target_config = next(
+                (item for item in secret_json if item.get("tenant_id") == target_tenant_id), None)
+            if not target_config: raise Exception(f"Tenant config not found: {target_tenant_id}")
+            return target_config['secret_data']
+        else:
+            return secret_json.get('secret_data', secret_json)
+    except Exception as e:
+        print(f"Failed to get secret: {e}")
         raise e
 
 def get_auth_token(api_key, login_id):
-    """
-    1. 認証API (/public-api/v1/auth) を叩いてトークンを取得
-    """
-    url = f"{API_BASE_URL}/public-api/v1/auth"
-    logger.info(f"Authenticating with {url}")
+    resp = requests.post(AUTH_API_URL, json={"api_key": api_key, "login_id": login_id})
+    resp.raise_for_status()
+    return resp.json().get('token')
+
+def is_valid_content(content):
+    """簡易バリデーション: JSONとしてパースでき、空でないか"""
+    if not content: return False
+    try:
+        parsed = json.loads(content)
+        return True if isinstance(parsed, list) and len(parsed) > 0 else False
+    except:
+        return False
+
+def recreate_job(creds, old_job_item, tenant_id):
+    """JSON不正時にジョブを作り直す"""
+    print(f"Re-creating job for old tid: {old_job_item['tid']}")
+
+    token = get_auth_token(creds['api_key'], creds['login_id'])
+    headers = {"X-Auth-Token": token, "Content-Type": "application/json"}
 
     payload = {
-        "api_key": api_key,
-        "login_id": login_id
-    }
-    data = json.dumps(payload).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
-
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-
-    try:
-        with urllib.request.urlopen(req, timeout=10) as res:
-            body = json.loads(res.read().decode("utf-8"))
-            token = body.get("token") or body.get("access_token")
-            if not token:
-                raise ValueError(f"Token not found in response: {body}")
-            return token
-
-    except urllib.error.HTTPError as e:
-        logger.error(f"Auth Failed: {e.code} - {e.read().decode('utf-8')}")
-        raise e
-    except Exception as e:
-        logger.exception("Authentication Request Error")
-        raise e
-
-def send_message_to_vq(token, prompt, job_id, tenant_id):
-    """
-    2. メッセージ送信API (/public-api/v1/message/{tid}) を叩く
-    """
-    # job_id をそのまま tid (スレッドID) として使う
-    tid = job_id
-    url = f"{API_BASE_URL}/public-api/v1/message/{tid}"
-    logger.info(f"Sending message to {url}")
-
-    # ★修正: callback_url に job_id も含める (Webhook側での特定用)
-    callback_url = f"{WEBHOOK_BASE_URL}?tenant_id={tenant_id}&job_id={job_id}"
-
-    payload = {
-        "message": prompt,
-        "callback_url": callback_url
+        "message": old_job_item.get('input_message'),
+        "model_id": creds['model_id'],
+        "callback_url": CALLBACK_URL
     }
 
-    data = json.dumps(payload).encode("utf-8")
+    vq_resp = requests.post(MESSAGE_API_URL, json=payload, headers=headers)
+    vq_resp.raise_for_status()
+    vq_data = vq_resp.json()
 
-    # ★修正: ヘッダーを X-Auth-Token に変更
-    headers = {
-        "Content-Type": "application/json",
-        "X-Auth-Token": f"Bearer {token}"
-    }
+    new_tid = vq_data.get('tid')
+    new_mid = vq_data.get('mid')
 
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    print(f"New ID acquired: {new_tid}")
 
-    try:
-        with urllib.request.urlopen(req, timeout=30) as res:
-            return json.loads(res.read().decode("utf-8"))
+    # DB更新 (Job IDは変えず、tid/midを更新)
+    table.update_item(
+        Key={'job_id': old_job_item['job_id']},
+        UpdateExpression="set tid=:t, mid=:m, #st=:s, updated_at=:u, retry_count=if_not_exists(retry_count, :zero) + :inc",
+        ExpressionAttributeNames={'#st': 'status'},
+        ExpressionAttributeValues={
+            ':t': new_tid, ':m': new_mid, ':s': 'PENDING',
+            ':u': int(time.time()), ':zero': 0, ':inc': 1
+        }
+    )
 
-    except urllib.error.HTTPError as e:
-        logger.error(f"Message Send Failed: {e.code} - {e.read().decode('utf-8')}")
-        raise e
-    except Exception as e:
-        logger.exception("Message Request Error")
-        raise e
+    # 新しいSQSメッセージを送信 (★tenant_id も忘れず引き継ぐ)
+    sqs.send_message(
+        QueueUrl=SQS_QUEUE_URL,
+        MessageBody=json.dumps({
+            'job_id': old_job_item['job_id'],
+            'tid': new_tid,
+            'mid': new_mid,
+            'tenant_id': tenant_id
+        })
+    )
 
-def update_job_status(tenant_id, job_id, status, api_response=None):
-    """DynamoDBのステータス更新"""
-    table = dynamodb.Table(TABLE_NAME)
-
-    update_expr = "SET #st = :st, updated_at = :ts"
-    expr_attrs = {":st": status, ":ts": int(time.time())}
-    expr_names = {"#st": "status"}
-
-    if api_response:
-        update_expr += ", #res = :res"
-        expr_attrs[":res"] = api_response
-        expr_names["#res"] = "api_response"
-
-    try:
-        table.update_item(
-            Key={"tenant_id": tenant_id, "job_id": job_id},
-            UpdateExpression=update_expr,
-            ExpressionAttributeNames=expr_names,
-            ExpressionAttributeValues=expr_attrs
-        )
-    except ClientError:
-        logger.exception("DynamoDB update failed")
-        raise
-
-@tracer.capture_lambda_handler
-@event_source(data_class=SQSEvent)
-@logger.inject_lambda_context
-def lambda_handler(event: SQSEvent, context):
-    """
-    SQSトリガーで実行されるメイン処理
-    """
-    for record in event.records:
+def lambda_handler(event, context):
+    for record in event['Records']:
         try:
-            body = json.loads(record.body)
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON in SQS body")
-            continue
+            body = json.loads(record['body'])
+            job_id = body.get('job_id')
+            tid = body.get('tid')
+            mid = body.get('mid')
+            tenant_id = body.get('tenant_id')
 
-        tenant_id = body.get("tenant_id")
-        job_id = body.get("job_id")
-        prompt = body.get("input_prompt")
+            print(f"Checking Job: {job_id}, tid: {tid}, tenant: {tenant_id}")
 
-        logger.append_keys(job_id=job_id, tenant_id=tenant_id)
-        logger.info("Starting VQ integration process")
+            # tenant_id がSQSにない場合の復旧ロジック
+            if not tenant_id:
+                item_resp = table.get_item(Key={'job_id': job_id})
+                if 'Item' in item_resp:
+                    tenant_id = item_resp['Item'].get('tenant_id')
 
-        try:
-            # バリデーション
-            if not prompt or not tenant_id or not job_id:
-                logger.error("Missing required fields")
-                if tenant_id and job_id:
-                    update_job_status(tenant_id, job_id, "FAILED", {"error": "Invalid input"})
-                return
+            if not tenant_id:
+                print("Error: Tenant ID missing.")
+                return # 処理不能
 
-            # -------------------------------------------------
-            # Step 1: Secrets Managerからキー取得
-            # -------------------------------------------------
-            secrets_data = get_vq_secrets(tenant_id)
-            api_key = secrets_data.get("api_key")
-            login_id = secrets_data.get("login_id")
+            # 1. 認証情報取得
+            creds = get_vq_credentials(tenant_id)
+            token = get_auth_token(creds['api_key'], creds['login_id'])
 
-            if not api_key or not login_id:
-                raise ValueError("api_key or login_id not found in Secrets Manager")
+            # 2. ポーリング (GET)
+            url = f"{MESSAGE_API_URL}/{tid}/{mid}"
+            resp = requests.get(url, headers={"X-Auth-Token": token})
+            resp.raise_for_status()
+            data = resp.json()
 
-            # -------------------------------------------------
-            # Step 2: 認証してトークン取得
-            # -------------------------------------------------
-            token = get_auth_token(api_key, login_id)
+            status = data.get('status')
 
-            # -------------------------------------------------
-            # Step 3: メッセージ送信 (ヘッダー修正済み)
-            # -------------------------------------------------
-            api_response = send_message_to_vq(token, prompt, job_id, tenant_id)
+            if status != 'done':
+                # まだ終わってなければ例外 -> SQS Visibility Timeoutでリトライ
+                raise Exception("Job not finished yet")
 
-            # -------------------------------------------------
-            # Step 4: 結果保存 (SENTステータスへ)
-            # -------------------------------------------------
-            update_job_status(tenant_id, job_id, "SENT", api_response)
+            # 3. 完了時の検証
+            result_message = data.get('message', '')
 
-            logger.info("Message successfully sent to VQ API")
+            if is_valid_content(result_message):
+                # 成功: DB更新
+                print("Validation OK.")
+                table.update_item(
+                    Key={'job_id': job_id},
+                    UpdateExpression="set #r=:r, #st=:s, updated_at=:u",
+                    ExpressionAttributeNames={'#r': 'reply', '#st': 'status'},
+                    ExpressionAttributeValues={
+                        ':r': result_message,
+                        ':s': 'COMPLETED',
+                        ':u': int(time.time())
+                    }
+                )
+            else:
+                # 失敗: やり直し
+                print("Validation FAILED. Re-creating...")
+                resp = table.get_item(Key={'job_id': job_id})
+                if 'Item' in resp:
+                    recreate_job(creds, resp['Item'], tenant_id)
 
         except Exception as e:
-            logger.exception("Process failed. SQS will retry.")
-            raise e
+            if "Job not finished yet" in str(e):
+                raise e # SQSリトライさせる
+            else:
+                print(f"Worker Error: {e}")
+                raise e # 予期せぬエラーもリトライ（要件次第でDLQへ）
