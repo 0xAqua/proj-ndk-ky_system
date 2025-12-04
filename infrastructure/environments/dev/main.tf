@@ -239,7 +239,7 @@ module "s3_vq_workflow" {
   authorizer_id             = module.api_gateway.authorizer_id
 
   # ★追加: シークレット情報を渡す
-  vq_secret_arn = module.secrets.secret_arn_prefix
+  vq_secret_arn = module.secrets.vq_secret_arn
   env = local.environment  # これを追加
 
   # 外部API

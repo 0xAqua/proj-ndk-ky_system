@@ -3,47 +3,52 @@ variable "name_prefix" {
 }
 
 variable "example_tenant_id" {
-  description = "Example Tenant ID (e.g., tenant-a) for creating the initial dummy secret."
+  description = "Example Tenant ID (e.g., tenant-a) used in the dummy json."
   type        = string
   default     = "tenant-example"
 }
 
 # ─────────────────────────────
-# 1. シークレットの「パスプレフィックス」を定義
+# VQ連携用の一元管理シークレット
 # ─────────────────────────────
-# このリソースはパスの基点となるプレフィックス（コンテナ）を作成します。
-# 例: ndk-ky-dev/vq-key/
-resource "aws_secretsmanager_secret" "vq_key_prefix" {
-  name        = "${var.name_prefix}/vq-key/"
-  description = "Base prefix for tenant-specific VQ API Keys."
+# Pythonコードは「1つのシークレットから全テナントの情報を読み取る」ロジックなので、
+# 階層構造にはせず、1つのJSONファイルを置くためのシークレットを作成します。
+
+resource "aws_secretsmanager_secret" "vq_credentials" {
+  # 名前例: ndk-ky-dev/vq-credentials
+  name        = "${var.name_prefix}/vq-credentials"
+  description = "Stores VQ API Keys for all tenants as a JSON list."
   recovery_window_in_days = 7
 }
 
 # ─────────────────────────────
-# 2. 初期値用のダミーシークレットを作成
+# 初期値（ダミーJSON）の投入
 # ─────────────────────────────
-# テストのため、特定のテナントID（例: tenant-example）用に1つだけシークレットを作成します。
-resource "aws_secretsmanager_secret" "initial_dummy_key" {
-  name = "${var.name_prefix}/vq-key/${var.example_tenant_id}"
-  description = "Dummy key for initial deployment and testing."
-  recovery_window_in_days = 0
-}
+resource "aws_secretsmanager_secret_version" "initial_version" {
+  secret_id     = aws_secretsmanager_secret.vq_credentials.id
 
-# ダミーの値をセット (Apply後にこの値を実際のAPIキーに手動で書き換えます)
-resource "aws_secretsmanager_secret_version" "initial_dummy_version" {
-  secret_id     = aws_secretsmanager_secret.initial_dummy_key.id
-  secret_string = jsonencode({ "api_key": "REPLACE_WITH_REAL_API_KEY" })
+  # Pythonコードが期待している「配列形式」のJSONを初期値としてセットします
+  secret_string = jsonencode([
+    {
+      "tenant_id": var.example_tenant_id,
+      "secret_data": {
+        "api_key": "REPLACE_WITH_REAL_API_KEY",
+        "login_id": "REPLACE_WITH_REAL_LOGIN_ID",
+        "model_id": "REPLACE_WITH_REAL_MODEL_ID"
+      }
+    }
+  ])
 
-  # ★重要: 以降、値が変わってもTerraformは無視する
+  # ★重要: 初回作成後はAWSコンソールで値を書き換えるため、Terraformでの変更は無視する
   lifecycle {
     ignore_changes = [secret_string]
   }
 }
 
 # ─────────────────────────────
-# 3. ARNを出力 (IAMポリシーでワイルドカードを使う基点)
+# Output (Lambdaに渡すARN)
 # ─────────────────────────────
-output "secret_arn_prefix" {
-  # プレフィックスのARNを渡し、IAMポリシー側でワイルドカードを適用します
-  value = aws_secretsmanager_secret.vq_key_prefix.arn
+output "vq_secret_arn" {
+  description = "The ARN of the VQ credentials secret"
+  value       = aws_secretsmanager_secret.vq_credentials.arn
 }
