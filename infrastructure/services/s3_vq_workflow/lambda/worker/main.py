@@ -38,16 +38,67 @@ def get_auth_token(api_key, login_id):
     resp.raise_for_status()
     return resp.json().get('token')
 
+def strip_markdown_code_block(content):
+    """Markdownコードブロック（```json ... ```）を除去"""
+    if not content:
+        return content
+    cleaned = content.strip()
+    if cleaned.startswith('```'):
+        lines = cleaned.split('\n')
+        # 最初の行（```json）を除去
+        if lines[0].startswith('```'):
+            lines = lines[1:]
+        # 最後の行（```）を除去
+        if lines and lines[-1].strip() == '```':
+            lines = lines[:-1]
+        cleaned = '\n'.join(lines)
+    return cleaned
+
+
 def is_valid_content(content):
-    """JSONとしてパースでき、かつ空でないかを検証"""
-    if not content: return False
-    try:
-        parsed = json.loads(content)
-        # 配列またはオブジェクトであり、中身があること
-        if isinstance(parsed, (list, dict)) and len(parsed) > 0:
-            return True
+    """JSONとしてパースでき、決められたキー構造を満たすかを検証"""
+    if not content:
         return False
-    except:
+    try:
+        cleaned = strip_markdown_code_block(content)
+        parsed = json.loads(cleaned)
+
+        # ルート要素は配列であること
+        if not isinstance(parsed, list) or len(parsed) == 0:
+            return False
+
+        # 各インシデントの構造をチェック
+        required_case_keys = {'caseNo', 'caseTitle', 'type', 'overview', 'countermeasures'}
+        required_countermeasure_keys = {'id', 'title', 'description', 'assignees'}
+
+        for case in parsed:
+            # 必須キーの存在チェック
+            if not isinstance(case, dict):
+                return False
+            if not required_case_keys.issubset(case.keys()):
+                return False
+
+            # typeの値チェック
+            if case.get('type') not in ('Fact', 'AI'):
+                return False
+
+            # countermeasuresの構造チェック
+            countermeasures = case.get('countermeasures')
+            if not isinstance(countermeasures, list) or len(countermeasures) == 0:
+                return False
+
+            for cm in countermeasures:
+                if not isinstance(cm, dict):
+                    return False
+                if not required_countermeasure_keys.issubset(cm.keys()):
+                    return False
+                # assigneesは配列であること
+                if not isinstance(cm.get('assignees'), list):
+                    return False
+
+        return True
+    except Exception as e:
+        print(f"Validation error: {e}")
         return False
 
 def recreate_job(creds, old_job_item, tenant_id):
@@ -143,21 +194,27 @@ def lambda_handler(event, context):
                 raise Exception("Job not finished yet")
 
             # 3. 完了時の検証
-            result_message = data.get('message', '')
+            result_message = data.get('reply', '')
 
             if is_valid_content(result_message):
                 # 成功: DB更新
                 print("Validation OK.")
-                table.update_item(
-                    Key={'job_id': job_id},
-                    UpdateExpression="set #r=:r, #st=:s, updated_at=:u",
-                    ExpressionAttributeNames={'#r': 'reply', '#st': 'status'},
-                    ExpressionAttributeValues={
-                        ':r': result_message,
-                        ':s': 'COMPLETED',
-                        ':u': int(time.time())
-                    }
-                )
+                # Markdownコードブロックを除去
+                cleaned = content.strip()
+                if cleaned.startswith('```'):
+                    # ```json や ``` を除去
+                    lines = cleaned.split('\n')
+                    # 最初の行（```json）と最後の行（```）を除去
+                    if lines[0].startswith('```'):
+                        lines = lines[1:]
+                    if lines and lines[-1].strip() == '```':
+                        lines = lines[:-1]
+                    cleaned = '\n'.join(lines)
+
+                parsed = json.loads(cleaned)
+                if isinstance(parsed, (list, dict)) and len(parsed) > 0:
+                    return True
+                return False
             else:
                 # 失敗: やり直し (Re-create)
                 print("Validation FAILED. Re-creating...")
@@ -172,3 +229,4 @@ def lambda_handler(event, context):
             else:
                 print(f"Worker Error: {e}")
                 raise e # 予期せぬエラーもリトライさせる
+
