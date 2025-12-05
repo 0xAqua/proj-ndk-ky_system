@@ -19,7 +19,6 @@ import { SiteCondition } from "@/features/entry/components/elements/SiteConditio
 
 export const EntryForm = () => {
     const navigate = useNavigate();
-    // const toast = useToast(); // ★削除 (v3では使えません)
 
     const {
         tenantId,
@@ -64,7 +63,6 @@ export const EntryForm = () => {
     const handleSubmit = async () => {
         // バリデーション (簡易)
         if (selectedTypeIds.length === 0 || selectedProcessIds.length === 0) {
-            // ★変更: toast -> alert
             alert("【入力不足】\n工事種別と工程を選択してください。");
             return;
         }
@@ -158,7 +156,7 @@ export const EntryForm = () => {
                     onClick={handleSubmit}
                     mt={4}
                     size="lg"
-                    loading={isSubmitting} // Chakra v3なら isLoading ではなく loading かもしれません
+                    loading={isSubmitting}
                     loadingText="送信中..."
                 >
                     登録内容を確認

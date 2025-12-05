@@ -21,6 +21,13 @@ const customConfig = defineConfig({
             backgroundImage: "linear-gradient(-45deg, #eff6ff, #dbeafe, #ffedd5, #eff6ff)",
             backgroundSize: "400% 400%",
             animation: "aurora 25s ease infinite",
+
+            overflow: "auto",
+            scrollbarWidth: "none",
+
+            "&::-webkit-scrollbar": {
+                display: "none",
+            },
         },
     },
 });
