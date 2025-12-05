@@ -38,6 +38,7 @@ def get_auth_token(api_key, login_id):
     resp.raise_for_status()
     return resp.json().get('token')
 
+
 def strip_markdown_code_block(content):
     """Markdownコードブロック（```json ... ```）を除去"""
     if not content:
@@ -52,54 +53,140 @@ def strip_markdown_code_block(content):
         if lines and lines[-1].strip() == '```':
             lines = lines[:-1]
         cleaned = '\n'.join(lines)
-    return cleaned
+    return cleaned.strip()
 
 
 def is_valid_content(content):
-    """JSONとしてパースでき、決められたキー構造を満たすかを検証"""
+    """
+    JSONとしてパースでき、決められたキー構造を満たすかを検証
+
+    期待する構造:
+    [
+      {
+        "caseNo": 1,
+        "caseTitle": "...",
+        "type": "Fact" | "AI",
+        "overview": "...",
+        "countermeasures": [
+          {
+            "id": 1,
+            "title": "...",
+            "description": "...",
+            "assignees": ["...", "..."]
+          },
+          ...
+        ]
+      },
+      ...
+    ]
+    """
     if not content:
+        print("Validation: content is empty")
         return False
+
     try:
+        # Markdownコードブロックを除去
         cleaned = strip_markdown_code_block(content)
         parsed = json.loads(cleaned)
 
         # ルート要素は配列であること
-        if not isinstance(parsed, list) or len(parsed) == 0:
+        if not isinstance(parsed, list):
+            print("Validation: root is not a list")
             return False
 
-        # 各インシデントの構造をチェック
+        if len(parsed) == 0:
+            print("Validation: root list is empty")
+            return False
+
+        # 必須キーの定義
         required_case_keys = {'caseNo', 'caseTitle', 'type', 'overview', 'countermeasures'}
         required_countermeasure_keys = {'id', 'title', 'description', 'assignees'}
 
-        for case in parsed:
-            # 必須キーの存在チェック
+        for idx, case in enumerate(parsed):
+            # 各caseはdictであること
             if not isinstance(case, dict):
-                return False
-            if not required_case_keys.issubset(case.keys()):
+                print(f"Validation: case[{idx}] is not a dict")
                 return False
 
-            # typeの値チェック
+            # 必須キーの存在チェック
+            missing_keys = required_case_keys - set(case.keys())
+            if missing_keys:
+                print(f"Validation: case[{idx}] missing keys: {missing_keys}")
+                return False
+
+            # caseNo は数値であること
+            if not isinstance(case.get('caseNo'), (int, float)):
+                print(f"Validation: case[{idx}].caseNo is not a number")
+                return False
+
+            # caseTitle, overview は文字列であること
+            if not isinstance(case.get('caseTitle'), str):
+                print(f"Validation: case[{idx}].caseTitle is not a string")
+                return False
+            if not isinstance(case.get('overview'), str):
+                print(f"Validation: case[{idx}].overview is not a string")
+                return False
+
+            # type の値チェック
             if case.get('type') not in ('Fact', 'AI'):
+                print(f"Validation: case[{idx}].type is not 'Fact' or 'AI', got: {case.get('type')}")
                 return False
 
-            # countermeasuresの構造チェック
+            # countermeasures の構造チェック
             countermeasures = case.get('countermeasures')
-            if not isinstance(countermeasures, list) or len(countermeasures) == 0:
+            if not isinstance(countermeasures, list):
+                print(f"Validation: case[{idx}].countermeasures is not a list")
                 return False
 
-            for cm in countermeasures:
+            if len(countermeasures) == 0:
+                print(f"Validation: case[{idx}].countermeasures is empty")
+                return False
+
+            for cm_idx, cm in enumerate(countermeasures):
                 if not isinstance(cm, dict):
-                    return False
-                if not required_countermeasure_keys.issubset(cm.keys()):
-                    return False
-                # assigneesは配列であること
-                if not isinstance(cm.get('assignees'), list):
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}] is not a dict")
                     return False
 
+                # 必須キーの存在チェック
+                missing_cm_keys = required_countermeasure_keys - set(cm.keys())
+                if missing_cm_keys:
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}] missing keys: {missing_cm_keys}")
+                    return False
+
+                # id は数値であること
+                if not isinstance(cm.get('id'), (int, float)):
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].id is not a number")
+                    return False
+
+                # title, description は文字列であること
+                if not isinstance(cm.get('title'), str):
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].title is not a string")
+                    return False
+                if not isinstance(cm.get('description'), str):
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].description is not a string")
+                    return False
+
+                # assignees は文字列の配列であること
+                assignees = cm.get('assignees')
+                if not isinstance(assignees, list):
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].assignees is not a list")
+                    return False
+
+                for a_idx, assignee in enumerate(assignees):
+                    if not isinstance(assignee, str):
+                        print(f"Validation: case[{idx}].countermeasures[{cm_idx}].assignees[{a_idx}] is not a string")
+                        return False
+
+        print("Validation: OK - all checks passed")
         return True
-    except Exception as e:
-        print(f"Validation error: {e}")
+
+    except json.JSONDecodeError as e:
+        print(f"Validation: JSON parse error - {e}")
         return False
+    except Exception as e:
+        print(f"Validation: unexpected error - {e}")
+        return False
+
 
 def recreate_job(creds, old_job_item, tenant_id):
     """JSONが不正だった場合にジョブを作り直す"""
@@ -182,9 +269,8 @@ def lambda_handler(event, context):
             resp.raise_for_status()
             data = resp.json()
 
-            # ★★★ 追加: VQからの生の返却値をログに出力 ★★★
+            # ★★★ VQからの生の返却値をログに出力 ★★★
             print(f"DEBUG: VQ API Full Response: {json.dumps(data, ensure_ascii=False)}")
-            # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
             # ステータス確認 (processing / done)
             status = data.get('status')
@@ -194,27 +280,22 @@ def lambda_handler(event, context):
                 raise Exception("Job not finished yet")
 
             # 3. 完了時の検証
-            result_message = data.get('reply', '')
+            result_reply = data.get('reply', '')
 
-            if is_valid_content(result_message):
-                # 成功: DB更新
-                print("Validation OK.")
-                # Markdownコードブロックを除去
-                cleaned = content.strip()
-                if cleaned.startswith('```'):
-                    # ```json や ``` を除去
-                    lines = cleaned.split('\n')
-                    # 最初の行（```json）と最後の行（```）を除去
-                    if lines[0].startswith('```'):
-                        lines = lines[1:]
-                    if lines and lines[-1].strip() == '```':
-                        lines = lines[:-1]
-                    cleaned = '\n'.join(lines)
-
-                parsed = json.loads(cleaned)
-                if isinstance(parsed, (list, dict)) and len(parsed) > 0:
-                    return True
-                return False
+            if is_valid_content(result_reply):
+                # 成功: DB更新（Markdownコードブロックを除去して保存）
+                print("Validation OK. Saving to DynamoDB...")
+                cleaned_reply = strip_markdown_code_block(result_reply)
+                table.update_item(
+                    Key={'job_id': job_id},
+                    UpdateExpression="set #r=:r, #st=:s, updated_at=:u",
+                    ExpressionAttributeNames={'#r': 'reply', '#st': 'status'},
+                    ExpressionAttributeValues={
+                        ':r': cleaned_reply,
+                        ':s': 'COMPLETED',
+                        ':u': int(time.time())
+                    }
+                )
             else:
                 # 失敗: やり直し (Re-create)
                 print("Validation FAILED. Re-creating...")
@@ -229,4 +310,3 @@ def lambda_handler(event, context):
             else:
                 print(f"Worker Error: {e}")
                 raise e # 予期せぬエラーもリトライさせる
-
