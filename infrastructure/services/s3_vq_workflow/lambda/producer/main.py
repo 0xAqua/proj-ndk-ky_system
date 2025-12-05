@@ -92,6 +92,10 @@ def handle_post(event, context):
             "callback_url": CALLBACK_URL
         }
 
+        print(f"DEBUG: Model ID: {model_id}")   # ← これが空やダミーになってないか確認！
+        print(f"DEBUG: Headers: {headers}")     # ← トークンが正しく入っているか
+        print(f"DEBUG: Payload: {payload}")     # ← 全体の構造確認
+
         vq_resp = requests.post(MESSAGE_API_URL, json=payload, headers=headers)
         vq_resp.raise_for_status()
         vq_data = vq_resp.json()
