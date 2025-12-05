@@ -95,9 +95,6 @@ export const EntryForm = () => {
                 throw new Error("Job ID not returned");
             }
 
-            // ★変更: toast -> alert
-            // alert("受付完了: AIによる解析を開始しました。");
-
             // 3. 結果画面へ遷移 (Job IDを持っていく)
             navigate(`/result/${jobId}`);
 

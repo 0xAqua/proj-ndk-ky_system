@@ -10,12 +10,15 @@ import {
 } from "@chakra-ui/react";
 import { useJobResult } from "@/features/result/hooks/useJobResult";
 import { normalizeIncidents } from "@/features/result/utils/normalizeIncidents";
-import { IncidentCard } from "@/features/result/components/elements/IncidentCard";
-import type {IncidentData, RawIncident} from "@/features/result/types";
 
+// 分割したコンポーネントをインポート
+import { IncidentCardHeader } from "@/features/result/components/elements/IncidentCardHeader";
+import { IncidentCardContent } from "@/features/result/components/elements/IncidentCardContent";
+
+import type { IncidentData, RawIncident } from "@/features/result/types";
 
 export const ResultForm = () => {
-    // ① Hooks は全部ここで呼ぶ（条件分岐の前）
+    // ① Hooks
     const { jobId } = useParams<{ jobId: string }>();
 
     const { status, result, error, isLoading } = useJobResult({
@@ -25,7 +28,6 @@ export const ResultForm = () => {
 
     const [selectedCases, setSelectedCases] = useState<string[]>([]);
 
-    // result が null / undefined / オブジェクトでも落ちないようにケア
     const rawIncidents: RawIncident[] = useMemo(
         () => (Array.isArray(result) ? (result as RawIncident[]) : []),
         [result],
@@ -44,9 +46,9 @@ export const ResultForm = () => {
         );
     };
 
-    // ② ここから下は「描画の分岐」だけ（Hook は呼ばない）
+    // ② 描画分岐
 
-    // jobId 自体が無いとき
+    // jobId なし
     if (!jobId) {
         return (
             <VStack m="auto" maxW="sm" gap={6} px={2} py={8}>
@@ -62,7 +64,7 @@ export const ResultForm = () => {
         );
     }
 
-    // ローディング中（まだ result も error も無い）
+    // ローディング
     if (isLoading && !result && !error) {
         return (
             <Box
@@ -96,22 +98,42 @@ export const ResultForm = () => {
         );
     }
 
-    // 通常ケース：デザイン適用して表示
+    // 通常ケース
     return (
-        <>
-            {/* インシデントリスト */}
-            <Box w="full">
-                <Stack gap={4}>
-                    {incidents.map((incident) => (
-                        <IncidentCard
+        <Box w="full">
+            <Stack gap={4}>
+                {incidents.map((incident) => {
+                    const isOpen = selectedCases.includes(incident.id);
+                    const onToggle = () => handleCaseClick(incident.id);
+
+                    return (
+                        // 元々 IncidentCard だった部分のデザイン(枠線など)をここに直接書く
+                        <Box
                             key={incident.id}
-                            incident={incident}
-                            isOpen={selectedCases.includes(incident.id)}
-                            onToggle={() => handleCaseClick(incident.id)}
-                        />
-                    ))}
-                </Stack>
-            </Box>
-        </>
+                            bg="white"
+                            borderRadius="md"
+                            borderWidth="1px"
+                            borderColor="gray.200"
+                            overflow="hidden"
+                            transition="all 0.2s"
+                        >
+                            {/* ヘッダー部分 */}
+                            <IncidentCardHeader
+                                incident={incident}
+                                isOpen={isOpen}
+                                onToggle={onToggle}
+                            />
+
+                            {/* 中身部分 */}
+                            <IncidentCardContent
+                                incident={incident}
+                                isOpen={isOpen} onToggle={function (): void {
+                                throw new Error("Function not implemented.");
+                            }}                            />
+                        </Box>
+                    );
+                })}
+            </Stack>
+        </Box>
     );
 };

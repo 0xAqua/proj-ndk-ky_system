@@ -1,7 +1,7 @@
-// src/components/result/elements/CountermeasureItem.tsx
-import { Badge, Box, Flex, Text } from "@chakra-ui/react";
+// CountermeasureItem.tsx (先ほどの最終案を採用)
+import { Badge, Box, Flex, Text, Stack, HStack, Icon } from "@chakra-ui/react";
 import { FiCheckCircle, FiFileText, FiUsers } from "react-icons/fi";
-import type {CountermeasureData} from "@/features/result/types";
+import type { CountermeasureData } from "@/features/result/types";
 
 type Props = {
     measure: CountermeasureData;
@@ -9,51 +9,56 @@ type Props = {
 
 export const CountermeasureItem = ({ measure }: Props) => {
     return (
-        <>
-            {/* タイトル */}
-            <Flex align="center" gap={2}>
-                <FiCheckCircle color="blue" size={16} />
-                <Text fontSize="sm" fontWeight="bold">
-                    {measure.title}
-                </Text>
-            </Flex>
-
-            {/* 実施内容 */}
-            <Box w="full" mt={2}>
-                <Flex align="center" gap={2} mb={1.5}>
-                    <FiFileText size={14} color="#38A169" />
-                    <Text fontSize="sm" fontWeight="bold" letterSpacing="wide">
-                        実施内容
+        <Box
+            w="full"
+            pl={4} // インデントを少し確保
+            borderLeftWidth="3px"
+            borderLeftColor="blue.500"
+            py={1}
+        >
+            <Stack gap={2}>
+                {/* タイトル */}
+                <HStack gap={2} align="flex-start">
+                    <Icon as={FiCheckCircle} color="blue.500" boxSize={5} mt={0.5} />
+                    <Text fontSize="sm" fontWeight="bold" color="gray.900" lineHeight="short">
+                        {measure.title}
                     </Text>
-                </Flex>
-                <Text
-                    fontSize="sm"
-                    color="gray.700"
-                    lineHeight="1.6"
-                    pl={5}
-                >
-                    {measure.content}
-                </Text>
-            </Box>
+                </HStack>
 
-            {/* 実施者 */}
-            {!!measure.implementers.length && (
-                <Box w="full" mt={2}>
-                    <Flex align="center" gap={2} mb={1.5}>
-                        <FiUsers size={14} color="#D69E2E" />
-                        <Text fontSize="sm" fontWeight="bold" letterSpacing="wide">
-                            実施者
+                {/* 内容（マイクロラベル付き） */}
+                <Box pl={7}>
+                    <HStack gap={1.5} mb={1} align="center">
+                        <Icon as={FiFileText} size="xs" color="gray.400" />
+                        <Text fontSize="xs" fontWeight="bold" color="gray.500">
+                            実施内容
                         </Text>
-                    </Flex>
-                    <Flex gap={2} flexWrap="wrap" pl={5}>
-                        {measure.implementers.map((person, idx) => (
-                            <Badge key={idx} size="sm" colorPalette="blue">
-                                {person}
-                            </Badge>
-                        ))}
-                    </Flex>
+                    </HStack>
+                    <Text fontSize="sm" color="gray.700" lineHeight="1.6">
+                        {measure.content}
+                    </Text>
                 </Box>
-            )}
-        </>
+
+                {/* 担当者 */}
+                {measure.implementers.length > 0 && (
+                    <Box pl={7} mt={1}>
+                        <Flex align="center" gap={3}>
+                            <HStack gap={1.5}>
+                                <Icon as={FiUsers} size="xs" color="gray.400" />
+                                <Text fontSize="xs" fontWeight="bold" color="gray.500">
+                                    担当者
+                                </Text>
+                            </HStack>
+                            <Flex gap={2} flexWrap="wrap">
+                                {measure.implementers.map((person, idx) => (
+                                    <Badge key={idx} variant="subtle" colorPalette="blue" size="sm">
+                                        {person}
+                                    </Badge>
+                                ))}
+                            </Flex>
+                        </Flex>
+                    </Box>
+                )}
+            </Stack>
+        </Box>
     );
 };
