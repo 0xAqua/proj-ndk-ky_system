@@ -44,7 +44,7 @@ export const Header = () => {
             }
         };
 
-        getUserData();
+        void getUserData();
     }, []);
 
     const handleLogoutClick = async () => {
@@ -91,7 +91,6 @@ export const Header = () => {
                             <Avatar
                                 name={userName}
                                 size="sm"
-                                src=""
                                 colorPalette="blue"
                             />
                             <Box color="gray.400">
