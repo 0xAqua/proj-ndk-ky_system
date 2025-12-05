@@ -16,6 +16,7 @@ import {
 } from "@/features/result/utils/normalizeIncidents";
 import { IncidentCard } from "@/features/result/components/elements/IncidentCard";
 
+
 export const ResultForm = () => {
     // ① Hooks は全部ここで呼ぶ（条件分岐の前）
     const { jobId } = useParams<{ jobId: string }>();

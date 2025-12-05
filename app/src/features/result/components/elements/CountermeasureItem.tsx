@@ -1,7 +1,7 @@
 // src/components/result/elements/CountermeasureItem.tsx
 import { Badge, Box, Flex, Text } from "@chakra-ui/react";
 import { FiCheckCircle, FiFileText, FiUsers } from "react-icons/fi";
-import type { CountermeasureData } from "@/features/result//ResultForm";
+import type {CountermeasureData} from "@/features/result/types";
 
 type Props = {
     measure: CountermeasureData;

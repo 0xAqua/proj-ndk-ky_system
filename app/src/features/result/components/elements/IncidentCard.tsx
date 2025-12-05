@@ -1,4 +1,3 @@
-// src/components/result/elements/IncidentCard.tsx
 import {
     Badge,
     Box,
@@ -11,8 +10,8 @@ import {
 import { HiSparkles } from "react-icons/hi";
 import { MdChevronRight, MdExpandMore, MdWarning } from "react-icons/md";
 import { FiInfo, FiShield } from "react-icons/fi";
-import type { IncidentData } from "@/features/result/ResultForm.tsx";
 import { CountermeasureItem } from "@/features/result/components/elements/CountermeasureItem";
+import type {IncidentData} from "@/features/result/types";
 
 type Props = {
     incident: IncidentData;
