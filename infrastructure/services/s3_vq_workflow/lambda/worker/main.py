@@ -131,6 +131,10 @@ def lambda_handler(event, context):
             resp.raise_for_status()
             data = resp.json()
 
+            # ★★★ 追加: VQからの生の返却値をログに出力 ★★★
+            print(f"DEBUG: VQ API Full Response: {json.dumps(data, ensure_ascii=False)}")
+            # ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
             # ステータス確認 (processing / done)
             status = data.get('status')
 
