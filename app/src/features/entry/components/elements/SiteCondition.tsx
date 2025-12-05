@@ -54,7 +54,7 @@ export const SiteCondition = ({ masterEnvironments, value = [], onChange }: Prop
     if (masterEnvironments.length === 0) return null;
 
     return (
-        <Box bg="white" w="full" p={2} borderRadius="lg">
+        <Box bg="white" w="full" p={2} borderRadius="2xl" boxShadow="0 4px 16px rgba(0, 0, 0, 0.08)" >
             <ContentBox>
                 <VStack align="start" gap={3} w="full">
                     {/* ヘッダー */}

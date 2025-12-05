@@ -9,12 +9,9 @@ import {
     VStack,
 } from "@chakra-ui/react";
 import { useJobResult } from "@/features/result/hooks/useJobResult";
-import {
-    normalizeIncidents,
-    type IncidentData,
-    type RawIncident,
-} from "@/features/result/utils/normalizeIncidents";
+import { normalizeIncidents } from "@/features/result/utils/normalizeIncidents";
 import { IncidentCard } from "@/features/result/components/elements/IncidentCard";
+import type {IncidentData, RawIncident} from "@/features/result/types";
 
 
 export const ResultForm = () => {
