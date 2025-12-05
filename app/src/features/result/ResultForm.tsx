@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import {
     Box,
     Spinner,
-    Stack,
+    Stack, StackSeparator,
     Text,
     VStack,
 } from "@chakra-ui/react";
@@ -101,39 +101,45 @@ export const ResultForm = () => {
     // 通常ケース
     return (
         <Box w="full">
-            <Stack gap={4}>
-                {incidents.map((incident) => {
-                    const isOpen = selectedCases.includes(incident.id);
-                    const onToggle = () => handleCaseClick(incident.id);
+            {/* 全体を囲む大きな枠（外枠） */}
+            <Box
+                bg="white"
+                borderRadius="xl" // 少し丸みを強くしてモダンに
+                borderWidth="1px"
+                borderColor="gray.200"
+                overflow="hidden" // 角丸からはみ出さないように
+                shadow="sm" // 軽く影をつける
+            >
+                {/* 隙間(gap)を0にして、間に線を入れる */}
+                <Stack gap={0} separator={<StackSeparator borderColor="gray.100" />}>
+                    {incidents.map((incident) => {
+                        const isOpen = selectedCases.includes(incident.id);
+                        const onToggle = () => handleCaseClick(incident.id);
 
-                    return (
-                        // 元々 IncidentCard だった部分のデザイン(枠線など)をここに直接書く
-                        <Box
-                            key={incident.id}
-                            bg="white"
-                            borderRadius="md"
-                            borderWidth="1px"
-                            borderColor="gray.200"
-                            overflow="hidden"
-                            transition="all 0.2s"
-                        >
-                            {/* ヘッダー部分 */}
-                            <IncidentCardHeader
-                                incident={incident}
-                                isOpen={isOpen}
-                                onToggle={onToggle}
-                            />
+                        return (
+                            <Box
+                                key={incident.id}
+                                bg={isOpen ? "gray.50" : "white"} // 開いている時は少し背景色を変える
+                                transition="background 0.2s"
+                            >
+                                {/* 中身のコンポーネントには「枠線」を持たせない
+                                    （親のStackSeparatorが区切り線になるため）
+                                */}
+                                <IncidentCardHeader
+                                    incident={incident}
+                                    isOpen={isOpen}
+                                    onToggle={onToggle}
+                                />
 
-                            {/* 中身部分 */}
-                            <IncidentCardContent
-                                incident={incident}
-                                isOpen={isOpen} onToggle={function (): void {
-                                throw new Error("Function not implemented.");
-                            }}                            />
-                        </Box>
-                    );
-                })}
-            </Stack>
+                                <IncidentCardContent
+                                    incident={incident}
+                                    isOpen={isOpen}
+                                />
+                            </Box>
+                        );
+                    })}
+                </Stack>
+            </Box>
         </Box>
     );
 };

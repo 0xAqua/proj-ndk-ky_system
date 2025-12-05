@@ -1,5 +1,5 @@
 // src/features/result/components/elements/IncidentCardHeader.tsx
-import { Badge, Box, Flex, HStack, Icon, Stack, Text } from "@chakra-ui/react";
+import { Center, Flex, Icon, Stack, Text } from "@chakra-ui/react";
 import { HiSparkles } from "react-icons/hi";
 import { MdChevronRight, MdExpandMore, MdWarning } from "react-icons/md";
 import type { IncidentData } from "@/features/result/types";
@@ -11,46 +11,52 @@ type Props = {
 };
 
 export const IncidentCardHeader = ({ incident, isOpen, onToggle }: Props) => {
+    // インシデントタイプごとの配色とアイコン定義
+    const isPast = incident.badgeType === "past";
+    const themeColor = isPast ? "orange" : "pink"; // または purple
+    const StatusIcon = isPast ? MdWarning : HiSparkles;
+
     return (
         <Flex
-            p={4}
-            borderLeft="4px solid"
-            borderLeftColor={incident.borderColor}
+            py={5} // 高さを出すために上下のパディングを大きく(4->5)
+            px={4}
             align="center"
             justify="space-between"
             cursor="pointer"
-            _hover={{ bg: "gray.50" }}
             onClick={onToggle}
-            bg="white" // 背景色を明示
+            _hover={{ bg: "gray.50" }}
+            gap={4} // アイコンとテキストの間の余白
         >
-            <Stack gap={1} flex={1}>
-                <Text fontSize="xs" color="gray.500" fontWeight="medium">
-                    {incident.caseNumber}
-                </Text>
-                <Text fontSize="sm" fontWeight="bold" lineHeight="short">
-                    {incident.title}
-                </Text>
-                <Box>
-                    <Badge
-                        variant="surface"
-                        colorPalette={incident.badgeType === "past" ? "orange" : "pink"}
-                        size="sm"
-                    >
-                        <HStack gap={1}>
-                            <Icon as={incident.badgeType === "past" ? MdWarning : HiSparkles} />
-                            <Text>
-                                {incident.badgeType === "past"
-                                    ? "過去に起こったインシデント"
-                                    : "AIが想定したインシデント"}
-                            </Text>
-                        </HStack>
-                    </Badge>
-                </Box>
-            </Stack>
+            <Flex flex={1} gap={4} align="center">
+                {/* 左側：アイコンボックス (Visual Anchor)
+            ここがあることで「高さ」と「リッチさ」が出ます
+        */}
+                <Center
+                    boxSize="48px" // 48x48pxの大きめの箱
+                    bg={`${themeColor}.100`} // 薄い背景色
+                    color={`${themeColor}.600`} // アイコンの色
+                    borderRadius="lg" // 少し丸く
+                    flexShrink={0} // 幅が縮まないように固定
+                >
+                    <Icon as={StatusIcon} boxSize={6} />
+                </Center>
+
+                {/* 中央：テキスト情報 */}
+                <Stack gap={1.5} flex={1}>
+
+                    <Text fontSize="md" fontWeight="bold" lineHeight="short" color="gray.900">
+                        {incident.title}
+                    </Text>
+
+                </Stack>
+            </Flex>
+
+            {/* 右端：開閉アイコン */}
             <Icon
                 as={isOpen ? MdExpandMore : MdChevronRight}
                 boxSize={6}
                 color="gray.400"
+                ml={2}
             />
         </Flex>
     );

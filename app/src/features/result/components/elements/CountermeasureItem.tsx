@@ -16,7 +16,7 @@ export const CountermeasureItem = ({ measure }: Props) => {
             borderLeftColor="blue.500"
             py={1}
         >
-            <Stack gap={2}>
+            <Stack gap={4}>
                 {/* タイトル */}
                 <HStack gap={2} align="flex-start">
                     <Icon as={FiCheckCircle} color="blue.500" boxSize={5} mt={0.5} />
