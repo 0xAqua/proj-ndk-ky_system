@@ -28,9 +28,6 @@ export const IncidentCardHeader = ({ incident, isOpen, onToggle }: Props) => {
             gap={4} // アイコンとテキストの間の余白
         >
             <Flex flex={1} gap={4} align="center">
-                {/* 左側：アイコンボックス (Visual Anchor)
-            ここがあることで「高さ」と「リッチさ」が出ます
-        */}
                 <Center
                     boxSize="48px" // 48x48pxの大きめの箱
                     bg={`${themeColor}.100`} // 薄い背景色
@@ -44,7 +41,7 @@ export const IncidentCardHeader = ({ incident, isOpen, onToggle }: Props) => {
                 {/* 中央：テキスト情報 */}
                 <Stack gap={1.5} flex={1}>
 
-                    <Text fontSize="md" fontWeight="bold" lineHeight="short" color="gray.900">
+                    <Text fontSize="sm" fontWeight="bold" lineHeight="short" color="gray.900">
                         {incident.title}
                     </Text>
 

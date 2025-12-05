@@ -3,6 +3,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { EntryPage } from "@/pages/EntryPage";
 import { ResultPage } from "@/pages/ResultPage";
 import { AuthGuard } from '@/features/auth/components/AuthGuard';
+import {SamplePage} from "@/features/entry/components/elements/SafetyScanView.tsx";
 
 export const AppRoutes = () => {
     return (
@@ -32,6 +33,7 @@ export const AppRoutes = () => {
                     </AuthGuard>
                 }
             />
+            <Route path={"/sample"} element={<SamplePage />} />
         </Routes>
     );
 };
