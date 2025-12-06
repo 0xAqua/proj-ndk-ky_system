@@ -21,3 +21,9 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "api_endpoint" {
+  description = "Allowed API endpoint for CSP"
+  type        = string
+  default     = ""
+}

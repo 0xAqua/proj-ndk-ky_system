@@ -91,7 +91,7 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
     }
 
     content_security_policy {
-      content_security_policy = "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://cognito-idp.ap-northeast-1.amazonaws.com https://ctv1qq7l56.execute-api.ap-northeast-1.amazonaws.com https://d1c3o812dlf2f9.cloudfront.net; img-src 'self' data: blob:;"
+      content_security_policy = "default-src 'self'; ... connect-src 'self' ${var.api_endpoint} ... ;"
       override                = true
     }
   }
