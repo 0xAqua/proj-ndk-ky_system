@@ -198,6 +198,11 @@ resource "aws_lambda_function" "producer" {
   tracing_config {
     mode = "Active"
   }
+
+  # テナント分離モードの設定
+  tenancy_config {
+    tenant_isolation_mode = "PER_TENANT"
+  }
 }
 
 # ─────────────────────────────
@@ -229,6 +234,10 @@ resource "aws_lambda_function" "worker" {
 
   tracing_config {
     mode = "Active"
+  }
+
+  tenancy_config {
+    tenant_isolation_mode = "PER_TENANT"
   }
 }
 
