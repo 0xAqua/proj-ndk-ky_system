@@ -63,7 +63,7 @@ module "api_gateway" {
 
   allowed_origins = [
     "http://localhost:3000",
-    module.frontend.cloudfront_domain
+    "https://${module.frontend.cloudfront_domain}"
   ]
 
   name_prefix         = "${local.project}-${local.environment}"

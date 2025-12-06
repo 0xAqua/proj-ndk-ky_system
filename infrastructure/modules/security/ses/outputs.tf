@@ -1,11 +1,11 @@
 output "sender_email" {
   description = "Verified sender email address"
-  value       = aws_ses_email_identity.sender.email
+  value       = var.domain_name == "" ? aws_ses_email_identity.sender[0].email : var.sender_email
 }
 
 output "sender_email_arn" {
   description = "ARN of the verified sender email"
-  value       = aws_ses_email_identity.sender.arn
+  value       = var.domain_name == "" ? aws_ses_email_identity.sender[0].arn : null
 }
 
 output "configuration_set_name" {
