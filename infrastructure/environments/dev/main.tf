@@ -61,6 +61,11 @@ module "dynamodb" {
 module "api_gateway" {
   source = "../../modules/api-gateway"
 
+  allowed_origins = [
+    "http://localhost:3000",
+    module.frontend.cloudfront_domain
+  ]
+
   name_prefix         = "${local.project}-${local.environment}"
   region              = local.region
   user_pool_id        = module.auth.user_pool_id

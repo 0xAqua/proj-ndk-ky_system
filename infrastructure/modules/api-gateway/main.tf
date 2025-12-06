@@ -5,10 +5,7 @@ resource "aws_apigatewayv2_api" "this" {
 
   # CORS設定 (フロントエンドからのアクセス許可)
   cors_configuration {
-    allow_origins = [
-      "http://localhost:3000",                  # ローカル開発用
-      "https://d1w3ij4j3pi58j.cloudfront.net"   # デプロイ環境用 (Terraform Outputの値を指定)
-    ]
+    allow_origins = var.allowed_origins
 
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
