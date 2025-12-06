@@ -308,7 +308,7 @@ module "backup" {
 
   # ★このタグが付いているリソース(DynamoDB, S3等)を全てバックアップ対象にする
   selection_tags = {
-    Project = local.project # "ndk-ky"
+    BackupTarget = "True"
   }
 }
 
@@ -354,4 +354,12 @@ module "ses" {
   name_prefix  = "${local.project}-${local.environment}"
   sender_email = "tsuji.kodai@ndisol.com"  # Todo: どれにするか
 }
+
+# ─────────────────────────────
+# 14. 脅威検知 (GuardDuty)
+# ─────────────────────────────
+module "guard-duty" {
+  source = "../../modules/security/guard-duty"
+}
+
 

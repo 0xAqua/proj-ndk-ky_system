@@ -12,7 +12,7 @@ resource "aws_s3_bucket" "log_archive" {
     Module      = "data-s3"
   }
 
-  force_destroy = true
+  force_destroy = var.force_destroy
 }
 
 # 暗号化
