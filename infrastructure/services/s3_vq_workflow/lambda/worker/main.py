@@ -298,10 +298,32 @@ def lambda_handler(event, context):
                 )
             else:
                 # 失敗: やり直し (Re-create)
-                print("Validation FAILED. Re-creating...")
+                print("Validation FAILED.")
+
+                # ★追加: 無限ループ防止のための回数チェック
                 resp = table.get_item(Key={'job_id': job_id})
                 if 'Item' in resp:
-                    recreate_job(creds, resp['Item'], tenant_id)
+                    current_item = resp['Item']
+                    current_retry = int(current_item.get('retry_count', 0))
+
+                    # 例: 3回以上リトライしていたら、あきらめてFAILEDにする
+                    if current_retry >= 3:
+                        print(f"Max retries reached ({current_retry}). Marking as FAILED.")
+                        table.update_item(
+                            Key={'job_id': job_id},
+                            UpdateExpression="set #st=:s, updated_at=:u, error_msg=:e",
+                            ExpressionAttributeNames={'#st': 'status'},
+                            ExpressionAttributeValues={
+                                ':s': 'FAILED',
+                                ':u': int(time.time()),
+                                ':e': 'Validation failed multiple times. Invalid JSON format.'
+                            }
+                        )
+                        return # ここで終了（再送しない）
+
+                    # まだ上限に達していなければ再作成
+                    print(f"Retrying... (Count: {current_retry + 1})")
+                    recreate_job(creds, current_item, tenant_id)
 
         except Exception as e:
             if "Job not finished yet" in str(e):

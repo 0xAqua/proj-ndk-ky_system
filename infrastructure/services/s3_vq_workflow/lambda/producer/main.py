@@ -93,7 +93,6 @@ def handle_post(event, context):
         }
 
         print(f"DEBUG: Model ID: {model_id}")   # ← これが空やダミーになってないか確認！
-        print(f"DEBUG: Headers: {headers}")     # ← トークンが正しく入っているか
         print(f"DEBUG: Payload: {payload}")     # ← 全体の構造確認
 
         vq_resp = requests.post(MESSAGE_API_URL, json=payload, headers=headers)
@@ -152,6 +151,10 @@ def handle_get(event, context):
 
         claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
         tenant_id = claims.get('custom:tenant_id')
+
+        if not tenant_id:
+            print("Error: No tenant_id in token")
+            return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized: No tenant info"})}
 
         # DynamoDBから取得
         resp = table.get_item(Key={'job_id': job_id})
