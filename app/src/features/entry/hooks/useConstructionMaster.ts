@@ -94,7 +94,6 @@ export const useConstructionMaster = () => {
         constructions,
         environments,
         isLoading,
-        // React QueryのエラーはError型なのでメッセージを取り出す、なければnull
         error: isError ? (error as Error).message : null,
     };
 };

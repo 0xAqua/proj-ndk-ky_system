@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-// ★修正1: useDisclosure をインポート
 import { Box, Spinner, VStack, Text, useDisclosure } from "@chakra-ui/react";
 import { useUserStore } from "@/stores/useUserStore";
-import { api } from "@/lib/api";
+import { tenantApi as api } from "@/lib/api";
 import ConstructionDate from "@/features/entry/components/elements/ConstructionDate";
 
 // Hooks & Services
