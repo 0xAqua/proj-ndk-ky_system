@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-// 画面遷移用
 import { useNavigate } from "react-router-dom";
 
-import { Box, Spinner, VStack, Button, Text } from "@chakra-ui/react";
+import { Box, Spinner, VStack, Text } from "@chakra-ui/react";
 import { useUserStore } from "@/stores/useUserStore";
 import { api } from "@/lib/api";
 import ConstructionDate from "@/features/entry/components/elements/ConstructionDate";
@@ -16,6 +15,7 @@ import { ConstructionProject } from "@/features/entry/components/elements/Constr
 import { ConstructionProcess } from "@/features/entry/components/elements/ConstructionProcess";
 import { ImportantEquipment } from "@/features/entry/components/elements/ImportantEquipment";
 import { SiteCondition } from "@/features/entry/components/elements/SiteCondition";
+import {SubmitButton} from "@/features/entry/components/elements/SubmitButton.tsx";
 
 export const EntryForm = () => {
     const navigate = useNavigate();
@@ -148,16 +148,13 @@ export const EntryForm = () => {
                     onChange={setSelectedEnvIds}
                 />
 
-                <Button
-                    colorScheme="blue"
+                <SubmitButton
                     onClick={handleSubmit}
-                    mt={4}
-                    size="lg"
-                    loading={isSubmitting}
+                    loading={isSubmitting} // isLoading ではなく loading プロパティとして渡せます
                     loadingText="送信中..."
                 >
                     登録内容を確認
-                </Button>
+                </SubmitButton>
             </VStack>
         </Box>
     );
