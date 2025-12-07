@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Box, Spinner, VStack, Text } from "@chakra-ui/react";
+// ★修正1: useDisclosure をインポート
+import { Box, Spinner, VStack, Text, useDisclosure } from "@chakra-ui/react";
 import { useUserStore } from "@/stores/useUserStore";
 import { api } from "@/lib/api";
 import ConstructionDate from "@/features/entry/components/elements/ConstructionDate";
@@ -15,11 +16,14 @@ import { ConstructionProject } from "@/features/entry/components/elements/Constr
 import { ConstructionProcess } from "@/features/entry/components/elements/ConstructionProcess";
 import { ImportantEquipment } from "@/features/entry/components/elements/ImportantEquipment";
 import { SiteCondition } from "@/features/entry/components/elements/SiteCondition";
-import {SubmitButton} from "@/features/entry/components/elements/SubmitButton.tsx";
+import { SubmitButton } from "@/features/entry/components/elements/SubmitButton.tsx";
+import { SiteConditionConfirmModal } from "@/features/entry/components/elements/SiteConditionConfirmModal.tsx";
 
 export const EntryForm = () => {
     const navigate = useNavigate();
 
+    // ★修正2: モーダル開閉用フック
+    const { open, onOpen, onClose } = useDisclosure();
     const {
         tenantId,
         setUserData,
@@ -58,22 +62,29 @@ export const EntryForm = () => {
     }, []);
 
     // ──────────────────────────────────────────
-    // 送信ハンドラ (API連携)
+    // ★修正3: ボタンクリック時のハンドラ (バリデーションと確認画面表示のみ)
     // ──────────────────────────────────────────
-    const handleSubmit = async () => {
+    const handleCheckAndOpen = () => {
         // バリデーション (簡易)
         if (selectedTypeIds.length === 0 || selectedProcessIds.length === 0) {
             alert("【入力不足】\n工事種別と工程を選択してください。");
             return;
         }
+        // エラーがなければモーダルを開く
+        onOpen();
+    };
 
+    // ──────────────────────────────────────────
+    // ★修正4: 実際の送信ハンドラ (モーダル内の「確定」で呼ばれる)
+    // ──────────────────────────────────────────
+    const handleFinalSubmit = async () => {
         setIsSubmitting(true);
 
         try {
             // 1. プロンプト生成
             const promptText = buildConstructionPrompt({
                 date,
-                constructions, // constructionsを渡す
+                constructions,
                 environments,
                 selectedTypeIds,
                 selectedProcessIds,
@@ -82,9 +93,7 @@ export const EntryForm = () => {
 
             console.log("Sending Prompt:", promptText);
 
-            // 2. API送信 (Producer Lambdaへ)
-            // ※エンドポイントは '/jobs' や '/prediction' などAPI Gatewayの設定に合わせてください
-            // ここでは '/jobs' と仮定しています
+            // 2. API送信
             const res = await api.post('/jobs', {
                 message: promptText
             });
@@ -95,12 +104,14 @@ export const EntryForm = () => {
                 throw new Error("Job ID not returned");
             }
 
-            // 3. 結果画面へ遷移 (Job IDを持っていく)
+            // モーダルを閉じる
+            onClose();
+
+            // 3. 結果画面へ遷移
             navigate(`/result/${jobId}`);
 
         } catch (e) {
             console.error("Submission failed:", e);
-            // ★変更: toast -> alert
             alert("【送信エラー】\nサーバーへの送信に失敗しました。");
         } finally {
             setIsSubmitting(false);
@@ -149,12 +160,25 @@ export const EntryForm = () => {
                 />
 
                 <SubmitButton
-                    onClick={handleSubmit}
-                    loading={isSubmitting} // isLoading ではなく loading プロパティとして渡せます
-                    loadingText="送信中..."
+                    onClick={handleCheckAndOpen}
+                    loading={isSubmitting}
                 >
                     登録内容を確認
                 </SubmitButton>
+
+                <SiteConditionConfirmModal
+                    // モーダル制御
+                    open={open}
+                    onClose={onClose}
+                    onSubmit={handleFinalSubmit}
+                    isSubmitting={isSubmitting}
+                    date={date}
+                    constructions={constructions}
+                    selectedTypeIds={selectedTypeIds}
+                    selectedProcessIds={selectedProcessIds}
+                    masterEnvironments={environments}
+                    value={selectedEnvIds}
+                />
             </VStack>
         </Box>
     );
