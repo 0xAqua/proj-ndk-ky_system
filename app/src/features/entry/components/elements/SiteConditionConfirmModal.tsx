@@ -6,10 +6,9 @@ import {
     Box,
     Flex,
     Separator,
-    IconButton,
     Badge
 } from "@chakra-ui/react";
-import { MdClose, MdCalendarToday, MdConstruction, MdListAlt, MdLocationOn } from "react-icons/md";
+import { MdCalendarToday, MdConstruction, MdListAlt, MdLocationOn } from "react-icons/md";
 import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
 import { useMemo } from "react";
 
@@ -18,12 +17,10 @@ type Props = {
     onClose: () => void;
     onSubmit: () => void;
     isSubmitting?: boolean;
-
     date: string;
     constructions: ProcessCategory[];
     selectedTypeIds: string[];
     selectedProcessIds: string[];
-
     masterEnvironments: ProcessCategory[];
     value: string[];
 };
@@ -34,7 +31,6 @@ export const SiteConditionConfirmModal = ({
                                               onSubmit,
                                               isSubmitting,
                                               date,
-                                              // ★修正: 以下の配列プロパティにデフォルト値 [] を設定して、undefinedエラーを防ぐ
                                               constructions = [],
                                               selectedTypeIds = [],
                                               selectedProcessIds = [],
@@ -43,65 +39,88 @@ export const SiteConditionConfirmModal = ({
                                           }: Props) => {
 
     // ──────────────────────────────────────────────
-    // 名称解決ヘルパー
+    // 【高速化 1】 ID参照用マップの作成 (O(N)で一度だけ作成)
     // ──────────────────────────────────────────────
-    const findNameById = (categories: ProcessCategory[], id: string): string | null => {
-        // categories が万が一 undefined の場合のガード
-        if (!categories) return null;
+    // 毎回 find で木構造を探索すると重いため、
+    // 事前に Map<ID, 名称> を作成して O(1) で引けるようにする
+    const idToNameMap = useMemo(() => {
+        const map = new Map<string, string>();
 
-        for (const cat of categories) {
-            if (cat.id === id) return cat.name;
-            if (cat.processes) {
-                const foundProcess = cat.processes.find(p => p.id === id);
-                if (foundProcess) return foundProcess.label;
-            }
-            if (cat.children) {
-                const foundInChildren = findNameById(cat.children, id);
-                if (foundInChildren) return foundInChildren;
-            }
-        }
-        return null;
-    };
-
-    // 1. 工事種別の名称リスト作成
-    const typeNames = useMemo(() => {
-        // selectedTypeIds が [] (空) なら安全に空配列が返る
-        return selectedTypeIds
-            .map(id => findNameById(constructions, id))
-            .filter((name): name is string => name !== null);
-    }, [constructions, selectedTypeIds]);
-
-    // 2. 工程の名称リスト作成
-    const processNames = useMemo(() => {
-        return selectedProcessIds
-            .map(id => findNameById(constructions, id))
-            .filter((name): name is string => name !== null);
-    }, [constructions, selectedProcessIds]);
-
-    // 3. 現場状況の表示データ作成
-    const envItemsDisplay = useMemo(() => {
-        const results: { categoryName: string; label: string }[] = [];
-        const traverse = (categories: ProcessCategory[], parentNames: string[] = []) => {
-            if (!categories) return; // ガード
+        const traverse = (categories: ProcessCategory[]) => {
+            if (!categories) return;
             categories.forEach(cat => {
+                map.set(cat.id, cat.name); // カテゴリID -> カテゴリ名
+
                 if (cat.processes) {
                     cat.processes.forEach(proc => {
-                        if (selectedEnvIds.includes(proc.id)) {
-                            results.push({
-                                categoryName: parentNames.concat(cat.name).join(" > "),
-                                label: proc.label
-                            });
-                        }
+                        map.set(proc.id, proc.label); // プロセスID -> プロセス名
                     });
                 }
-                if (cat.children) traverse(cat.children, [...parentNames, cat.name]);
+                if (cat.children) {
+                    traverse(cat.children);
+                }
             });
         };
+
+        traverse(constructions);
+        return map;
+    }, [constructions]);
+
+    // ──────────────────────────────────────────────
+    // 【高速化 2】 表示データの生成 (Mapを使うため超高速)
+    // ──────────────────────────────────────────────
+
+    // 工事種別名
+    const typeNames = useMemo(() => {
+        return selectedTypeIds
+            .map(id => idToNameMap.get(id))
+            .filter((name): name is string => name !== undefined);
+    }, [selectedTypeIds, idToNameMap]);
+
+    // 工程名
+    const processNames = useMemo(() => {
+        return selectedProcessIds
+            .map(id => idToNameMap.get(id))
+            .filter((name): name is string => name !== undefined);
+    }, [selectedProcessIds, idToNameMap]);
+
+
+    // ──────────────────────────────────────────────
+    // 現場状況の表示データ作成
+    // (ここは構造を表示する必要があるため、ツリー走査を行うがメモ化で抑制)
+    // ──────────────────────────────────────────────
+    const envItemsDisplay = useMemo(() => {
+        // モーダルが閉じているときは計算しない（レンダリングコスト削減）
+        if (!open) return [];
+
+        const results: { categoryName: string; label: string }[] = [];
+
+        const traverse = (categories: ProcessCategory[], parentNames: string[] = []) => {
+            if (!categories) return;
+            categories.forEach(cat => {
+                // プロセス走査
+                if (cat.processes) {
+                    const selectedProcesses = cat.processes.filter(p => selectedEnvIds.includes(p.id));
+                    // 該当するものがあれば追加
+                    selectedProcesses.forEach(proc => {
+                        results.push({
+                            categoryName: parentNames.concat(cat.name).join(" > "),
+                            label: proc.label
+                        });
+                    });
+                }
+                // 再帰
+                if (cat.children) {
+                    traverse(cat.children, [...parentNames, cat.name]);
+                }
+            });
+        };
+
         traverse(masterEnvironments);
         return results;
-    }, [masterEnvironments, selectedEnvIds]);
+    }, [masterEnvironments, selectedEnvIds, open]);
 
-    // 共通の見出しコンポーネント
+    // 共通ヘッダーコンポーネント
     const SectionHeader = ({ icon: Icon, title }: { icon: any, title: string }) => (
         <Flex align="center" gap={2} mb={2} color="gray.600">
             <Icon />
@@ -116,17 +135,22 @@ export const SiteConditionConfirmModal = ({
             size="xl"
             scrollBehavior="inside"
         >
-            <Dialog.Backdrop bg="blackAlpha.300" backdropFilter="blur(5px)" />
+            {/* 【高速化 3】 backdropFilter を削除または軽減
+               blur処理はGPU負荷が高いため、重い場合は bg="blackAlpha.500" だけにするのが定石
+            */}
+            <Dialog.Backdrop bg="blackAlpha.500" />
 
             <Dialog.Positioner>
-                <Dialog.Content borderRadius="xl" bg="white">
-                    <Dialog.Header fontWeight="bold" fontSize="lg" display="flex" justifyContent="space-between" alignItems="center">
+                <Dialog.Content
+                    borderRadius="xl"
+                    bg="white"
+                    // ★修正: スマホ(base)は90%〜95%、PC(md以上)は500px
+                    w={{ base: "95%", md: "500px" }}
+                    // 必要であれば最大幅も指定しておくと安全です
+                    maxW="100vw"
+                >
+                    <Dialog.Header fontWeight="bold" fontSize="lg" py={4}>
                         <Text>登録内容の確認</Text>
-                        <Dialog.CloseTrigger asChild>
-                            <IconButton variant="ghost" size="sm" aria-label="閉じる">
-                                <MdClose size={20} />
-                            </IconButton>
-                        </Dialog.CloseTrigger>
                     </Dialog.Header>
 
                     <Dialog.Body py={6}>
@@ -137,7 +161,7 @@ export const SiteConditionConfirmModal = ({
                                 </Text>
                             </Box>
 
-                            {/* 1. 日付 */}
+                            {/* 日付 */}
                             <Box>
                                 <SectionHeader icon={MdCalendarToday} title="工事実施日" />
                                 <Text fontSize="lg" fontWeight="bold" ps={6}>
@@ -147,7 +171,7 @@ export const SiteConditionConfirmModal = ({
 
                             <Separator borderColor="gray.100" />
 
-                            {/* 2. 工事種別 */}
+                            {/* 工事種別 */}
                             <Box>
                                 <SectionHeader icon={MdConstruction} title="工事種別" />
                                 <Flex wrap="wrap" gap={2} ps={6}>
@@ -165,7 +189,7 @@ export const SiteConditionConfirmModal = ({
 
                             <Separator borderColor="gray.100" />
 
-                            {/* 3. 工程 */}
+                            {/* 工程 */}
                             <Box>
                                 <SectionHeader icon={MdListAlt} title="実施工程" />
                                 <VStack align="start" gap={1} ps={6}>
@@ -181,7 +205,7 @@ export const SiteConditionConfirmModal = ({
 
                             <Separator borderColor="gray.100" />
 
-                            {/* 4. 現場状況 */}
+                            {/* 現場状況 */}
                             <Box>
                                 <SectionHeader icon={MdLocationOn} title="現場状況・環境" />
                                 {envItemsDisplay.length === 0 ? (
@@ -204,22 +228,37 @@ export const SiteConditionConfirmModal = ({
                         </VStack>
                     </Dialog.Body>
 
-                    <Dialog.Footer bg="gray.50" borderBottomRadius="xl">
-                        <Dialog.CloseTrigger asChild>
-                            <Button variant="ghost" mr={3} disabled={isSubmitting}>
+                    <Dialog.Footer
+                        bg="gray.50"
+                        borderBottomRadius="xl"
+                        borderTopWidth="1px"
+                        borderColor="gray.100"
+                    >
+                        <Flex w="full" justify="flex-end" gap={3}>
+                            <Button
+                                variant="outline"
+                                color="gray.600"
+                                borderColor="gray.300"
+                                bg="white"
+                                _hover={{ bg: "gray.50" }}
+                                disabled={isSubmitting}
+                                onClick={onClose}
+                            >
                                 戻る
                             </Button>
-                        </Dialog.CloseTrigger>
 
-                        <Button
-                            colorPalette="green"
-                            onClick={onSubmit}
-                            loading={isSubmitting}
-                            loadingText="送信中"
-                            px={8}
-                        >
-                            確定する
-                        </Button>
+                            {/* 確定ボタン */}
+                            <Button
+                                colorPalette="green"
+                                onClick={onSubmit}
+                                loading={isSubmitting}
+                                loadingText="送信中"
+                                px={8}
+                                boxShadow="0 2px 8px rgba(52, 199, 89, 0.3)" // おまけ: 少し影をつけてリッチに
+                            >
+                                確定する
+                            </Button>
+                        </Flex>
                     </Dialog.Footer>
                 </Dialog.Content>
             </Dialog.Positioner>
