@@ -8,7 +8,7 @@ import {
     Separator,
     Badge
 } from "@chakra-ui/react";
-import { MdCalendarToday, MdConstruction, MdListAlt, MdLocationOn } from "react-icons/md";
+import {MdCalendarToday, MdCheckCircle, MdConstruction, MdInfoOutline, MdListAlt, MdLocationOn} from "react-icons/md";
 import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
 
 import { useSiteConditionConfirmData } from "@/features/entry/hooks/useSiteConditionConfirmData";
@@ -40,7 +40,7 @@ export const SiteConditionConfirmModal = ({
                                           }: Props) => {
 
     // ★ロジックはこれ一行で完結
-    const { typeNames, processNames, envItemsDisplay } = useSiteConditionConfirmData({
+    const { typeNames, envItemsDisplay } = useSiteConditionConfirmData({
         open,
         constructions,
         masterEnvironments,
@@ -70,8 +70,9 @@ export const SiteConditionConfirmModal = ({
                 <Dialog.Content
                     borderRadius="xl"
                     bg="white"
-                    w={{ base: "95%", md: "500px" }}
+                    w={{ base: "100%", md: "480px" }}
                     maxW="100vw"
+                    mx={4}
                 >
                     <Dialog.Header fontWeight="bold" fontSize="lg" py={4}>
                         <Text>登録内容の確認</Text>
@@ -116,14 +117,54 @@ export const SiteConditionConfirmModal = ({
                             {/* 工程 */}
                             <Box>
                                 <SectionHeader icon={MdListAlt} title="実施工程" />
-                                <VStack align="start" gap={1} ps={6}>
-                                    {processNames.length > 0 ? (
-                                        processNames.map((name) => (
-                                            <Text key={name} fontWeight="medium">・{name}</Text>
-                                        ))
-                                    ) : (
-                                        <Text color="gray.400" fontSize="sm">未選択</Text>
-                                    )}
+                                <VStack align="stretch" gap={3} ps={6}>
+                                    {(() => {
+                                        const groupedProcesses = constructions
+                                            .map((category) => {
+                                                const targetList = category.processes || [];
+                                                const selectedItems = targetList.filter((p) =>
+                                                    selectedProcessIds.includes(p.id)
+                                                );
+
+                                                return {
+                                                    categoryName: category.name,
+                                                    items: selectedItems
+                                                };
+                                            })
+                                            .filter((group) => group.items.length > 0);
+
+                                        if (groupedProcesses.length === 0) {
+                                            return <Text color="gray.400" fontSize="sm">未選択</Text>;
+                                        }
+
+                                        return groupedProcesses.map((group) => (
+                                            <Box
+                                                key={group.categoryName}
+                                                bg="gray.50"
+                                                p={3}
+                                                borderRadius="md"
+                                                border="1px solid"
+                                                borderColor="gray.100"
+                                            >
+                                                {/* カテゴリ名 */}
+                                                <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={2}>
+                                                    {group.categoryName}
+                                                </Text>
+
+                                                {/* チェックリスト風の表示 */}
+                                                <Flex wrap="wrap" gap={3}>
+                                                    {group.items.map((item) => (
+                                                        <Flex key={item.id} align="center" gap={1.5}>
+                                                            <Box as={MdCheckCircle} color="green.500" boxSize="16px" />
+                                                            <Text fontSize="sm" fontWeight="bold" color="gray.700">
+                                                                {item.label}
+                                                            </Text>
+                                                        </Flex>
+                                                    ))}
+                                                </Flex>
+                                            </Box>
+                                        ));
+                                    })()}
                                 </VStack>
                             </Box>
 
@@ -135,17 +176,55 @@ export const SiteConditionConfirmModal = ({
                                 {envItemsDisplay.length === 0 ? (
                                     <Text color="gray.400" fontSize="sm" ps={6}>特になし</Text>
                                 ) : (
-                                    <VStack align="start" gap={3} w="full" ps={6}>
-                                        {envItemsDisplay.map((item, index) => (
-                                            <Box key={index} w="full">
-                                                <Text fontSize="xs" color="gray.500" mb={0.5}>
-                                                    {item.categoryName}
-                                                </Text>
-                                                <Text fontSize="md" fontWeight="bold" color="gray.800" ps={2} borderLeft="3px solid" borderColor="green.400">
-                                                    {item.label}
-                                                </Text>
-                                            </Box>
-                                        ))}
+                                    <VStack align="stretch" gap={3} ps={6}>
+                                        {(() => {
+                                            // ▼ フラットな配列をカテゴリごとにグループ化する
+                                            const groupedEnv = envItemsDisplay.reduce((acc, item) => {
+                                                if (!acc[item.categoryName]) {
+                                                    acc[item.categoryName] = [];
+                                                }
+                                                acc[item.categoryName].push(item.label);
+                                                return acc;
+                                            }, {} as Record<string, string[]>);
+
+                                            return Object.entries(groupedEnv).map(([categoryName, labels]) => (
+                                                <Box
+                                                    key={categoryName}
+                                                    bg="gray.50"
+                                                    p={3}
+                                                    borderRadius="md"
+                                                    border="1px solid"
+                                                    borderColor="gray.100"
+                                                >
+                                                    {/* カテゴリ名 */}
+                                                    <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={2}>
+                                                        {categoryName}
+                                                    </Text>
+
+                                                    {/* 項目リスト（タグ風に表示して状況・条件であることを強調） */}
+                                                    <Flex wrap="wrap" gap={2}>
+                                                        {labels.map((label, i) => (
+                                                            <Badge
+                                                                key={i}
+                                                                variant="surface"
+                                                                colorPalette="orange"
+                                                                px={2}
+                                                                py={1}
+                                                                borderRadius="md"
+                                                                textTransform="none"
+                                                                fontSize="sm"
+                                                                fontWeight="medium"
+                                                            >
+                                                                <Flex align="center" gap={1}>
+                                                                    <MdInfoOutline />
+                                                                    {label}
+                                                                </Flex>
+                                                            </Badge>
+                                                        ))}
+                                                    </Flex>
+                                                </Box>
+                                            ));
+                                        })()}
                                     </VStack>
                                 )}
                             </Box>
