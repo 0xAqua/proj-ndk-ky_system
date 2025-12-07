@@ -1,74 +1,55 @@
-import axios, {type InternalAxiosRequestConfig } from 'axios';
+
+import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-// -------------------------------------------------------------
-// 1. ベース設定 (共通のTimeoutやBaseURL)
-// -------------------------------------------------------------
-const baseConfig = {
+// 共通のAxiosインスタンス作成
+export const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 10000, // タイムアウト設定なども共通化
-};
+});
 
-// -------------------------------------------------------------
-// 2. Public API用 (認証不要・テナントID不要・最速)
-// -------------------------------------------------------------
-export const publicApi = axios.create(baseConfig);
-
-// -------------------------------------------------------------
-// 3. Tenant API用 (認証必須・テナントID付与)
-// -------------------------------------------------------------
-export const tenantApi = axios.create(baseConfig);
-
-// テナントAPI用のリクエストインターセプター
-tenantApi.interceptors.request.use(
-    async (config: InternalAxiosRequestConfig) => {
+// リクエストインターセプター: 通信の直前に割り込んでトークンをセットする
+api.interceptors.request.use(
+    async (config) => {
         try {
-            // Amplifyからセッションを取得 (Amplifyはトークンをメモリキャッシュするため、頻繁に呼んでも低速化の心配は少ないです)
+            // Amplifyから最新のセッションを取得
             const session = await fetchAuthSession();
             const token = session.tokens?.idToken?.toString();
 
-            // JWTからテナントIDを取得 (Amplifyのカスタム属性に入っている前提)
-            const payload = session.tokens?.idToken?.payload;
-            const tenantId = payload?.['custom:tenant_id'] as string | undefined;
-
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
-            }
 
-            // Terraformで `PER_TENANT` モードにしたため、ヘッダーで明示的に渡す
-            // (バックエンドがJWT解析だけで判断するなら不要ですが、ログやルーティングで使う場合はヘッダーが有効です)
-            if (tenantId) {
-                config.headers['X-Tenant-ID'] = tenantId;
+                // (任意) 将来のテナント分離のためにヘッダーにも入れておく
+                // const tenantId = session.tokens?.idToken?.payload['custom:tenant_id'];
+                // if (tenantId) config.headers['X-Tenant-ID'] = tenantId;
             }
-
         } catch (error) {
-            console.error('Auth/Tenant session fetch failed', error);
-            // 認証エラー時はリクエストを止めるか、そのまま流して401にするか判断
+            console.error('Failed to get auth token', error);
         }
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-// -------------------------------------------------------------
-// 4. 共通レスポンス処理 (401ハンドリングなど)
-// -------------------------------------------------------------
-const handleResponseError = async (error: any) => {
-    if (error.response?.status === 401) {
-        console.warn("Session expired. Redirecting...");
-        const { signOut } = await import('aws-amplify/auth');
-        await signOut();
-        window.location.href = '/login';
+// レスポンスインターセプター: エラー時の共通処理
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        // 401 (認証切れ) の場合
+        if (error.response?.status === 401) {
+            console.warn("Session expired. Logging out...");
+
+            // 1. Cognitoからサインアウト
+            const { signOut } = await import('aws-amplify/auth');
+            await signOut();
+
+            // 2. Storeをクリア (循環参照を避けるため、直接importせずにwindow.location等でリロードさせるのが一番確実ですが、今回はStoreを呼ぶ)
+            // ※ ここでStoreを呼ぶと依存関係が複雑になるので、
+            //    一番簡単なのは「強制リロード」してログイン画面に戻すことです。
+            window.location.href = '/login';
+        }
+        return Promise.reject(error);
     }
-    return Promise.reject(error);
-};
-
-// 両方のインスタンスにエラーハンドリングを適用
-publicApi.interceptors.response.use((res) => res, handleResponseError);
-tenantApi.interceptors.response.use((res) => res, handleResponseError);
-
-// デフォルトエクスポートは廃止するか、よく使う方(tenantApi)にする
-export default tenantApi;
+);

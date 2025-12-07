@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+
 import { Box, Spinner, VStack, Text, useDisclosure } from "@chakra-ui/react";
 import { useUserStore } from "@/stores/useUserStore";
-import { tenantApi as api } from "@/lib/api";
+import { api } from "@/lib/api";
 import ConstructionDate from "@/features/entry/components/elements/ConstructionDate";
 
 // Hooks & Services
