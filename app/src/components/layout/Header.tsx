@@ -1,10 +1,9 @@
 import { Box, Flex, Text, Image, HStack, Separator } from "@chakra-ui/react";
-import logo from '@/assets/logo.png';
-import { Badge } from "@chakra-ui/react";
 import { LuLogOut, LuChevronDown } from "react-icons/lu";
 import { signOut, fetchUserAttributes } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import logo from '@/assets/logo.png';
 
 import { Avatar } from "@/components/ui/avatar";
 import {
@@ -25,22 +24,14 @@ export const Header = () => {
     useEffect(() => {
         const getUserData = async () => {
             try {
-                // Cognitoから属性を取得 (email, given_name, family_name, etc.)
                 const attributes = await fetchUserAttributes();
-
-                // メールアドレスがあればセット
                 if (attributes.email) {
                     setUserEmail(attributes.email);
                 }
-
-                // 名前があればセット (例: custom:name や name 属性など)
-                // なければメールアドレスを名前代わりにしたり、'User'としたり調整可能
                 const name = attributes.name || attributes.given_name || attributes.email || "User";
                 setUserName(name);
-
             } catch (error) {
                 console.error("ユーザー情報の取得に失敗しました", error);
-                // セッション切れ等の場合はログイン画面へ飛ばす処理を入れても良い
             }
         };
 
@@ -67,27 +58,52 @@ export const Header = () => {
             maxW="480px"
             mx="auto"
             shadow="xs"
-            borderBottomWidth="1px"
             borderColor="gray.100"
+            position="sticky"
+            top={0}
+            zIndex="sticky"
         >
-            <Flex justify="space-between" align="center">
+            {/* relativeを指定することで、中のabsolute要素(タイトル)が
+               このFlexコンテナを基準に配置されます
+            */}
+            <Flex justify="space-between" align="center" position="relative" h="32px">
 
-                <Flex align="center" gap={3}>
-                    <Image src={logo} alt="Logo" h="32px" objectFit="contain" />
-                    <HStack align="start" gap={2}>
-                        <Text fontSize="sm" fontWeight="bold" color="gray.800" lineHeight="1.2">
-                            危険予知システム
-                        </Text>
-                        <Badge variant="surface" colorPalette="green" size="xs">
-                            Beta
-                        </Badge>
-                    </HStack>
-                </Flex>
+                {/* --- 左側：メニューアイコンなど --- */}
+                <Box
+                    // as="button" // ボタンとして振る舞う場合
+                    // cursor="pointer"
+                    // color="gray.600"
+                    // _hover={{ color: "gray.900" }}
+                    // onClick={() => console.log("Menu clicked")} // メニュー処理など
+                >
+                    {/*<LuMenu size={24} />*/}
+                </Box>
 
+                {/* --- 中央：タイトル (絶対配置でど真ん中へ) --- */}
+                {/* --- 中央：ロゴ画像とタイトル --- */}
+                <HStack
+                    position="absolute"
+                    left="50%"
+                    transform="translateX(-50%)"
+                    align="center"
+                    gap={2}
+                >
+                    {/* 2. ロゴ画像を表示 (テキストに合わせて少し小さめに h="20px" 程度推奨) */}
+                    <Image src={logo} alt="Logo" h="22px" objectFit="contain" />
+
+                    <Text
+                        fontSize="sm"
+                        fontWeight="bold"
+                        color="gray.800"
+                        whiteSpace="nowrap"
+                    >
+                        危険予知システム
+                    </Text>
+                </HStack>
+                {/* --- 右側：アバターメニュー --- */}
                 <MenuRoot positioning={{ placement: "bottom-end" }}>
                     <MenuTrigger asChild>
                         <HStack gap={1} cursor="pointer" _hover={{ opacity: 0.8 }}>
-                            {/* name属性にセットすると、自動でイニシャル画像になります */}
                             <Avatar
                                 name={userName}
                                 size="sm"
@@ -102,14 +118,12 @@ export const Header = () => {
                     <MenuContent minW="200px" portalled>
                         <Box px={3} py={2}>
                             <Text fontSize="xs" color="gray.500">ログイン中</Text>
-                            {/* 取得したメールアドレスを表示 */}
                             <Text fontSize="sm" fontWeight="medium" truncate>
                                 {userEmail || "読み込み中..."}
                             </Text>
                         </Box>
 
                         <Separator />
-
 
                         <MenuItem
                             value="logout"
