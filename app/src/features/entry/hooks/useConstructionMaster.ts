@@ -1,9 +1,7 @@
-// src/features/entry/hooks/useConstructionMaster.ts
-
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
 import { useUserStore } from "@/stores/useUserStore";
+import {fetchConstructionMaster} from "@/api/constructionApi.ts";
 
 export type ConstructionTask = { id: string; title: string; };
 export type SafetyEquipment = { id: string; title: string; is_high_risk: boolean; };
@@ -18,13 +16,6 @@ export type ProcessCategory = {
         safety_equipments: SafetyEquipment[];
     }[];
     children?: ProcessCategory[];
-};
-
-// --- API取得関数 ---
-// コンポーネントの外に定義することで、余計な再生成を防ぎます
-export const fetchConstructionMaster = async () => {
-    const res = await api.get('/construction-master');
-    return res.data;
 };
 
 export const useConstructionMaster = () => {

@@ -1,15 +1,12 @@
-// src/features/auth/hooks/useLoginForm.ts
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser } from "aws-amplify/auth";
-// ★追加: React Query関連
 import { useQueryClient } from "@tanstack/react-query";
-import { fetchConstructionMaster } from "@/features/entry/hooks/useConstructionMaster";
 
 import { useCredentialsAuth } from "./useCredentialsAuth";
 import { useOtpAuth } from "./useOtpAuth";
 import { usePasskeyAuth } from "./usePasskeyAuth";
+import {fetchConstructionMaster} from "@/api/constructionApi.ts";
 
 export type LoginStep = 'INPUT_CREDENTIALS' | 'INPUT_OTP';
 
