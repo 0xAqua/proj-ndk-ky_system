@@ -10,7 +10,8 @@ import {
 } from "@chakra-ui/react";
 import { MdCalendarToday, MdConstruction, MdListAlt, MdLocationOn } from "react-icons/md";
 import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
-import { useMemo } from "react";
+
+import { useSiteConditionConfirmData } from "@/features/entry/hooks/useSiteConditionConfirmData";
 
 type Props = {
     open: boolean;
@@ -38,89 +39,17 @@ export const SiteConditionConfirmModal = ({
                                               value: selectedEnvIds = []
                                           }: Props) => {
 
-    // ──────────────────────────────────────────────
-    // 【高速化 1】 ID参照用マップの作成 (O(N)で一度だけ作成)
-    // ──────────────────────────────────────────────
-    // 毎回 find で木構造を探索すると重いため、
-    // 事前に Map<ID, 名称> を作成して O(1) で引けるようにする
-    const idToNameMap = useMemo(() => {
-        const map = new Map<string, string>();
+    // ★ロジックはこれ一行で完結
+    const { typeNames, processNames, envItemsDisplay } = useSiteConditionConfirmData({
+        open,
+        constructions,
+        masterEnvironments,
+        selectedTypeIds,
+        selectedProcessIds,
+        selectedEnvIds
+    });
 
-        const traverse = (categories: ProcessCategory[]) => {
-            if (!categories) return;
-            categories.forEach(cat => {
-                map.set(cat.id, cat.name); // カテゴリID -> カテゴリ名
-
-                if (cat.processes) {
-                    cat.processes.forEach(proc => {
-                        map.set(proc.id, proc.label); // プロセスID -> プロセス名
-                    });
-                }
-                if (cat.children) {
-                    traverse(cat.children);
-                }
-            });
-        };
-
-        traverse(constructions);
-        return map;
-    }, [constructions]);
-
-    // ──────────────────────────────────────────────
-    // 【高速化 2】 表示データの生成 (Mapを使うため超高速)
-    // ──────────────────────────────────────────────
-
-    // 工事種別名
-    const typeNames = useMemo(() => {
-        return selectedTypeIds
-            .map(id => idToNameMap.get(id))
-            .filter((name): name is string => name !== undefined);
-    }, [selectedTypeIds, idToNameMap]);
-
-    // 工程名
-    const processNames = useMemo(() => {
-        return selectedProcessIds
-            .map(id => idToNameMap.get(id))
-            .filter((name): name is string => name !== undefined);
-    }, [selectedProcessIds, idToNameMap]);
-
-
-    // ──────────────────────────────────────────────
-    // 現場状況の表示データ作成
-    // (ここは構造を表示する必要があるため、ツリー走査を行うがメモ化で抑制)
-    // ──────────────────────────────────────────────
-    const envItemsDisplay = useMemo(() => {
-        // モーダルが閉じているときは計算しない（レンダリングコスト削減）
-        if (!open) return [];
-
-        const results: { categoryName: string; label: string }[] = [];
-
-        const traverse = (categories: ProcessCategory[], parentNames: string[] = []) => {
-            if (!categories) return;
-            categories.forEach(cat => {
-                // プロセス走査
-                if (cat.processes) {
-                    const selectedProcesses = cat.processes.filter(p => selectedEnvIds.includes(p.id));
-                    // 該当するものがあれば追加
-                    selectedProcesses.forEach(proc => {
-                        results.push({
-                            categoryName: parentNames.concat(cat.name).join(" > "),
-                            label: proc.label
-                        });
-                    });
-                }
-                // 再帰
-                if (cat.children) {
-                    traverse(cat.children, [...parentNames, cat.name]);
-                }
-            });
-        };
-
-        traverse(masterEnvironments);
-        return results;
-    }, [masterEnvironments, selectedEnvIds, open]);
-
-    // 共通ヘッダーコンポーネント
+    // 小さなUIコンポーネントは同じファイル内に定義してもOK（あるいは別ファイルへ）
     const SectionHeader = ({ icon: Icon, title }: { icon: any, title: string }) => (
         <Flex align="center" gap={2} mb={2} color="gray.600">
             <Icon />
@@ -135,18 +64,13 @@ export const SiteConditionConfirmModal = ({
             size="xl"
             scrollBehavior="inside"
         >
-            {/* 【高速化 3】 backdropFilter を削除または軽減
-               blur処理はGPU負荷が高いため、重い場合は bg="blackAlpha.500" だけにするのが定石
-            */}
             <Dialog.Backdrop bg="blackAlpha.500" />
 
             <Dialog.Positioner>
                 <Dialog.Content
                     borderRadius="xl"
                     bg="white"
-                    // ★修正: スマホ(base)は90%〜95%、PC(md以上)は500px
                     w={{ base: "95%", md: "500px" }}
-                    // 必要であれば最大幅も指定しておくと安全です
                     maxW="100vw"
                 >
                     <Dialog.Header fontWeight="bold" fontSize="lg" py={4}>
@@ -247,14 +171,13 @@ export const SiteConditionConfirmModal = ({
                                 戻る
                             </Button>
 
-                            {/* 確定ボタン */}
                             <Button
                                 colorPalette="green"
                                 onClick={onSubmit}
                                 loading={isSubmitting}
                                 loadingText="送信中"
                                 px={8}
-                                boxShadow="0 2px 8px rgba(52, 199, 89, 0.3)" // おまけ: 少し影をつけてリッチに
+                                boxShadow="0 2px 8px rgba(52, 199, 89, 0.3)"
                             >
                                 確定する
                             </Button>
