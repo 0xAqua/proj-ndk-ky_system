@@ -28,11 +28,14 @@ export const ResultForm = () => {
 
     const [selectedCases, setSelectedCases] = useState<string[]>([]);
 
-    const rawIncidents: RawIncident[] = useMemo(
-        () => (Array.isArray(result) ? (result as RawIncident[]) : []),
-        [result],
-    );
+    const rawIncidents: RawIncident[] = useMemo(() => {
+        // VQ形式: { incidents: [...] }
+        if (result && typeof result === 'object' && 'incidents' in result) {
+            return result.incidents as RawIncident[];
+        }
 
+        return [];
+    }, [result]);
     const incidents: IncidentData[] = useMemo(
         () => normalizeIncidents(rawIncidents),
         [rawIncidents],

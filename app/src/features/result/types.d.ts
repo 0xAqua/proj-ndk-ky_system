@@ -1,15 +1,17 @@
+// VQ API形式に対応
 export interface RawCountermeasure {
-    id: number;
+    no: number;
     title: string;
     description: string;
-    assignees: string[];
+    responsible: string;
 }
 
 export interface RawIncident {
-    caseNo: number;
-    caseTitle: string;
-    type: "Fact" | "AI" | string;
-    overview: string;
+    id: number;
+    title: string;
+    classification: string;  // "過去に起きたインシデント" | "推測されるインシデント"
+    summary: string;
+    cause: string;
     countermeasures: RawCountermeasure[];
 }
 
