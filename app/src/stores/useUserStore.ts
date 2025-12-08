@@ -23,15 +23,12 @@ export const useUserStore = create<UserState>((set) => ({
     isLoading: false,
 
     setUserData: (data) => {
-        // データ構造のチェック
-        const directDepts = data.departments;
         const nestedDepts = data.tenantUser?.departments;
 
-        console.log("Check data.departments:", directDepts);
         console.log("Check data.tenantUser.departments:", nestedDepts);
 
         // データの取得（優先順位: 直下 > tenantUser配下 > 空）
-        const rawDepts = directDepts || nestedDepts || {};
+        const rawDepts = nestedDepts;
 
         const formattedDepts: Department[] = Object.entries(rawDepts).map(([key, value]) => ({
             id: key,
@@ -39,8 +36,8 @@ export const useUserStore = create<UserState>((set) => ({
         }));
 
         set({
-            tenantId: data.tenant_id || data.tenantId,
-            userId: data.user_id || data.userId,
+            tenantId: data.tenantId,
+            userId: data.userId,
             departments: formattedDepts,
         });
     },
