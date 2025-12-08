@@ -15,7 +15,7 @@ resource "aws_apigatewayv2_api" "this" {
       "X-Amz-Date",
       "X-Api-Key",
       "X-Amz-Security-Token",
-      "x-tenant-id"
+      "tenant-id"
     ]
 
     allow_credentials = true
