@@ -23,10 +23,6 @@ export const useUserStore = create<UserState>((set) => ({
     isLoading: false,
 
     setUserData: (data) => {
-        // ★デバッグログ1: APIから渡ってきた生のデータを見る
-        console.group("🔍 [Store Debug] setUserData called");
-        console.log("Raw Data:", data);
-
         // データ構造のチェック
         const directDepts = data.departments;
         const nestedDepts = data.tenantUser?.departments;
@@ -41,10 +37,6 @@ export const useUserStore = create<UserState>((set) => ({
             id: key,
             name: String(value)
         }));
-
-        // ★デバッグログ2: 整形後の部署データを見る
-        console.log("Formatted Departments:", formattedDepts);
-        console.groupEnd();
 
         set({
             // snake_case対応: tenant_id が来ても tenantId に入れる
