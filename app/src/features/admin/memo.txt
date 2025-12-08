@@ -1,0 +1,25 @@
+app/src/features/admin/
+├── users/                     # 【ユーザー管理: CRUD】
+│   ├── components/
+│   │   ├── UserListTable.tsx  # 一覧表示（Read/Delete）
+│   │   ├── UserForm.tsx       # 登録・編集フォーム（Create/Update共通化）
+│   │   └── UserDeleteModal.tsx # 削除確認用
+│   ├── UserListPage.tsx       # 一覧ページ（親）
+│   └── UserEditPage.tsx       # 編集・新規作成ページ
+│
+├── settings/                  # 【設定: 画面1つ】
+│   ├── components/
+│   │   └── OutputConfigSection.tsx # 設定のカテゴリごとにコンポーネントを分ける
+│   └── SettingsPage.tsx       # 全てをまとめる1枚のページ
+│
+└── logs/                      # 【ログ: グラフ・表・検索】
+    ├── components/
+    │   ├── LogStatsChart.tsx  # ログ集計グラフ（Rechartsなど）
+    │   ├── LogSearchFilter.tsx # 検索条件・絞り込みフォーム
+    │   └── LogTable.tsx       # ログ一覧表（ページネーションUI含む）
+    ├── hooks/
+    │   └── useLogData.ts      # 検索条件によるデータ取得ロジック
+    └── AuditLogsPage.tsx      # これらを縦に並べる親ページ
+
+
+基本はDshbord画面を用意
