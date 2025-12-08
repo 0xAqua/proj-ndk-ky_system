@@ -3,6 +3,7 @@ import { LuLogOut, LuChevronDown } from "react-icons/lu";
 import { signOut, fetchUserAttributes } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { useUserStore } from "@/stores/useUserStore";
 import logo from '@/assets/logo.png';
 
 import { Avatar } from "@/components/ui/avatar";
@@ -15,6 +16,7 @@ import {
 
 export const Header = () => {
     const navigate = useNavigate();
+    const clearUser = useUserStore((state) => state.clearUser);
 
     // ユーザー情報を保存するState
     const [userEmail, setUserEmail] = useState("");
@@ -41,6 +43,7 @@ export const Header = () => {
     const handleLogoutClick = async () => {
         try {
             await signOut();
+            clearUser();
             navigate('/login');
         } catch (error) {
             console.error("Logout failed", error);
