@@ -2,6 +2,7 @@ import { Checkbox, Flex, Text, Box, VStack, Accordion } from "@chakra-ui/react";
 import { ContentBox } from "@/features/entry/components/layout/ContentBox";
 import { MdBuild, MdChevronRight, MdInfoOutline } from "react-icons/md";
 import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
+import {useEffect} from "react";
 
 type Props = {
     // 親から受け取るマスタデータ (EntryFormから渡される constructions)
@@ -14,6 +15,21 @@ type Props = {
 };
 
 export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [], onChange }: Props) => {
+
+    useEffect(() => {
+        // 現在有効な種別に含まれる工程IDを取得
+        const validProcessIds = masterCategories
+            .filter(cat => targetTypeIds.includes(cat.id))
+            .flatMap(cat => cat.processes.map(p => p.id));
+
+        // 無効な工程IDを除外
+        const filteredValue = value.filter(id => validProcessIds.includes(id));
+
+        // 変更があれば更新
+        if (filteredValue.length !== value.length) {
+            onChange(filteredValue);
+        }
+    }, [targetTypeIds, masterCategories, value, onChange]);
 
     // 選択された種別ID(targetTypeIds)に一致するものだけを抽出
     const visibleCategories = masterCategories.filter(cat =>
