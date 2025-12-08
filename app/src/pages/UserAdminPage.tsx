@@ -1,9 +1,10 @@
-import {AdminSidebar} from "@/components/elements/AdminSidebar.tsx";
+import { AdminLayout } from "@/components/layout/AdminLayout";
+import { UserAdminForm } from "@/features/admin/users/UserAdminForm";
 
 export const UserAdminPage = () => {
     return (
-        <>
-            <AdminSidebar/>
-        </>
+        <AdminLayout>
+            <UserAdminForm />
+        </AdminLayout>
     );
 };
