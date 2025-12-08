@@ -192,6 +192,8 @@ resource "aws_lambda_function" "producer" {
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
       MESSAGE_API_URL  = "${var.external_api_base_url}/public-api/v1/message"
       CALLBACK_URL     = "${var.api_endpoint}/webhook"
+
+      ALLOWED_ORIGIN = "http://localhost:3000"  # 本番は CloudFront URL
     }
   }
 

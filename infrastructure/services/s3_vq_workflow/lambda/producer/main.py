@@ -18,6 +18,12 @@ AUTH_API_URL    = os.environ.get('AUTH_API_URL')
 MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
 CALLBACK_URL    = os.environ.get('CALLBACK_URL')
 VQ_SECRET_ARN   = os.environ.get('VQ_SECRET_ARN')
+ALLOWED_ORIGIN = os.environ.get('ALLOWED_ORIGIN', 'http://localhost:3000')
+CORS_HEADERS = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+    "Access-Control-Allow-Credentials": "true"
+}
 
 # ロガーの初期化 (構造化ログ用)
 logger = Logger()
@@ -152,14 +158,17 @@ def handle_post(event):
 
         return {
             "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
+            "headers": CORS_HEADERS,
             "body": json.dumps({"job_id": job_id, "message": "Job accepted"})
         }
 
     except Exception as e:
         logger.exception("POST Error") # スタックトレースを含めてログ出力
-        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
-
+        return {
+            "statusCode": 500,
+            "headers": CORS_HEADERS,
+            "body": json.dumps({"error": str(e)})
+        }
 # ---------------------------------------------------
 # GET: ジョブ取得処理
 # ---------------------------------------------------
@@ -196,14 +205,17 @@ def handle_get(event):
 
         return {
             "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
+            "headers": CORS_HEADERS,
             "body": json.dumps(item, cls=DecimalEncoder)
         }
 
     except Exception as e:
         logger.exception("GET Error")
-        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
-
+        return {
+            "statusCode": 500,
+            "headers": CORS_HEADERS,
+            "body": json.dumps({"error": str(e)})
+        }
 # ---------------------------------------------------
 # メインハンドラ
 # ---------------------------------------------------
