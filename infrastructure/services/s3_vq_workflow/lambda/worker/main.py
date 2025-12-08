@@ -57,132 +57,48 @@ def strip_markdown_code_block(content):
 
 
 def is_valid_content(content):
-    """
-    JSONとしてパースでき、決められたキー構造を満たすかを検証
-
-    期待する構造:
-    [
-      {
-        "caseNo": 1,
-        "caseTitle": "...",
-        "type": "Fact" | "AI",
-        "overview": "...",
-        "countermeasures": [
-          {
-            "id": 1,
-            "title": "...",
-            "description": "...",
-            "assignees": ["...", "..."]
-          },
-          ...
-        ]
-      },
-      ...
-    ]
-    """
+    """VQ API形式のJSON検証"""
     if not content:
-        print("Validation: content is empty")
+        logger.warning("Validation: content is empty")
         return False
 
     try:
-        # Markdownコードブロックを除去
         cleaned = strip_markdown_code_block(content)
         parsed = json.loads(cleaned)
 
+        # VQ API形式: { "incidents": [...] }
         if isinstance(parsed, dict) and 'incidents' in parsed:
-            parsed = parsed['incidents']
-
-        if len(parsed) == 0:
-            print("Validation: root list is empty")
+            incidents = parsed['incidents']
+        elif isinstance(parsed, list):
+            incidents = parsed
+        else:
+            logger.warning("Validation: invalid root structure")
             return False
 
-        # 必須キーの定義
-        required_case_keys = {'caseNo', 'caseTitle', 'type', 'overview', 'countermeasures'}
-        required_countermeasure_keys = {'id', 'title', 'description', 'assignees'}
+        if len(incidents) == 0:
+            logger.warning("Validation: incidents list is empty")
+            return False
 
-        for idx, case in enumerate(parsed):
-            # 各caseはdictであること
-            if not isinstance(case, dict):
-                print(f"Validation: case[{idx}] is not a dict")
+        required_keys = {'id', 'title', 'classification', 'summary', 'cause', 'countermeasures'}
+        required_cm_keys = {'no', 'title', 'description', 'responsible'}
+
+        for idx, incident in enumerate(incidents):
+            missing = required_keys - set(incident.keys())
+            if missing:
+                logger.warning(f"Validation: incident[{idx}] missing keys: {missing}")
                 return False
 
-            # 必須キーの存在チェック
-            missing_keys = required_case_keys - set(case.keys())
-            if missing_keys:
-                print(f"Validation: case[{idx}] missing keys: {missing_keys}")
-                return False
-
-            # caseNo は数値であること
-            if not isinstance(case.get('caseNo'), (int, float)):
-                print(f"Validation: case[{idx}].caseNo is not a number")
-                return False
-
-            # caseTitle, overview は文字列であること
-            if not isinstance(case.get('caseTitle'), str):
-                print(f"Validation: case[{idx}].caseTitle is not a string")
-                return False
-            if not isinstance(case.get('overview'), str):
-                print(f"Validation: case[{idx}].overview is not a string")
-                return False
-
-            # type の値チェック
-            if case.get('type') not in ('Fact', 'AI'):
-                print(f"Validation: case[{idx}].type is not 'Fact' or 'AI', got: {case.get('type')}")
-                return False
-
-            # countermeasures の構造チェック
-            countermeasures = case.get('countermeasures')
-            if not isinstance(countermeasures, list):
-                print(f"Validation: case[{idx}].countermeasures is not a list")
-                return False
-
-            if len(countermeasures) == 0:
-                print(f"Validation: case[{idx}].countermeasures is empty")
-                return False
-
-            for cm_idx, cm in enumerate(countermeasures):
-                if not isinstance(cm, dict):
-                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}] is not a dict")
+            for cm_idx, cm in enumerate(incident.get('countermeasures', [])):
+                missing_cm = required_cm_keys - set(cm.keys())
+                if missing_cm:
+                    logger.warning(f"Validation: incident[{idx}].countermeasures[{cm_idx}] missing keys: {missing_cm}")
                     return False
 
-                # 必須キーの存在チェック
-                missing_cm_keys = required_countermeasure_keys - set(cm.keys())
-                if missing_cm_keys:
-                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}] missing keys: {missing_cm_keys}")
-                    return False
-
-                # id は数値であること
-                if not isinstance(cm.get('id'), (int, float)):
-                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].id is not a number")
-                    return False
-
-                # title, description は文字列であること
-                if not isinstance(cm.get('title'), str):
-                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].title is not a string")
-                    return False
-                if not isinstance(cm.get('description'), str):
-                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].description is not a string")
-                    return False
-
-                # assignees は文字列の配列であること
-                assignees = cm.get('assignees')
-                if not isinstance(assignees, list):
-                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].assignees is not a list")
-                    return False
-
-                for a_idx, assignee in enumerate(assignees):
-                    if not isinstance(assignee, str):
-                        print(f"Validation: case[{idx}].countermeasures[{cm_idx}].assignees[{a_idx}] is not a string")
-                        return False
-
-        print("Validation: OK - all checks passed")
+        logger.info("Validation: OK")
         return True
 
     except json.JSONDecodeError as e:
-        print(f"Validation: JSON parse error - {e}")
-        return False
-    except Exception as e:
-        print(f"Validation: unexpected error - {e}")
+        logger.warning(f"Validation: JSON parse error - {e}")
         return False
 
 
