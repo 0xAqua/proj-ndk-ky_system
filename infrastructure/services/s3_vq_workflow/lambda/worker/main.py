@@ -3,6 +3,9 @@ import json
 import time
 import boto3
 import requests
+from aws_lambda_powertools import Logger
+
+logger = Logger()
 
 # 環境変数
 JOB_TABLE_NAME  = os.environ.get('JOB_TABLE_NAME')
