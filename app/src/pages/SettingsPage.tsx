@@ -1,0 +1,118 @@
+import { useState } from "react";
+import {
+    Box,
+    Button,
+    Heading,
+    Text,
+    VStack,
+    Flex,
+    Input,
+    Separator,
+    Stack
+} from "@chakra-ui/react";
+// 追加したSwitchコンポーネントをインポート
+import { Switch } from "@/components/ui/switch";
+import { PiFloppyDisk } from "react-icons/pi";
+
+export const SettingsPage = () => {
+    // スイッチの動きを確認するためのState
+    const [includePrediction, setIncludePrediction] = useState(true);
+
+    return (
+        <Box maxW="3xl" mx="auto">
+
+            {/* 1. ヘッダーエリア */}
+            <Box mb={8}>
+                <Heading size="2xl" mb={2} color="black">設定</Heading>
+                <Text color="gray.500">
+                    システム全体の動作設定を管理します。
+                </Text>
+            </Box>
+
+            <VStack gap={6} align="stretch">
+
+                {/* 2. カードエリア: AI出力設定 */}
+                <Box
+                    bg="white"
+                    p={8}
+                    borderRadius="xl"
+                    borderWidth="1px"
+                    borderColor="gray.200"
+                    shadow="sm"
+                >
+                    <Flex align="center" gap={3} mb={6}>
+                        <Heading size="md" color="black">AI出力設定</Heading>
+                    </Flex>
+
+                    <Stack gap={8}> {/* 間隔を少し広げてスッキリさせる */}
+
+                        {/* 項目1: 出力件数 */}
+                        <Flex justify="space-between" align="center">
+                            <Box>
+                                <Text fontWeight="bold" color="black">インシデント出力件数</Text>
+                                <Text fontSize="sm" color="gray.500" mt={1}>
+                                    1回の生成でAIが提案するリスク事例の数（推奨: 3〜5件）
+                                </Text>
+                            </Box>
+                            <Box w="100px">
+                                <Input
+                                    type="number"
+                                    defaultValue={3}
+                                    min={1}
+                                    max={10}
+                                    textAlign="right"
+                                    borderColor="gray.300"
+                                    _focus={{ borderColor: "black", outlineColor: "black" }}
+                                />
+                            </Box>
+                        </Flex>
+
+                        <Separator borderColor="gray.100" />
+
+                        {/* 項目2: 推測結果の表示 (Switch) */}
+                        <Flex
+                            justify="space-between"
+                            align="center"
+                            cursor="pointer"
+                            // ここでステートを反転させる（ここだけ残す）
+                            onClick={() => setIncludePrediction(!includePrediction)}
+                            _hover={{ opacity: 0.8 }} // クリックできる感触を出すため推奨
+                        >
+                            <Box>
+                                <Text fontWeight="bold" color="black">推測されるインシデントを含める</Text>
+                                <Text fontSize="sm" color="gray.500" mt={1}>
+                                    ONにすると、過去事例だけでなくAI予測も表示します
+                                </Text>
+                            </Box>
+
+                            {/* Switchコンポーネント */}
+                            <Switch
+                                colorPalette="gray"
+                                checked={includePrediction}
+                                pointerEvents="none"
+                                size="lg"
+                            />
+                        </Flex>
+
+                    </Stack>
+                </Box>
+
+                {/* 3. 保存ボタンエリア */}
+                <Flex justify="flex-end">
+                    <Button
+                        bg="black"
+                        color="white"
+                        size="lg"
+                        px={8}
+                        borderRadius="md"
+                        _hover={{ bg: "gray.800" }}
+                    >
+                        <PiFloppyDisk style={{ marginRight: "8px" }} />
+                        変更を保存
+                    </Button>
+                </Flex>
+
+            </VStack>
+        </Box>
+    );
+};
