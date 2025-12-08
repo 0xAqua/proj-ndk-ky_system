@@ -9,10 +9,15 @@ resource "aws_apigatewayv2_api" "this" {
 
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
-    # ★変更: AWSの標準的なヘッダーも追加しておく
-    allow_headers = ["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"]
+    allow_headers = [
+      "Content-Type",
+      "Authorization",
+      "X-Amz-Date",
+      "X-Api-Key",
+      "X-Amz-Security-Token",
+      "x-tenant-id"
+    ]
 
-    # ★変更: コメントアウトを外して有効化 (Cookieや認証ヘッダーを通すために必要)
     allow_credentials = true
 
     max_age           = 300
