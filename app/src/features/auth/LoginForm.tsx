@@ -23,7 +23,8 @@ export const LoginForm = () => {
         showPasskeyModal,
         setShowPasskeyModal,
         handlePasskeyLogin,
-        handleModalComplete
+        handleModalComplete,
+        handleBackToLogin
     } = useLoginForm();
 
     if (isCheckingSession) {
@@ -91,7 +92,7 @@ export const LoginForm = () => {
                         isLoading={isLoading}
                         onOtpChange={setOtp}
                         onSubmit={handleVerifyOtp}
-                        onBack={() => window.location.reload()}
+                        onBack={handleBackToLogin}
                     />
                 )}
 
