@@ -165,10 +165,10 @@ export const AdminSidebar = () => {
 
                 {/* 2. ナビゲーションリスト */}
                 <VStack gap={0} flex={1} w="full" align="flex-start" overflowX="hidden">
-                    <NavItem to="/admin" icon={PiSquaresFour} label="ダッシュボード" isExpanded={isExpanded} />
-                    <NavItem to="/admin/users" icon={PiUsers} label="ユーザー管理" isExpanded={isExpanded} />
-                    <NavItem to="/admin/results" icon={PiListChecks} label="結果一覧" isExpanded={isExpanded} />
-                    <NavItem to="/admin/logs" icon={PiFileText} label="操作ログ・履歴" isExpanded={isExpanded} />
+                    <NavItem to="/sample" icon={PiSquaresFour} label="ダッシュボード" isExpanded={isExpanded} />
+                    <NavItem to="/users" icon={PiUsers} label="ユーザー管理" isExpanded={isExpanded} />
+                    <NavItem to="/results" icon={PiListChecks} label="結果一覧" isExpanded={isExpanded} />
+                    <NavItem to="/logs" icon={PiFileText} label="操作ログ・履歴" isExpanded={isExpanded} />
                 </VStack>
 
                 {/* 3. フッターエリア */}
@@ -177,7 +177,7 @@ export const AdminSidebar = () => {
                     <Box w="full" px={2}><Box w="full" h="1px" bg="gray.200" my={2} /></Box>
 
                     <NavItem to="/entry" icon={PiPencilSimple} label="入力画面へ" isExpanded={isExpanded} isExternal />
-                    <NavItem to="/admin/settings" icon={PiGear} label="設定" isExpanded={isExpanded} />
+                    <NavItem to="/settings" icon={PiGear} label="設定" isExpanded={isExpanded} />
 
                     <Box w="full" px={2} mt={2}>
                         <Tooltip

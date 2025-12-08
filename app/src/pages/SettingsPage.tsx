@@ -13,12 +13,14 @@ import {
 // 追加したSwitchコンポーネントをインポート
 import { Switch } from "@/components/ui/switch";
 import { PiFloppyDisk } from "react-icons/pi";
+import {AdminLayout} from "@/components/layout/AdminLayout.tsx";
 
 export const SettingsPage = () => {
     // スイッチの動きを確認するためのState
     const [includePrediction, setIncludePrediction] = useState(true);
 
     return (
+        <AdminLayout>
         <Box maxW="3xl" mx="auto">
 
             {/* 1. ヘッダーエリア */}
@@ -114,5 +116,6 @@ export const SettingsPage = () => {
 
             </VStack>
         </Box>
+        </AdminLayout>
     );
 };
