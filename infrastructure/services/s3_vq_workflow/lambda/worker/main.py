@@ -89,14 +89,8 @@ def is_valid_content(content):
         cleaned = strip_markdown_code_block(content)
         parsed = json.loads(cleaned)
 
-        # フォーマット対応: { "incidents": [...] }であること
         if isinstance(parsed, dict) and 'incidents' in parsed:
-            incidents = parsed['incidents']
-        elif isinstance(parsed, list):
-            incidents = parsed
-        else:
-            logger.warning("Validation: invalid root structure")
-            return False
+            parsed = parsed['incidents']
 
         if len(parsed) == 0:
             print("Validation: root list is empty")
