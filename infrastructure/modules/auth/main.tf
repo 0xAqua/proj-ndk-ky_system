@@ -139,6 +139,10 @@ resource "aws_cognito_user_pool_client" "web" {
   id_token_validity      = 60   # 分
   refresh_token_validity = 30   # 日
 
+  # access_token_validity  = 15   # 15分
+  # id_token_validity      = 15   # 15分
+  # refresh_token_validity = 1    # 1日
+  #
   token_validity_units {
     access_token  = "minutes"
     id_token      = "minutes"
