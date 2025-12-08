@@ -195,7 +195,7 @@ def recreate_job(creds, old_job_item, tenant_id):
     token = get_auth_token(creds['api_key'], creds['login_id'])
 
     headers = {
-        "X-Auth-Token": f"Bearer {token}", # ★Bearer付与
+        "Authorization": f"Bearer {token}", # ★Bearer付与
         "Content-Type": "application/json"
     }
 
@@ -263,7 +263,7 @@ def lambda_handler(event, context):
 
             # 2. ポーリング (GET)
             url = f"{MESSAGE_API_URL}/{tid}/{mid}"
-            headers = {"X-Auth-Token": f"Bearer {token}"} # ★Bearer付与
+            headers = {"Authorization": f"Bearer {token}"} # ★Bearer付与
 
             resp = requests.get(url, headers=headers)
             resp.raise_for_status()

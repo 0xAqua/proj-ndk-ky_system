@@ -83,7 +83,7 @@ def handle_post(event, context):
         token = get_auth_token(api_key, login_id)
 
         headers = {
-            "X-Auth-Token": f"Bearer {token}", # ★Bearer付与
+            "Authorization": f"Bearer {token}", # ★Bearer付与
             "Content-Type": "application/json"
         }
         payload = {
