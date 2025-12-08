@@ -92,6 +92,7 @@ export const EntryForm = () => {
             });
 
             console.log("Sending Prompt:", promptText);
+            console.log("Current Tenant ID:", tenantId);
 
             // 2. API送信
             const res = await api.post('/jobs',
@@ -100,7 +101,7 @@ export const EntryForm = () => {
                 },
                 {
                     headers: {
-                        'x-tenant-id': tenantId
+                        'tenant-id': tenantId
                     }
                 }
             );
