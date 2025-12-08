@@ -12,7 +12,7 @@ export default function ConstructionDate ({ value, onChange }: DateProps) {
     const today = new Date().toISOString().split("T")[0];
 
     return (
-        <Box bg="white" w="full" p={2} borderRadius="lg">
+        <Box bg="white" w="full" py={2} borderRadius="2xl" boxShadow="0 4px 16px rgba(0, 0, 0, 0.08)" >
             <ContentBox>
                 <VStack align="start" gap={2} w="full">
                     <Flex align="center" gap={2}>

@@ -48,7 +48,7 @@ export const ImportantEquipment = ({ masterCategories, selectedProcessIds }: Pro
     );
 
     return (
-        <Box bg="white" w="full" p={2} borderRadius="lg">
+        <Box bg="white" w="full" p={2} borderRadius="2xl" boxShadow="0 4px 16px rgba(0, 0, 0, 0.08)" >
             <ContentBox>
                 <VStack align="start" gap={3} w="full">
                     {/* ── ヘッダーエリア ── */}
@@ -84,12 +84,11 @@ export const ImportantEquipment = ({ masterCategories, selectedProcessIds }: Pro
                                 {visibleEquipments.map((equipment) => (
                                     <Badge
                                         key={equipment.id}
-                                        size="md"
+                                        size="sm"
                                         colorPalette={equipment.is_high_risk ? "red" : "orange"}
                                         variant="subtle"
                                     >
                                         {equipment.title}
-                                        {equipment.is_high_risk && " (危険)"}
                                     </Badge>
                                 ))}
                                 {sortedEquipments.length > 4 && (

@@ -53,6 +53,8 @@ export const MultiSelect = ({
             {/* 選択ボックス */}
             <Box
                 border="1px solid"
+                display="flex"
+                alignItems="center"
                 borderColor="gray.200"
                 borderRadius="md"
                 p={2}
@@ -100,7 +102,7 @@ export const MultiSelect = ({
                     overflowY="auto"
                     zIndex={10}
                     boxShadow="lg"
-                    p={2}
+                    px={2}
                 >
                     {options.map(option => (
                         <Flex

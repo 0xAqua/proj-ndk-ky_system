@@ -26,6 +26,8 @@ export const ContentBox = ({ children }: ContentBoxProps) => {
             // 3. 既存のスタイル
             px={{ base: 2 }}
             py={{ base: 4 }}
+
+
         >
             {children}
         </Box>

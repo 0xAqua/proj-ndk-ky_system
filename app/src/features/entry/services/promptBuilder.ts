@@ -1,18 +1,26 @@
 import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
+import {
+    getConstructionPromptRules,
+    generateContextPart
+} from "@/features/entry/constants/promptTemplates";
+
+// ▼ ここで数を変更できます
+const PROMPT_CONFIG = {
+    totalIncidents: 3,        // 合計出力数
+    factIncidents: 1,         // そのうち過去事例(Fact)にする数
+    countermeasuresPerCase: 3 // 対応策の数
+};
 
 type PromptInput = {
     date: string;
-    // マスタデータ (名前解決用)
     constructions: ProcessCategory[];
     environments: ProcessCategory[];
-    // 選択されたID
     selectedTypeIds: string[];
     selectedProcessIds: string[];
     selectedEnvIds: string[];
 };
 
 export const buildConstructionPrompt = ({
-                                            date,
                                             constructions,
                                             environments,
                                             selectedTypeIds,
@@ -21,132 +29,72 @@ export const buildConstructionPrompt = ({
                                         }: PromptInput): string => {
 
     // ──────────────────────────────────────────
-    // 1. 画面の入力内容をテキスト化する
+    // 1. データの加工処理（ロジック）
     // ──────────────────────────────────────────
 
-    // 工事種別 (Type) の名前
+    // 1. 工事種別 (Type) の名前リスト作成（概要・本日の工事用）
     const typeNames = constructions
         .filter(cat => selectedTypeIds.includes(cat.id))
         .map(cat => cat.name);
 
-    // 工程 (Process) と機材の詳細
+    // 2. 使用機材 (Equipment) のリスト作成
+    // 選択されたProcessIDに基づいて、紐づく機材(safety_equipments)を抽出
     const selectedProcesses = constructions
         .flatMap(cat => cat.processes)
         .filter(proc => selectedProcessIds.includes(proc.id));
 
-    const processDetails = selectedProcesses.map(proc => {
-        const equipments = proc.safety_equipments
-            .map(eq => eq.is_high_risk ? `★${eq.title}` : eq.title)
-            .join(", ");
-        return `・${proc.label} (使用機材: ${equipments || "なし"})`;
-    });
+    // 機材名を配列化
+    const allEquipments = selectedProcesses
+        .flatMap(proc => proc.safety_equipments)
+        .map(eq => eq.title);
 
-    // 現場環境 (Environment) の名前
+    // 重複を削除して一意にする
+    const uniqueEquipments = Array.from(new Set(allEquipments));
+
+    // 3. 現場環境 (Environment) の名前リスト作成
     const selectedEnvNames: string[] = [];
     environments.forEach(large => {
         large.children?.forEach(mid => {
             mid.processes.forEach(item => {
                 if (selectedEnvIds.includes(item.id)) {
-                    selectedEnvNames.push(`・${large.name} > ${mid.name} > ${item.label}`);
+                    // プロンプトの例に合わせて「-項目名」の形式にします
+                    selectedEnvNames.push(`-${item.label}`);
                 }
             });
         });
     });
 
     // ──────────────────────────────────────────
-    // 2. プロンプトの組み立て
+    // 2. 文字列への整形
     // ──────────────────────────────────────────
 
-    // 入力データ部分
-    const contextPart = `
-# 対象となる工事作業内容
-以下の作業条件に基づき、危険予知（KY）のためのインシデント事例を生成してください。
+    const typeNamesStr = typeNames.length > 0
+        ? typeNames.join("\n")
+        : "(指定なし)";
 
-## 1. 作業日時
-${date}
+    // 機材：もしあれば「-機材名」の形式で結合
+    const equipmentsStr = uniqueEquipments.length > 0
+        ? uniqueEquipments.map(name => `-${name}`).join("\n")
+        : "(指定なし)";
 
-## 2. 工事種別
-${typeNames.length > 0 ? typeNames.join(", ") : "(指定なし)"}
+    const envNamesStr = selectedEnvNames.length > 0
+        ? selectedEnvNames.join("\n")
+        : "(特記事項なし)";
 
-## 3. 実施工程・使用機材
-${processDetails.length > 0 ? processDetails.join("\n") : "(指定なし)"}
+    // ──────────────────────────────────────────
+    // 3. プロンプトの結合
+    // ──────────────────────────────────────────
 
-## 4. 現場状況・環境条件
-${selectedEnvNames.length > 0 ? selectedEnvNames.join("\n") : "(特記事項なし)"}
-`;
+    // コンテキスト部分
+    const contextPart = generateContextPart(
+        typeNamesStr,  // 工事概要
+        typeNamesStr,  // 本日の工事
+        equipmentsStr, // ★使用機材
+        envNamesStr    // 現場状況
+    );
 
-    // ルール・出力形式部分 (ご指定のテキスト)
-    const rulesPart = `
-## ルール
-* データ構造：JSON
-* 出力形式：
-　* 回答は挨拶や解説などは一切含まない。
-　* 出力は必ず有効なJSONでなければならない。
-* インシデント構成：
-　* **合計3件**のインシデントオブジェクトを生成してください。
-　* 過去に実際に起きたインシデントは、類似の過去事例をベースとし、\`"type": "Fact"\` と設定してください。
-　* AIが推測するオリジナル事例は、\`"type": "AI"\` と設定してください。
-* データ要件：
-　* 各インシデントには、必ず**3つの具体的な対応策**を \`countermeasures\` 配列に含めてください。
-　* \`description\` には、「気をつける」のような抽象的な表現を避け、**現場で実践できる具体的な行動**を記述してください。
-　* \`assignees\` 配列には、「現場責任者」「クレーンオペレーター」のように、**具体的な役割や役職名**を記述してください。
+    // ルール部分（設定値を渡して生成）
+    const rulesPart = getConstructionPromptRules(PROMPT_CONFIG);
 
-# JSONデータ構造
-
-以下のオブジェクト構造に厳密に従ってください。
-
-\`\`\`json
-[
-  {
-    "caseNo": 1,
-    "caseTitle": "（文字列）インシデントのタイトル",
-    "type": "（文字列）\"Fact\" または \"AI\"",
-    "overview": "（文字列）インシデントの具体的な状況説明",
-    "countermeasures": [
-      {
-        "id": 1,
-        "title": "（文字列）対応策のタイトル",
-        "description": "（文字列）対応策の具体的な手順や内容",
-        "assignees": [
-          "（文字列）役割や役職名1",
-          "（文字列）役割や役職名2"
-        ]
-      },
-      {
-        "id": 2,
-        "title": "（文字列）対応策のタイトル",
-        "description": "（文字列）対応策の具体的な手順や内容",
-        "assignees": [
-          "（文字列）役割や役職名"
-        ]
-      },
-      {
-        "id": 3,
-        "title": "（文字列）対応策のタイトル",
-        "description": "（文字列）対応策の具体的な手順や内容",
-        "assignees": [
-          "（文字列）役割や役職名"
-        ]
-      }
-    ]
-  },
-  {
-    "caseNo": 2,
-    "caseTitle": "...",
-    "type": "...",
-    "overview": "...",
-    "countermeasures": [...]
-  },
-  {
-    "caseNo": 3,
-    "caseTitle": "...",
-    "type": "...",
-    "overview": "...",
-    "countermeasures": [...]
-  }
-]
-\`\`\`
-`;
-
-    return (contextPart + "\n" + rulesPart).trim();
+    return [contextPart, rulesPart].join("\n").trim();
 };
