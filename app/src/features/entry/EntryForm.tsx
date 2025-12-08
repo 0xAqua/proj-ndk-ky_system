@@ -140,7 +140,10 @@ export const EntryForm = () => {
                 <ConstructionProject
                     masterCategories={constructions}
                     selectedTypeIds={selectedTypeIds}
-                    onChange={setSelectedTypeIds}
+                    onChange={(newTypeIds) => {
+                        setSelectedTypeIds(newTypeIds);
+                        setSelectedProcessIds([]);
+                    }}
                 />
 
                 <ConstructionProcess
