@@ -94,10 +94,16 @@ export const EntryForm = () => {
             console.log("Sending Prompt:", promptText);
 
             // 2. API送信
-            const res = await api.post('/jobs', {
-                message: promptText
-            });
-
+            const res = await api.post('/jobs',
+                {
+                    message: promptText
+                },
+                {
+                    headers: {
+                        'x-tenant-id': tenantId
+                    }
+                }
+            );
             const { job_id: jobId } = res.data;
 
             if (!jobId) {
