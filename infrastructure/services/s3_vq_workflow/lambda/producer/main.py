@@ -5,12 +5,7 @@ import boto3
 import requests
 from decimal import Decimal
 from botocore.exceptions import ClientError
-from aws_lambda_powertools import Logger
-from aws_lambda_powertools.utilities.typing import LambdaContext
 
-# ---------------------------------------------------
-# 初期設定
-# ---------------------------------------------------
 # 環境変数
 JOB_TABLE_NAME  = os.environ.get('JOB_TABLE_NAME')
 SQS_QUEUE_URL   = os.environ.get('SQS_QUEUE_URL')
@@ -18,15 +13,6 @@ AUTH_API_URL    = os.environ.get('AUTH_API_URL')
 MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
 CALLBACK_URL    = os.environ.get('CALLBACK_URL')
 VQ_SECRET_ARN   = os.environ.get('VQ_SECRET_ARN')
-ALLOWED_ORIGIN = os.environ.get('ALLOWED_ORIGIN', 'http://localhost:3000')
-CORS_HEADERS = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-    "Access-Control-Allow-Credentials": "true"
-}
-
-# ロガーの初期化 (構造化ログ用)
-logger = Logger()
 
 dynamodb = boto3.resource('dynamodb')
 table    = dynamodb.Table(JOB_TABLE_NAME)
@@ -60,7 +46,7 @@ def get_vq_credentials(target_tenant_id):
         else:
             return secret_json.get('secret_data', secret_json)
     except Exception as e:
-        logger.error(f"Failed to get secret: {e}")
+        print(f"Failed to get secret: {e}")
         raise e
 
 def get_auth_token(api_key, login_id):
@@ -72,9 +58,9 @@ def get_auth_token(api_key, login_id):
 # ---------------------------------------------------
 # POST: ジョブ作成処理
 # ---------------------------------------------------
-def handle_post(event):
+def handle_post(event, context):
     try:
-        logger.info("Processing POST Request")
+        print("Processing POST Request")
 
         body = json.loads(event.get('body', '{}'))
         input_message = body.get('message')
@@ -82,15 +68,9 @@ def handle_post(event):
         # Cognitoからユーザー情報取得
         claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
         user_id = claims.get('sub', 'unknown')
-        tenant_id = claims.get('custom:tenant_id')
-
-        # ★重要: ログコンテキストにテナントIDを注入
-        # 以降のログには全て自動的に "tenant_id": "xxx" が付与されます
-        if tenant_id:
-            logger.append_keys(tenant_id=tenant_id)
+        tenant_id = claims.get('custom:tenant_id') # ★修正済み
 
         if not tenant_id:
-            logger.warning("Missing custom:tenant_id in token")
             return {"statusCode": 400, "body": json.dumps({"error": "Missing custom:tenant_id in token"})}
 
         # 認証情報の取得
@@ -103,7 +83,7 @@ def handle_post(event):
         token = get_auth_token(api_key, login_id)
 
         headers = {
-            "X-Auth-Token": f"Bearer {token}",
+            "X-Auth-Token": f"Bearer {token}", # ★Bearer付与
             "Content-Type": "application/json"
         }
         payload = {
@@ -112,7 +92,8 @@ def handle_post(event):
             "callback_url": CALLBACK_URL
         }
 
-        logger.debug(f"Payload prepared", extra={"model_id": model_id, "payload": payload})
+        print(f"DEBUG: Model ID: {model_id}")   # ← これが空やダミーになってないか確認！
+        print(f"DEBUG: Payload: {payload}")     # ← 全体の構造確認
 
         vq_resp = requests.post(MESSAGE_API_URL, json=payload, headers=headers)
         vq_resp.raise_for_status()
@@ -120,7 +101,7 @@ def handle_post(event):
 
         tid = vq_data.get('tid')
         mid = vq_data.get('mid')
-        job_id = tid
+        job_id = tid  # 今回はtidを主キーとする
 
         # DynamoDB登録
         item = {
@@ -137,7 +118,6 @@ def handle_post(event):
         table.put_item(Item=item)
 
         # SQS送信 (Workerへ)
-        # ★修正: MessageAttributes にも TenantId を追加
         sqs.send_message(
             QueueUrl=SQS_QUEUE_URL,
             MessageBody=json.dumps({
@@ -145,36 +125,25 @@ def handle_post(event):
                 'tid': tid,
                 'mid': mid,
                 'tenant_id': tenant_id
-            }),
-            MessageAttributes={
-                'TenantId': {
-                    'DataType': 'String',
-                    'StringValue': tenant_id
-                }
-            }
+            })
         )
-
-        logger.info(f"Job accepted: {job_id}")
 
         return {
             "statusCode": 200,
-            "headers": CORS_HEADERS,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"job_id": job_id, "message": "Job accepted"})
         }
 
     except Exception as e:
-        logger.exception("POST Error") # スタックトレースを含めてログ出力
-        return {
-            "statusCode": 500,
-            "headers": CORS_HEADERS,
-            "body": json.dumps({"error": str(e)})
-        }
+        print(f"POST Error: {e}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+
 # ---------------------------------------------------
 # GET: ジョブ取得処理
 # ---------------------------------------------------
-def handle_get(event):
+def handle_get(event, context):
     try:
-        logger.info("Processing GET Request")
+        print("Processing GET Request")
 
         job_id = event.get('pathParameters', {}).get('jobId')
         if not job_id:
@@ -183,12 +152,8 @@ def handle_get(event):
         claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
         tenant_id = claims.get('custom:tenant_id')
 
-        # ログコンテキスト更新
-        if tenant_id:
-            logger.append_keys(tenant_id=tenant_id)
-
         if not tenant_id:
-            logger.warning("Unauthorized: No tenant info")
+            print("Error: No tenant_id in token")
             return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized: No tenant info"})}
 
         # DynamoDBから取得
@@ -200,36 +165,31 @@ def handle_get(event):
 
         # セキュリティチェック: 自テナントのデータのみ許可
         if tenant_id and item.get('tenant_id') != tenant_id:
-            logger.warning(f"Access Denied: User tenant {tenant_id} tried to access Job tenant {item.get('tenant_id')}")
+            print(f"Access Denied: User tenant {tenant_id} tried to access Job tenant {item.get('tenant_id')}")
             return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
 
         return {
             "statusCode": 200,
-            "headers": CORS_HEADERS,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps(item, cls=DecimalEncoder)
         }
 
     except Exception as e:
-        logger.exception("GET Error")
-        return {
-            "statusCode": 500,
-            "headers": CORS_HEADERS,
-            "body": json.dumps({"error": str(e)})
-        }
+        print(f"GET Error: {e}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+
 # ---------------------------------------------------
 # メインハンドラ
 # ---------------------------------------------------
-@logger.inject_lambda_context(log_event=True) # イベント情報をデバッグログに出力（本番はFalseでも可）
 def lambda_handler(event, context):
     # HTTPメソッド判定
     http_method = event.get('requestContext', {}).get('http', {}).get('method')
 
     if http_method == 'GET':
-        return handle_get(event)
+        return handle_get(event, context)
     elif http_method == 'POST':
-        return handle_post(event)
+        return handle_post(event, context)
     else:
-        logger.warning(f"Method {http_method} not allowed")
         return {
             "statusCode": 405,
             "body": json.dumps({"error": f"Method {http_method} not allowed"})

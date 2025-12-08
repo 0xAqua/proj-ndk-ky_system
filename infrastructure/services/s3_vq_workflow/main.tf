@@ -192,24 +192,12 @@ resource "aws_lambda_function" "producer" {
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
       MESSAGE_API_URL  = "${var.external_api_base_url}/public-api/v1/message"
       CALLBACK_URL     = "${var.api_endpoint}/webhook"
-
-      ALLOWED_ORIGIN = "http://localhost:3000"  # 本番は CloudFront URL
     }
   }
 
   tracing_config {
     mode = "Active"
   }
-
-  # テナント分離モードの設定
-  tenancy_config {
-    tenant_isolation_mode = "PER_TENANT"
-  }
-
-  layers = [
-    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:7"
-  ]
-
 }
 
 # ─────────────────────────────
@@ -242,15 +230,6 @@ resource "aws_lambda_function" "worker" {
   tracing_config {
     mode = "Active"
   }
-
-  tenancy_config {
-    tenant_isolation_mode = "PER_TENANT"
-  }
-
-  layers = [
-    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:7"
-  ]
-
 }
 
 # ─────────────────────────────

@@ -3,12 +3,7 @@ import json
 import time
 import boto3
 import requests
-from aws_lambda_powertools import Logger
-from aws_lambda_powertools.utilities.typing import LambdaContext
 
-# ---------------------------------------------------
-# 初期設定
-# ---------------------------------------------------
 # 環境変数
 JOB_TABLE_NAME  = os.environ.get('JOB_TABLE_NAME')
 SQS_QUEUE_URL   = os.environ.get('SQS_QUEUE_URL')
@@ -17,17 +12,11 @@ MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
 CALLBACK_URL    = os.environ.get('CALLBACK_URL')
 VQ_SECRET_ARN   = os.environ.get('VQ_SECRET_ARN')
 
-# ロガー初期化
-logger = Logger()
-
 dynamodb = boto3.resource('dynamodb')
 table    = dynamodb.Table(JOB_TABLE_NAME)
 sqs      = boto3.client('sqs')
 secrets  = boto3.client('secretsmanager')
 
-# ---------------------------------------------------
-# 共通関数
-# ---------------------------------------------------
 def get_vq_credentials(target_tenant_id):
     """Producerと同じ認証情報取得ロジック"""
     try:
@@ -41,13 +30,14 @@ def get_vq_credentials(target_tenant_id):
         else:
             return secret_json.get('secret_data', secret_json)
     except Exception as e:
-        logger.error(f"Failed to get secret: {e}")
+        print(f"Failed to get secret: {e}")
         raise e
 
 def get_auth_token(api_key, login_id):
     resp = requests.post(AUTH_API_URL, json={"api_key": api_key, "login_id": login_id})
     resp.raise_for_status()
     return resp.json().get('token')
+
 
 def strip_markdown_code_block(content):
     """Markdownコードブロック（```json ... ```）を除去"""
@@ -56,117 +46,156 @@ def strip_markdown_code_block(content):
     cleaned = content.strip()
     if cleaned.startswith('```'):
         lines = cleaned.split('\n')
+        # 最初の行（```json）を除去
         if lines[0].startswith('```'):
             lines = lines[1:]
+        # 最後の行（```）を除去
         if lines and lines[-1].strip() == '```':
             lines = lines[:-1]
         cleaned = '\n'.join(lines)
     return cleaned.strip()
 
+
 def is_valid_content(content):
-    """JSON検証ロジック"""
+    """
+    JSONとしてパースでき、決められたキー構造を満たすかを検証
+
+    期待する構造:
+    [
+      {
+        "caseNo": 1,
+        "caseTitle": "...",
+        "type": "Fact" | "AI",
+        "overview": "...",
+        "countermeasures": [
+          {
+            "id": 1,
+            "title": "...",
+            "description": "...",
+            "assignees": ["...", "..."]
+          },
+          ...
+        ]
+      },
+      ...
+    ]
+    """
     if not content:
-        logger.warning("Validation: content is empty")
+        print("Validation: content is empty")
         return False
 
     try:
+        # Markdownコードブロックを除去
         cleaned = strip_markdown_code_block(content)
         parsed = json.loads(cleaned)
 
+        # ルート要素は配列であること
         if not isinstance(parsed, list):
-            logger.warning("Validation: root is not a list")
+            print("Validation: root is not a list")
             return False
 
         if len(parsed) == 0:
-            logger.warning("Validation: root list is empty")
+            print("Validation: root list is empty")
             return False
 
+        # 必須キーの定義
         required_case_keys = {'caseNo', 'caseTitle', 'type', 'overview', 'countermeasures'}
         required_countermeasure_keys = {'id', 'title', 'description', 'assignees'}
 
         for idx, case in enumerate(parsed):
+            # 各caseはdictであること
             if not isinstance(case, dict):
-                logger.warning(f"Validation: case[{idx}] is not a dict")
+                print(f"Validation: case[{idx}] is not a dict")
                 return False
 
+            # 必須キーの存在チェック
             missing_keys = required_case_keys - set(case.keys())
             if missing_keys:
-                logger.warning(f"Validation: case[{idx}] missing keys: {missing_keys}")
+                print(f"Validation: case[{idx}] missing keys: {missing_keys}")
                 return False
 
+            # caseNo は数値であること
             if not isinstance(case.get('caseNo'), (int, float)):
-                logger.warning(f"Validation: case[{idx}].caseNo is not a number")
+                print(f"Validation: case[{idx}].caseNo is not a number")
                 return False
 
+            # caseTitle, overview は文字列であること
             if not isinstance(case.get('caseTitle'), str):
-                logger.warning(f"Validation: case[{idx}].caseTitle is not a string")
+                print(f"Validation: case[{idx}].caseTitle is not a string")
                 return False
             if not isinstance(case.get('overview'), str):
-                logger.warning(f"Validation: case[{idx}].overview is not a string")
+                print(f"Validation: case[{idx}].overview is not a string")
                 return False
 
+            # type の値チェック
             if case.get('type') not in ('Fact', 'AI'):
-                logger.warning(f"Validation: case[{idx}].type is not 'Fact' or 'AI', got: {case.get('type')}")
+                print(f"Validation: case[{idx}].type is not 'Fact' or 'AI', got: {case.get('type')}")
                 return False
 
+            # countermeasures の構造チェック
             countermeasures = case.get('countermeasures')
             if not isinstance(countermeasures, list):
-                logger.warning(f"Validation: case[{idx}].countermeasures is not a list")
+                print(f"Validation: case[{idx}].countermeasures is not a list")
                 return False
 
             if len(countermeasures) == 0:
-                logger.warning(f"Validation: case[{idx}].countermeasures is empty")
+                print(f"Validation: case[{idx}].countermeasures is empty")
                 return False
 
             for cm_idx, cm in enumerate(countermeasures):
                 if not isinstance(cm, dict):
-                    logger.warning(f"Validation: case[{idx}].countermeasures[{cm_idx}] is not a dict")
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}] is not a dict")
                     return False
 
+                # 必須キーの存在チェック
                 missing_cm_keys = required_countermeasure_keys - set(cm.keys())
                 if missing_cm_keys:
-                    logger.warning(f"Validation: case[{idx}].countermeasures[{cm_idx}] missing keys: {missing_cm_keys}")
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}] missing keys: {missing_cm_keys}")
                     return False
 
+                # id は数値であること
                 if not isinstance(cm.get('id'), (int, float)):
-                    logger.warning(f"Validation: case[{idx}].countermeasures[{cm_idx}].id is not a number")
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].id is not a number")
                     return False
 
+                # title, description は文字列であること
                 if not isinstance(cm.get('title'), str):
-                    logger.warning(f"Validation: case[{idx}].countermeasures[{cm_idx}].title is not a string")
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].title is not a string")
                     return False
                 if not isinstance(cm.get('description'), str):
-                    logger.warning(f"Validation: case[{idx}].countermeasures[{cm_idx}].description is not a string")
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].description is not a string")
                     return False
 
+                # assignees は文字列の配列であること
                 assignees = cm.get('assignees')
                 if not isinstance(assignees, list):
-                    logger.warning(f"Validation: case[{idx}].countermeasures[{cm_idx}].assignees is not a list")
+                    print(f"Validation: case[{idx}].countermeasures[{cm_idx}].assignees is not a list")
                     return False
 
                 for a_idx, assignee in enumerate(assignees):
                     if not isinstance(assignee, str):
-                        logger.warning(f"Validation: case[{idx}].countermeasures[{cm_idx}].assignees[{a_idx}] is not a string")
+                        print(f"Validation: case[{idx}].countermeasures[{cm_idx}].assignees[{a_idx}] is not a string")
                         return False
 
-        logger.info("Validation: OK - all checks passed")
+        print("Validation: OK - all checks passed")
         return True
 
     except json.JSONDecodeError as e:
-        logger.warning(f"Validation: JSON parse error - {e}")
+        print(f"Validation: JSON parse error - {e}")
         return False
     except Exception as e:
-        logger.error(f"Validation: unexpected error - {e}")
+        print(f"Validation: unexpected error - {e}")
         return False
+
 
 def recreate_job(creds, old_job_item, tenant_id):
     """JSONが不正だった場合にジョブを作り直す"""
-    logger.info(f"Re-creating job for old tid: {old_job_item['tid']}")
+    print(f"Re-creating job for old tid: {old_job_item['tid']}")
 
     token = get_auth_token(creds['api_key'], creds['login_id'])
 
     headers = {
-        "X-Auth-Token": f"Bearer {token}",
+        "X-Auth-Token": f"Bearer {token}", # ★Bearer付与
         "Content-Type": "application/json"
     }
 
@@ -183,9 +212,9 @@ def recreate_job(creds, old_job_item, tenant_id):
     new_tid = vq_data.get('tid')
     new_mid = vq_data.get('mid')
 
-    logger.info(f"New ID acquired: {new_tid}")
+    print(f"New ID acquired: {new_tid}")
 
-    # DynamoDB更新
+    # DynamoDB更新 (tid/midを新しいものに書き換え)
     table.update_item(
         Key={'job_id': old_job_item['job_id']},
         UpdateExpression="set tid=:t, mid=:m, #st=:s, updated_at=:u, retry_count=if_not_exists(retry_count, :zero) + :inc",
@@ -197,7 +226,6 @@ def recreate_job(creds, old_job_item, tenant_id):
     )
 
     # 新しいSQSメッセージを送信 (Worker自身へ再送)
-    # ★修正: ここでも MessageAttributes に TenantId を付与してリレーする
     sqs.send_message(
         QueueUrl=SQS_QUEUE_URL,
         MessageBody=json.dumps({
@@ -205,19 +233,9 @@ def recreate_job(creds, old_job_item, tenant_id):
             'tid': new_tid,
             'mid': new_mid,
             'tenant_id': tenant_id
-        }),
-        MessageAttributes={
-            'TenantId': {
-                'DataType': 'String',
-                'StringValue': tenant_id
-            }
-        }
+        })
     )
 
-# ---------------------------------------------------
-# メインハンドラ
-# ---------------------------------------------------
-@logger.inject_lambda_context
 def lambda_handler(event, context):
     for record in event['Records']:
         try:
@@ -225,29 +243,18 @@ def lambda_handler(event, context):
             job_id = body.get('job_id')
             tid = body.get('tid')
             mid = body.get('mid')
-
-            # テナントID取得: Body優先、無ければAttributesから取得
             tenant_id = body.get('tenant_id')
-            if not tenant_id:
-                msg_attrs = record.get('messageAttributes', {})
-                if 'TenantId' in msg_attrs:
-                    tenant_id = msg_attrs['TenantId']['stringValue']
 
-            # ログコンテキストに注入
-            if tenant_id:
-                logger.append_keys(tenant_id=tenant_id)
+            print(f"Checking Job: {job_id}, tid: {tid}, tenant: {tenant_id}")
 
-            logger.info(f"Checking Job: {job_id}, tid: {tid}")
-
-            # データベースからのフォールバック取得
+            # tenant_id がSQSにない場合の復旧ロジック
             if not tenant_id:
                 item_resp = table.get_item(Key={'job_id': job_id})
                 if 'Item' in item_resp:
                     tenant_id = item_resp['Item'].get('tenant_id')
-                    logger.append_keys(tenant_id=tenant_id) # 取得できたのでセット
 
             if not tenant_id:
-                logger.error("Error: Tenant ID missing.")
+                print("Error: Tenant ID missing.")
                 return # 処理不能
 
             # 1. 認証情報取得
@@ -256,15 +263,16 @@ def lambda_handler(event, context):
 
             # 2. ポーリング (GET)
             url = f"{MESSAGE_API_URL}/{tid}/{mid}"
-            headers = {"X-Auth-Token": f"Bearer {token}"}
+            headers = {"X-Auth-Token": f"Bearer {token}"} # ★Bearer付与
 
             resp = requests.get(url, headers=headers)
             resp.raise_for_status()
             data = resp.json()
 
-            # デバッグログ（構造化ログとして出力）
-            logger.debug("VQ API Full Response", extra={"response": data})
+            # ★★★ VQからの生の返却値をログに出力 ★★★
+            print(f"DEBUG: VQ API Full Response: {json.dumps(data, ensure_ascii=False)}")
 
+            # ステータス確認 (processing / done)
             status = data.get('status')
 
             if status != 'done':
@@ -275,7 +283,8 @@ def lambda_handler(event, context):
             result_reply = data.get('reply', '')
 
             if is_valid_content(result_reply):
-                logger.info("Validation OK. Saving to DynamoDB...")
+                # 成功: DB更新（Markdownコードブロックを除去して保存）
+                print("Validation OK. Saving to DynamoDB...")
                 cleaned_reply = strip_markdown_code_block(result_reply)
                 table.update_item(
                     Key={'job_id': job_id},
@@ -288,16 +297,18 @@ def lambda_handler(event, context):
                     }
                 )
             else:
-                logger.warning("Validation FAILED.")
+                # 失敗: やり直し (Re-create)
+                print("Validation FAILED.")
 
-                # 無限ループ防止
+                # ★追加: 無限ループ防止のための回数チェック
                 resp = table.get_item(Key={'job_id': job_id})
                 if 'Item' in resp:
                     current_item = resp['Item']
                     current_retry = int(current_item.get('retry_count', 0))
 
+                    # 例: 3回以上リトライしていたら、あきらめてFAILEDにする
                     if current_retry >= 3:
-                        logger.error(f"Max retries reached ({current_retry}). Marking as FAILED.")
+                        print(f"Max retries reached ({current_retry}). Marking as FAILED.")
                         table.update_item(
                             Key={'job_id': job_id},
                             UpdateExpression="set #st=:s, updated_at=:u, error_msg=:e",
@@ -308,17 +319,16 @@ def lambda_handler(event, context):
                                 ':e': 'Validation failed multiple times. Invalid JSON format.'
                             }
                         )
-                        return
+                        return # ここで終了（再送しない）
 
-                    logger.info(f"Retrying... (Count: {current_retry + 1})")
+                    # まだ上限に達していなければ再作成
+                    print(f"Retrying... (Count: {current_retry + 1})")
                     recreate_job(creds, current_item, tenant_id)
 
         except Exception as e:
-            # "Job isn't finished yet" は正常な待機状態なのでInfoレベルでも良いが、
-            # Lambdaのリトライ機構に乗せるため例外を再送出する
             if "Job not finished yet" in str(e):
-                logger.info("Job not finished yet, waiting for retry...")
+                # ポーリング継続のための正常な再試行フロー
                 raise e
             else:
-                logger.exception("Worker Error") # スタックトレース付きログ
-                raise e
+                print(f"Worker Error: {e}")
+                raise e # 予期せぬエラーもリトライさせる
