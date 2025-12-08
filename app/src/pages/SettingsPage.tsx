@@ -10,9 +10,8 @@ import {
     Separator,
     Stack
 } from "@chakra-ui/react";
-// 追加したSwitchコンポーネントをインポート
 import { Switch } from "@/components/ui/switch";
-import { PiFloppyDisk } from "react-icons/pi";
+import { PiFloppyDisk, PiGear } from "react-icons/pi";
 import {AdminLayout} from "@/components/layout/AdminLayout.tsx";
 
 export const SettingsPage = () => {
@@ -25,9 +24,42 @@ export const SettingsPage = () => {
 
             {/* 1. ヘッダーエリア */}
             <Box mb={8}>
-                <Heading size="2xl" mb={2} color="black">設定</Heading>
-                <Text color="gray.500">
-                    システム全体の動作設定を管理します。
+                <Flex align="center" color="black" mb={0}>
+                    {/* アイコン: sizeを36に、mrを3に調整 */}
+                    <Box p={2} borderRadius="l2" bg="gray.100" mr={3} boxShadow="md">
+                        <PiGear size={36}/> {/* アイコンサイズを調整 */}
+                    </Box>
+
+                    {/* テキストブロック */}
+                    <Box>
+                        {/* メインの見出し: lineHeightを削除し、デフォルトに任せるか1.2などに設定 */}
+                        <Text
+                            fontSize="22"
+                            fontWeight="bold"
+                            lineHeight="2" // 行間を自然に詰める
+                            p={0}
+                            m={0}
+                        >
+                            設定
+                        </Text>
+
+                        {/* 説明文 (サブテキスト) */}
+                        <Text
+                            color="gray.500"
+                            fontSize="sm"
+                            lineHeight="1"
+                            mt="2px"
+                            p={0}
+                            m={0}
+                        >
+                            システム全体の動作設定を管理します。
+                        </Text>
+                    </Box>
+                </Flex>
+
+                {/* 補足説明文 */}
+                <Text fontSize="sm" color="gray.500" mt={4}>
+                    設定を変更すると、画面の読み込み速度や操作の応答時間に影響が出ることがありますので、ご注意ください。
                 </Text>
             </Box>
 
@@ -89,7 +121,7 @@ export const SettingsPage = () => {
 
                             {/* Switchコンポーネント */}
                             <Switch
-                                colorPalette="gray"
+                                colorPalette="blue"
                                 checked={includePrediction}
                                 pointerEvents="none"
                                 size="lg"
@@ -102,7 +134,7 @@ export const SettingsPage = () => {
                 {/* 3. 保存ボタンエリア */}
                 <Flex justify="flex-end">
                     <Button
-                        bg="black"
+                        bg="green.500"
                         color="white"
                         size="lg"
                         px={8}
