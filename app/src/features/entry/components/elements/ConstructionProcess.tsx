@@ -52,6 +52,14 @@ export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [
         onChange(nextValue);
     };
 
+    // チェックボックス制御ロジック に追加
+    const isCategoryIndeterminate = (items: { id: string }[]) => {
+        if (!items || items.length === 0) return false;
+        const checkedCount = items.filter((p) => value.includes(p.id)).length;
+        return checkedCount > 0 && checkedCount < items.length;
+    };
+
+
     return (
         <Box bg="white" w="full" p={2} borderRadius="2xl" boxShadow="0 4px 16px rgba(0, 0, 0, 0.08)" >
             <ContentBox>
@@ -79,9 +87,15 @@ export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [
                                             <Flex justify="space-between" align="center" w="full">
                                                 <Flex align="center" gap={2}>
                                                     <Checkbox.Root
-                                                        checked={isCategoryChecked(category.processes)}
+                                                        checked={
+                                                            isCategoryChecked(category.processes)
+                                                                ? true
+                                                                : isCategoryIndeterminate(category.processes)
+                                                                    ? "indeterminate"
+                                                                    : false
+                                                        }
                                                         onCheckedChange={() => toggleCategory(category.processes)}
-                                                        colorPalette="blue"
+                                                        colorPalette="green"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <Checkbox.HiddenInput />
@@ -103,7 +117,7 @@ export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [
                                                             key={process.id}
                                                             checked={value.includes(process.id)}
                                                             onCheckedChange={() => toggleProcess(process.id)}
-                                                            colorPalette="blue"
+                                                            colorPalette="green"
                                                         >
                                                             <Checkbox.HiddenInput />
                                                             <Checkbox.Control />
