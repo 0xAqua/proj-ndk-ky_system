@@ -23,10 +23,6 @@ variable "callback_urls" {
   type = list(string)
 
   default = [
-    # 例: テナントごとに callback を増やすやり方（やらない方針）
-    # "https://tenant-a.example.com/auth/callback",
-    # "https://tenant-b.example.com/auth/callback",
-
     # 採用する方針: 認証専用ドメイン 1つに集約
     "https://auth.example.com/callback",
     "http://localhost:3000/api/auth/callback"

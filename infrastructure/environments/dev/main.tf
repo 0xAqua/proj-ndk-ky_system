@@ -43,7 +43,7 @@ module "auth" {
   create_auth_lambda_arn = module.auth_challenge.create_challenge_lambda_arn
   verify_auth_lambda_arn = module.auth_challenge.verify_challenge_lambda_arn
 
-  webauthn_relying_party_id = module.frontend.cloudfront_domain
+  webauthn_relying_party_id = local.environment == "dev" ? "localhost" : module.frontend.cloudfront_domain
 }
 
 # ─────────────────────────────
@@ -60,6 +60,11 @@ module "dynamodb" {
 # ─────────────────────────────
 module "api_gateway" {
   source = "../../modules/api-gateway"
+
+  allowed_origins = [
+    "http://localhost:3000",
+    "https://${module.frontend.cloudfront_domain}"
+  ]
 
   name_prefix         = "${local.project}-${local.environment}"
   region              = local.region
@@ -303,7 +308,7 @@ module "backup" {
 
   # ★このタグが付いているリソース(DynamoDB, S3等)を全てバックアップ対象にする
   selection_tags = {
-    Project = local.project # "ndk-ky"
+    BackupTarget = "True"
   }
 }
 
@@ -349,4 +354,12 @@ module "ses" {
   name_prefix  = "${local.project}-${local.environment}"
   sender_email = "tsuji.kodai@ndisol.com"  # Todo: どれにするか
 }
+
+# ─────────────────────────────
+# 14. 脅威検知 (GuardDuty)
+# ─────────────────────────────
+module "guard-duty" {
+  source = "../../modules/security/guard-duty"
+}
+
 

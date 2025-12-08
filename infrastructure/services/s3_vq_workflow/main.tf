@@ -180,6 +180,7 @@ resource "aws_lambda_function" "producer" {
 
   filename         = data.archive_file.producer_zip.output_path
   source_code_hash = data.archive_file.producer_zip.output_base64sha256
+  kms_key_arn = var.lambda_kms_key_arn
 
   environment {
     variables = {
@@ -211,6 +212,7 @@ resource "aws_lambda_function" "worker" {
 
   filename         = data.archive_file.worker_zip.output_path
   source_code_hash = data.archive_file.worker_zip.output_base64sha256
+  kms_key_arn = var.lambda_kms_key_arn
 
   environment {
     variables = {

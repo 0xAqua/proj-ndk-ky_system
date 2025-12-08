@@ -5,11 +5,22 @@ resource "aws_apigatewayv2_api" "this" {
 
   # CORS設定 (フロントエンドからのアクセス許可)
   cors_configuration {
-    allow_origins = ["*"] # 本番時は "https://example.com" 等に制限推奨
+    allow_origins = var.allowed_origins
+
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allow_headers = ["Content-Type", "Authorization"]
-    # allow_credentials = true  # 追加推奨
-    # max_age           = 300   # プリフライトキャッシュ
+
+    allow_headers = [
+      "Content-Type",
+      "Authorization",
+      "X-Amz-Date",
+      "X-Api-Key",
+      "X-Amz-Security-Token",
+      "tenant-id"
+    ]
+
+    allow_credentials = true
+
+    max_age           = 300
   }
 }
 

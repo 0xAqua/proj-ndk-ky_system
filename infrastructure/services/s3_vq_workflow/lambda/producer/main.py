@@ -30,6 +30,7 @@ class DecimalEncoder(json.JSONEncoder):
 # 共通関数
 # ---------------------------------------------------
 def get_vq_credentials(target_tenant_id):
+    """Secrets Managerからテナントごとの認証情報を取得"""
     try:
         resp = secrets.get_secret_value(SecretId=VQ_SECRET_ARN)
         secret_json = json.loads(resp.get('SecretString'))
@@ -49,12 +50,13 @@ def get_vq_credentials(target_tenant_id):
         raise e
 
 def get_auth_token(api_key, login_id):
+    """VQ API認証トークン取得"""
     resp = requests.post(AUTH_API_URL, json={"api_key": api_key, "login_id": login_id})
     resp.raise_for_status()
     return resp.json().get('token')
 
 # ---------------------------------------------------
-# POST: ジョブ作成処理 (既存ロジック)
+# POST: ジョブ作成処理
 # ---------------------------------------------------
 def handle_post(event, context):
     try:
@@ -63,23 +65,25 @@ def handle_post(event, context):
         body = json.loads(event.get('body', '{}'))
         input_message = body.get('message')
 
+        # Cognitoからユーザー情報取得
         claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
         user_id = claims.get('sub', 'unknown')
-        tenant_id = claims.get('custom:tenant_id')
+        tenant_id = claims.get('custom:tenant_id') # ★修正済み
 
         if not tenant_id:
             return {"statusCode": 400, "body": json.dumps({"error": "Missing custom:tenant_id in token"})}
 
-        # 認証 & VQ送信
+        # 認証情報の取得
         creds = get_vq_credentials(tenant_id)
         api_key  = creds['api_key']
         login_id = creds['login_id']
         model_id = creds['model_id']
 
+        # VQ API実行
         token = get_auth_token(api_key, login_id)
 
         headers = {
-            "X-Auth-Token": f"Bearer {token}",
+            "Authorization": f"Bearer {token}", # ★Bearer付与
             "Content-Type": "application/json"
         }
         payload = {
@@ -88,15 +92,18 @@ def handle_post(event, context):
             "callback_url": CALLBACK_URL
         }
 
+        print(f"DEBUG: Model ID: {model_id}")   # ← これが空やダミーになってないか確認！
+        print(f"DEBUG: Payload: {payload}")     # ← 全体の構造確認
+
         vq_resp = requests.post(MESSAGE_API_URL, json=payload, headers=headers)
         vq_resp.raise_for_status()
         vq_data = vq_resp.json()
 
         tid = vq_data.get('tid')
         mid = vq_data.get('mid')
-        job_id = tid
+        job_id = tid  # 今回はtidを主キーとする
 
-        # DB登録
+        # DynamoDB登録
         item = {
             'job_id': job_id,
             'tenant_id': tenant_id,
@@ -110,7 +117,7 @@ def handle_post(event, context):
         }
         table.put_item(Item=item)
 
-        # SQS送信
+        # SQS送信 (Workerへ)
         sqs.send_message(
             QueueUrl=SQS_QUEUE_URL,
             MessageBody=json.dumps({
@@ -132,30 +139,31 @@ def handle_post(event, context):
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
 # ---------------------------------------------------
-# GET: ジョブ取得処理 (★新規追加)
+# GET: ジョブ取得処理
 # ---------------------------------------------------
 def handle_get(event, context):
     try:
         print("Processing GET Request")
 
-        # 1. パスパラメータからID取得
         job_id = event.get('pathParameters', {}).get('jobId')
         if not job_id:
             return {"statusCode": 400, "body": json.dumps({"error": "Missing jobId parameter"})}
 
-        # 2. テナントID取得 (セキュリティチェック用)
         claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
         tenant_id = claims.get('custom:tenant_id')
 
-        # 3. DynamoDBから取得
-        # キー構成変更に対応 (PK: job_id)
+        if not tenant_id:
+            print("Error: No tenant_id in token")
+            return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized: No tenant info"})}
+
+        # DynamoDBから取得
         resp = table.get_item(Key={'job_id': job_id})
         item = resp.get('Item')
 
         if not item:
             return {"statusCode": 404, "body": json.dumps({"error": "Job not found"})}
 
-        # 4. セキュリティ: 別テナントのデータは見せない
+        # セキュリティチェック: 自テナントのデータのみ許可
         if tenant_id and item.get('tenant_id') != tenant_id:
             print(f"Access Denied: User tenant {tenant_id} tried to access Job tenant {item.get('tenant_id')}")
             return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
@@ -163,7 +171,6 @@ def handle_get(event, context):
         return {
             "statusCode": 200,
             "headers": {"Content-Type": "application/json"},
-            # DecimalEncoderを使って数値をJSON化
             "body": json.dumps(item, cls=DecimalEncoder)
         }
 
@@ -172,10 +179,10 @@ def handle_get(event, context):
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
 # ---------------------------------------------------
-# メインハンドラ (ルーティング)
+# メインハンドラ
 # ---------------------------------------------------
 def lambda_handler(event, context):
-    # HTTP API v2 のメソッド取得方法
+    # HTTPメソッド判定
     http_method = event.get('requestContext', {}).get('http', {}).get('method')
 
     if http_method == 'GET':

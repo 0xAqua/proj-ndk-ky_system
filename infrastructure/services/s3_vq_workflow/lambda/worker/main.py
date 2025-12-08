@@ -3,6 +3,9 @@ import json
 import time
 import boto3
 import requests
+from aws_lambda_powertools import Logger
+
+logger = Logger()
 
 # 環境変数
 JOB_TABLE_NAME  = os.environ.get('JOB_TABLE_NAME')
@@ -18,14 +21,14 @@ sqs      = boto3.client('sqs')
 secrets  = boto3.client('secretsmanager')
 
 def get_vq_credentials(target_tenant_id):
-    """(Producerと同じロジック)"""
+    """Producerと同じ認証情報取得ロジック"""
     try:
         resp = secrets.get_secret_value(SecretId=VQ_SECRET_ARN)
         secret_json = json.loads(resp.get('SecretString'))
         if isinstance(secret_json, list):
             target_config = next(
                 (item for item in secret_json if item.get("tenant_id") == target_tenant_id), None)
-            if not target_config: raise Exception(f"Tenant config not found: {target_tenant_id}")
+            if not target_config: raise Exception(f"Tenant config not found for id: {target_tenant_id}")
             return target_config['secret_data']
         else:
             return secret_json.get('secret_data', secret_json)
@@ -38,23 +41,78 @@ def get_auth_token(api_key, login_id):
     resp.raise_for_status()
     return resp.json().get('token')
 
+
+def strip_markdown_code_block(content):
+    """Markdownコードブロック（```json ... ```）を除去"""
+    if not content:
+        return content
+    cleaned = content.strip()
+    if cleaned.startswith('```'):
+        lines = cleaned.split('\n')
+        # 最初の行（```json）を除去
+        if lines[0].startswith('```'):
+            lines = lines[1:]
+        # 最後の行（```）を除去
+        if lines and lines[-1].strip() == '```':
+            lines = lines[:-1]
+        cleaned = '\n'.join(lines)
+    return cleaned.strip()
+
+
 def is_valid_content(content):
-    """簡易バリデーション: JSONとしてパースでき、空でないか"""
-    if not content: return False
-    try:
-        parsed = json.loads(content)
-        return True if isinstance(parsed, list) and len(parsed) > 0 else False
-    except:
+    """VQ API形式のJSON検証"""
+    if not content:
+        logger.warning("Validation: content is empty")
         return False
 
+    try:
+        cleaned = strip_markdown_code_block(content)
+        parsed = json.loads(cleaned)
+
+        # VQ API形式: { "incidents": [...] }
+        if isinstance(parsed, dict) and 'incidents' in parsed:
+            incidents = parsed['incidents']
+        elif isinstance(parsed, list):
+            incidents = parsed
+        else:
+            logger.warning("Validation: invalid root structure")
+            return False
+
+        if len(incidents) == 0:
+            logger.warning("Validation: incidents list is empty")
+            return False
+
+        required_keys = {'id', 'title', 'classification', 'summary', 'cause', 'countermeasures'}
+        required_cm_keys = {'no', 'title', 'description', 'responsible'}
+
+        for idx, incident in enumerate(incidents):
+            missing = required_keys - set(incident.keys())
+            if missing:
+                logger.warning(f"Validation: incident[{idx}] missing keys: {missing}")
+                return False
+
+            for cm_idx, cm in enumerate(incident.get('countermeasures', [])):
+                missing_cm = required_cm_keys - set(cm.keys())
+                if missing_cm:
+                    logger.warning(f"Validation: incident[{idx}].countermeasures[{cm_idx}] missing keys: {missing_cm}")
+                    return False
+
+        logger.info("Validation: OK")
+        return True
+
+    except json.JSONDecodeError as e:
+        logger.warning(f"Validation: JSON parse error - {e}")
+        return False
+
+
 def recreate_job(creds, old_job_item, tenant_id):
-    """JSON不正時にジョブを作り直す"""
+    """JSONが不正だった場合にジョブを作り直す"""
     print(f"Re-creating job for old tid: {old_job_item['tid']}")
 
     token = get_auth_token(creds['api_key'], creds['login_id'])
 
     headers = {
-        "X-Auth-Token": f"Bearer {token}",
+        "Authorization": f"Bearer {token}", # ★Bearer付与
         "Content-Type": "application/json"
     }
 
@@ -73,7 +131,7 @@ def recreate_job(creds, old_job_item, tenant_id):
 
     print(f"New ID acquired: {new_tid}")
 
-    # DB更新 (Job IDは変えず、tid/midを更新)
+    # DynamoDB更新 (tid/midを新しいものに書き換え)
     table.update_item(
         Key={'job_id': old_job_item['job_id']},
         UpdateExpression="set tid=:t, mid=:m, #st=:s, updated_at=:u, retry_count=if_not_exists(retry_count, :zero) + :inc",
@@ -84,7 +142,7 @@ def recreate_job(creds, old_job_item, tenant_id):
         }
     )
 
-    # 新しいSQSメッセージを送信 (★tenant_id も忘れず引き継ぐ)
+    # 新しいSQSメッセージを送信 (Worker自身へ再送)
     sqs.send_message(
         QueueUrl=SQS_QUEUE_URL,
         MessageBody=json.dumps({
@@ -122,13 +180,16 @@ def lambda_handler(event, context):
 
             # 2. ポーリング (GET)
             url = f"{MESSAGE_API_URL}/{tid}/{mid}"
+            headers = {"Authorization": f"Bearer {token}"} # ★Bearer付与
 
-            headers = {"X-Auth-Token": f"Bearer {token}"}
             resp = requests.get(url, headers=headers)
-
             resp.raise_for_status()
             data = resp.json()
 
+            # ★★★ VQからの生の返却値をログに出力 ★★★
+            print(f"DEBUG: VQ API Full Response: {json.dumps(data, ensure_ascii=False)}")
+
+            # ステータス確認 (processing / done)
             status = data.get('status')
 
             if status != 'done':
@@ -136,31 +197,55 @@ def lambda_handler(event, context):
                 raise Exception("Job not finished yet")
 
             # 3. 完了時の検証
-            result_message = data.get('message', '')
+            result_reply = data.get('reply', '')
 
-            if is_valid_content(result_message):
-                # 成功: DB更新
-                print("Validation OK.")
+            if is_valid_content(result_reply):
+                # 成功: DB更新（Markdownコードブロックを除去して保存）
+                print("Validation OK. Saving to DynamoDB...")
+                cleaned_reply = strip_markdown_code_block(result_reply)
                 table.update_item(
                     Key={'job_id': job_id},
                     UpdateExpression="set #r=:r, #st=:s, updated_at=:u",
                     ExpressionAttributeNames={'#r': 'reply', '#st': 'status'},
                     ExpressionAttributeValues={
-                        ':r': result_message,
+                        ':r': cleaned_reply,
                         ':s': 'COMPLETED',
                         ':u': int(time.time())
                     }
                 )
             else:
-                # 失敗: やり直し
-                print("Validation FAILED. Re-creating...")
+                # 失敗: やり直し (Re-create)
+                print("Validation FAILED.")
+
+                # ★追加: 無限ループ防止のための回数チェック
                 resp = table.get_item(Key={'job_id': job_id})
                 if 'Item' in resp:
-                    recreate_job(creds, resp['Item'], tenant_id)
+                    current_item = resp['Item']
+                    current_retry = int(current_item.get('retry_count', 0))
+
+                    # 例: 3回以上リトライしていたら、あきらめてFAILEDにする
+                    if current_retry >= 3:
+                        print(f"Max retries reached ({current_retry}). Marking as FAILED.")
+                        table.update_item(
+                            Key={'job_id': job_id},
+                            UpdateExpression="set #st=:s, updated_at=:u, error_msg=:e",
+                            ExpressionAttributeNames={'#st': 'status'},
+                            ExpressionAttributeValues={
+                                ':s': 'FAILED',
+                                ':u': int(time.time()),
+                                ':e': 'Validation failed multiple times. Invalid JSON format.'
+                            }
+                        )
+                        return # ここで終了（再送しない）
+
+                    # まだ上限に達していなければ再作成
+                    print(f"Retrying... (Count: {current_retry + 1})")
+                    recreate_job(creds, current_item, tenant_id)
 
         except Exception as e:
             if "Job not finished yet" in str(e):
-                raise e # SQSリトライさせる
+                # ポーリング継続のための正常な再試行フロー
+                raise e
             else:
                 print(f"Worker Error: {e}")
-                raise e # 予期せぬエラーもリトライ（要件次第でDLQへ）
+                raise e # 予期せぬエラーもリトライさせる

@@ -12,6 +12,9 @@ resource "aws_sqs_queue" "dlq" {
 resource "aws_sqs_queue" "main" {
   name                      = "${var.name_prefix}-vq-job-queue"
 
+  # Producerがメッセージを入れても、Workerには20秒間見えなくなります
+  delay_seconds = 20
+
   # Worker Lambdaのタイムアウトより長く設定 (Workerのタイムアウトは60秒を想定)
   visibility_timeout_seconds = 65
 
