@@ -1,5 +1,4 @@
-// src/hooks/useJobResult.ts
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export type JobStatus =
@@ -14,71 +13,65 @@ type UseJobResultOptions = {
     intervalMs?: number;
 };
 
+type JobResponse = {
+    status: JobStatus;
+    reply?: any;
+    errorMessage?: string;
+};
+
 export const useJobResult = ({ jobId, intervalMs = 3000 }: UseJobResultOptions) => {
-    const [status, setStatus] = useState<JobStatus>("LOADING");
-    const [result, setResult] = useState<any>(null);
-    const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (!jobId) {
-            setError("jobId が指定されていません");
-            setStatus("FAILED");
-            return;
-        }
+    const { data, isError, error: queryError } = useQuery({
+        // jobIdが変わるごとに別のキャッシュとして扱う
+        queryKey: ['jobResult', jobId],
 
-        let cancelled = false;
-        let intervalId: ReturnType<typeof setInterval> | undefined;
+        // jobIdが無いときはクエリを実行しない
+        enabled: !!jobId,
 
-        const fetchResult = async () => {
-            try {
-                const res = await api.get(`/jobs/${jobId}`);
-                if (cancelled) return;
+        // データ取得関数
+        queryFn: async (): Promise<JobResponse> => {
+            if (!jobId) throw new Error("No Job ID");
+            const res = await api.get(`/jobs/${jobId}`);
+            return res.data;
+        },
 
-                const data = res.data;
-                setStatus(data.status);
-
-                if (data.status === "COMPLETED") {
-                    let parsed: any = data.reply;
-                    if (typeof parsed === "string") {
-                        try {
-                            parsed = JSON.parse(parsed);
-                        } catch {
-                            // パース失敗時はそのまま
-                        }
-                    }
-                    setResult(parsed);
-                    if (intervalId) clearInterval(intervalId);
-                } else if (data.status === "FAILED") {
-                    setError(data.errorMessage ?? "ジョブが失敗しました");
-                    if (intervalId) clearInterval(intervalId);
-                }
-                // PENDING / PROCESSING の場合はポーリング継続
-            } catch (e) {
-                console.error("Failed to fetch result:", e);
-                if (cancelled) return;
-                setError("結果の取得に失敗しました");
-                if (intervalId) clearInterval(intervalId);
+        // ★ポーリング制御の肝
+        // ステータスが完了または失敗になるまで、intervalMs 間隔で再取得する
+        refetchInterval: (query) => {
+            const status = query.state.data?.status;
+            if (status === "COMPLETED" || status === "FAILED") {
+                return false; // ポーリング停止
             }
-        };
+            return intervalMs; // ポーリング継続
+        },
 
-        // リセット
-        setStatus("LOADING");
-        setResult(null);
-        setError(null);
+        // ウィンドウフォーカス時の再取得は、ポーリング中なのでオフでも良い（お好みで）
+        refetchOnWindowFocus: false,
+    });
 
-        // 初回実行
-        void fetchResult();
-        // ポーリング開始
-        intervalId = setInterval(fetchResult, intervalMs);
+    // 結果の正規化（既存のインターフェースに合わせる）
+    const status: JobStatus = data?.status || "LOADING";
 
-        return () => {
-            cancelled = true;
-            if (intervalId) clearInterval(intervalId);
-        };
-    }, [jobId, intervalMs]);
+    // エラーハンドリング
+    const error = isError
+        ? (queryError as Error).message
+        : (data?.status === "FAILED" ? data.errorMessage || "ジョブが失敗しました" : null);
 
-    const isLoading =
-        status === "LOADING" || status === "PENDING" || status === "PROCESSING";
+    // JSONパース処理
+    let result = null;
+    if (data?.status === "COMPLETED" && data.reply) {
+        result = data.reply;
+        // 二重JSON文字列対策
+        if (typeof result === "string") {
+            try {
+                result = JSON.parse(result);
+            } catch {
+                // パース失敗ならそのまま使う
+            }
+        }
+    }
+
+    const isLoading = status === "LOADING" || status === "PENDING" || status === "PROCESSING";
 
     return {
         status,
