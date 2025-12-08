@@ -25,8 +25,6 @@ export const useUserStore = create<UserState>((set) => ({
     setUserData: (data) => {
         const nestedDepts = data.tenantUser?.departments;
 
-        console.log("Check data.tenantUser.departments:", nestedDepts);
-
         // データの取得（優先順位: 直下 > tenantUser配下 > 空）
         const rawDepts = nestedDepts;
 
