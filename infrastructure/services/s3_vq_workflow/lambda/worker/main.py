@@ -89,9 +89,13 @@ def is_valid_content(content):
         cleaned = strip_markdown_code_block(content)
         parsed = json.loads(cleaned)
 
-        # ルート要素は配列であること
-        if not isinstance(parsed, list):
-            print("Validation: root is not a list")
+        # フォーマット対応: { "incidents": [...] }であること
+        if isinstance(parsed, dict) and 'incidents' in parsed:
+            incidents = parsed['incidents']
+        elif isinstance(parsed, list):
+            incidents = parsed
+        else:
+            logger.warning("Validation: invalid root structure")
             return False
 
         if len(parsed) == 0:
