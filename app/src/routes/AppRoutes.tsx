@@ -5,6 +5,7 @@ import { ResultPage } from "@/pages/ResultPage";
 import { AuthGuard } from '@/features/auth/components/AuthGuard';
 import {SamplePage} from "@/pages/SampletPage.tsx";
 import {SettingsPage} from "@/pages/SettingsPage.tsx";
+import {UserAdminPage} from "@/pages/UserAdminPage.tsx";
 
 export const AppRoutes = () => {
     return (
@@ -37,6 +38,7 @@ export const AppRoutes = () => {
 
             <Route path="/sample" element={<SamplePage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/users" element={<UserAdminPage />} />
 
         </Routes>
     );
