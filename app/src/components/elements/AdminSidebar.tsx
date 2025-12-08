@@ -167,7 +167,7 @@ export const AdminSidebar = () => {
                 <VStack gap={0} flex={1} w="full" align="flex-start" overflowX="hidden">
                     <NavItem to="/sample" icon={PiSquaresFour} label="ダッシュボード" isExpanded={isExpanded} />
                     <NavItem to="/users" icon={PiUsers} label="ユーザー管理" isExpanded={isExpanded} />
-                    <NavItem to="/results" icon={PiListChecks} label="結果一覧" isExpanded={isExpanded} />
+                    <NavItem to="/result-list" icon={PiListChecks} label="結果一覧" isExpanded={isExpanded} />
                     <NavItem to="/logs" icon={PiFileText} label="操作ログ・履歴" isExpanded={isExpanded} />
                 </VStack>
 

@@ -7,6 +7,7 @@ import {SamplePage} from "@/pages/SampletPage.tsx";
 import {SettingsPage} from "@/pages/SettingsPage.tsx";
 import {UserAdminPage} from "@/pages/UserAdminPage.tsx";
 import {ResultListPage} from "@/pages/ResultListPage.tsx";
+import {LogsPage} from "@/pages/LogsPage.tsx";
 
 export const AppRoutes = () => {
     return (
@@ -41,6 +42,7 @@ export const AppRoutes = () => {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/users" element={<UserAdminPage />} />
             <Route path="/result-list" element={<ResultListPage />} />
+            <Route path="/logs" element={<LogsPage />} />
 
         </Routes>
     );
