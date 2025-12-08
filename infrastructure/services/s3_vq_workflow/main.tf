@@ -205,6 +205,11 @@ resource "aws_lambda_function" "producer" {
   tenancy_config {
     tenant_isolation_mode = "PER_TENANT"
   }
+
+  layers = [
+    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:7"
+  ]
+
 }
 
 # ─────────────────────────────
@@ -241,6 +246,11 @@ resource "aws_lambda_function" "worker" {
   tenancy_config {
     tenant_isolation_mode = "PER_TENANT"
   }
+
+  layers = [
+    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:7"
+  ]
+
 }
 
 # ─────────────────────────────
