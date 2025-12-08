@@ -39,7 +39,6 @@ export const useUserStore = create<UserState>((set) => ({
         }));
 
         set({
-            // snake_case対応: tenant_id が来ても tenantId に入れる
             tenantId: data.tenant_id || data.tenantId,
             userId: data.user_id || data.userId,
             departments: formattedDepts,
