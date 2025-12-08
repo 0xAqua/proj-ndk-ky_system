@@ -29,21 +29,39 @@ export const useCredentialsAuth = (onOtpRequired: OnOtpRequired) => {
                 }
             });
 
+            // ★修正ポイント: パスワード認証においては、ここに来る以外は全て異常とみなします
             if (nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE') {
-                onOtpRequired();
                 console.log("Password verified, OTP sent.");
+                onOtpRequired();
             } else {
-                console.error("Unexpected step:", nextStep.signInStep);
-                setError("予期せぬログインステータスです。");
+                // DONE（OTPなしでログイン完了）などが返ってきたら、セキュリティ上のバグとして弾く
+                console.error("Unexpected step in Password Flow:", nextStep.signInStep);
+                setError("認証エラー: 二要素認証がスキップされました。システム管理者に連絡してください。");
             }
+
         } catch (err: any) {
             console.error("Sign in failed:", err);
-            if (err.name === "NotAuthorizedException") {
-                setError("メールアドレスまたはパスワードが間違っています。");
-            } else if (err.name === "UserNotFoundException") {
-                setError("ユーザーが見つかりません。");
-            } else {
-                setError("ログインに失敗しました。ネットワーク状況などを確認してください。");
+
+            switch (err.name) {
+                case "UserNotConfirmedException":
+                    setError("メールアドレスの確認が完了していません。");
+                    break;
+
+                case "PasswordResetRequiredException":
+                    setError("パスワードの変更が必要です。");
+                    break;
+
+                case "NotAuthorizedException":
+                case "UserNotFoundException":
+                    setError("メールアドレスまたはパスワードが間違っています。");
+                    break;
+
+                case "LimitExceededException":
+                    setError("試行回数が上限を超えました。しばらく待ってから再度お試しください。");
+                    break;
+
+                default:
+                    setError("ログインに失敗しました。ネットワーク状況などを確認してください。");
             }
         } finally {
             setIsLoading(false);

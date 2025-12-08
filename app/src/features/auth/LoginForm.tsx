@@ -39,7 +39,10 @@ export const LoginForm = () => {
         <>
             <PasskeyPromotionModal
                 isOpen={showPasskeyModal}
-                onClose={() => setShowPasskeyModal(false)}
+                onClose={() => {
+                    setShowPasskeyModal(false);
+                    handleModalComplete();
+                }}
                 onComplete={handleModalComplete}
             />
             <VStack gap={6}>
