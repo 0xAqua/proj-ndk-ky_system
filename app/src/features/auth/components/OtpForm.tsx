@@ -8,6 +8,7 @@ type Props = {
     onOtpChange: (value: string) => void;
     onSubmit: (e: React.FormEvent) => void;
     onBack: () => void;
+    onResend: () => void; // ★追加: 再送信イベント
 };
 
 export const OtpForm = ({
@@ -16,9 +17,10 @@ export const OtpForm = ({
                             isLoading,
                             onOtpChange,
                             onSubmit,
-                            onBack
+                            onBack,
+                            onResend // ★追加
                         }: Props) => {
-    // 文字列を配列に変換（メモ化して安定させる）
+    // 文字列を配列に変換
     const pinValue = useMemo(() => {
         return otp.padEnd(6, '').slice(0, 6).split('');
     }, [otp]);
@@ -34,14 +36,14 @@ export const OtpForm = ({
                         <Center w="full">
                             <PinInput.Root
                                 otp
-                                type="alphanumeric"
+                                type="numeric" // ★修正: alphanumeric -> numeric (設計書合わせ)
                                 value={pinValue}
                                 onValueChange={(details) => {
-                                    // details.valueAsString を使う（Chakra v3）
                                     const newValue = details.valueAsString ?? details.value.join('');
                                     onOtpChange(newValue);
                                 }}
                                 size="lg"
+                                // disabled={isLoading} // ★ローディング中は入力不可にするのがベター
                             >
                                 <PinInput.HiddenInput />
                                 <PinInput.Control>
@@ -63,7 +65,19 @@ export const OtpForm = ({
                     loading={isLoading}
                     loadingText="確認中..."
                 >
-                    ログイン
+                    認証
+                </Button>
+
+                {/* ★追加: 再送信ボタン */}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onResend}
+                    disabled={isLoading}
+                    fontSize="xs"
+                    color="blue.500"
+                >
+                    コードが届かない場合は再送信
                 </Button>
 
                 <Button
