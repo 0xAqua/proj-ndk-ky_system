@@ -15,12 +15,14 @@ tracer = Tracer()
 dynamodb = boto3.resource("dynamodb")
 TABLE_NAME = os.environ.get("TENANT_USER_MASTER_TABLE_NAME")
 
+
 def create_response(status_code: int, body: dict) -> dict:
     return {
         "statusCode": status_code,
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
+
 
 @tracer.capture_lambda_handler
 @event_source(data_class=APIGatewayProxyEventV2)
@@ -29,7 +31,7 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
 
     # 2. 環境変数のチェック
     if not TABLE_NAME:
-        logger.error("Environment variable 'TENANT_USER_MASTER_TABLE_NAME' is not set.")
+        logger.error("環境変数 'TENANT_USER_MASTER_TABLE_NAME' が設定されていません", action_category="ERROR")
         return create_response(500, {"message": "Server configuration error"})
 
     # 3. トークン(JWT)から情報の取り出し
@@ -50,12 +52,12 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
     logger.append_keys(tenant_id=tenant_id, user_id=user_id)
 
     if not tenant_id or not user_id:
-        logger.warning("Missing tenant_id or user_id in token claims.")
+        logger.warning("トークンにtenant_idまたはuser_idがありません", action_category="ERROR")
         # デバッグ用に claims の中身をログに出す（本番ログで見るとき用）
-        logger.debug(f"Claims received: {raw_claims}")
+        logger.debug("受信したclaims", action_category="EXECUTE", claims=raw_claims)
         return create_response(400, {"message": "Invalid token claims"})
 
-    logger.info("Fetching tenant user data from DynamoDB")
+    logger.info("テナントユーザー情報を取得します", action_category="EXECUTE")
 
     # 4. DynamoDBアクセス
     try:
@@ -67,14 +69,16 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
             }
         )
     except ClientError:
-        logger.exception("DynamoDB Access Failed")
+        logger.exception("DynamoDBアクセスに失敗しました", action_category="ERROR")
         return create_response(500, {"message": "Database access error"})
     except Exception:
-        logger.exception("Unexpected error")
+        logger.exception("予期しないエラーが発生しました", action_category="ERROR")
         return create_response(500, {"message": "Internal server error"})
 
     # 5. レスポンス返却
     user_item = response.get("Item")
+
+    logger.info("テナントユーザー情報を取得しました", action_category="EXECUTE")
 
     response_body = {
         "tenantId": tenant_id,

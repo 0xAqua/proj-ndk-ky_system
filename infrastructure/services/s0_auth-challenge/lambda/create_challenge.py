@@ -47,7 +47,7 @@ def save_otp_to_dynamodb(tenant_id: str, email: str, otp: str, user_id: str) -> 
             "attempts": 0,
         }
     )
-    logger.info(f"OTP saved to DynamoDB, expires_at: {expires_at}")
+    logger.info("OTPをDynamoDBに保存しました", action_category="AUTH", expires_at=expires_at)
 
 
 def send_otp_email(email: str, otp: str) -> None:
@@ -146,7 +146,7 @@ def send_otp_email(email: str, otp: str) -> None:
             },
         },
     )
-    logger.info(f"OTP email sent to: {email}")
+    logger.info("OTPメールを送信しました", action_category="AUTH", email=email)
 
 
 @tracer.capture_lambda_handler
@@ -168,17 +168,17 @@ def lambda_handler(event, context):
     user_id = user_attributes.get("sub")
     tenant_id = user_attributes.get("custom:tenant_id", "default")
 
-    logger.append_keys(tenant_id=tenant_id, user_id=user_id, email=email)
-    logger.info("Creating OTP challenge")
+    logger.append_keys(tenant_id=tenant_id, user_id=user_id)
+    logger.info("OTPチャレンジ作成を開始", action_category="AUTH")
 
     if not email:
-        logger.error("Email not found in user attributes")
+        logger.error("メールアドレスが見つかりません", action_category="ERROR")
         raise ValueError("Email is required for OTP authentication")
 
     try:
         # 1. OTP生成
         otp = generate_otp(OTP_LENGTH)
-        logger.info(f"OTP generated (length: {OTP_LENGTH})")
+        logger.info("OTPを生成しました", action_category="AUTH", otp_length=OTP_LENGTH)
 
         # 2. DynamoDBに保存
         save_otp_to_dynamodb(tenant_id, email, otp, user_id)
@@ -202,13 +202,13 @@ def lambda_handler(event, context):
         }
 
         event["response"] = response
-        logger.info("OTP challenge created successfully")
+        logger.info("OTPチャレンジ作成完了", action_category="AUTH")
 
     except ClientError as e:
-        logger.exception("AWS service error during OTP creation")
+        logger.exception("AWSサービスエラーが発生しました", action_category="ERROR")
         raise
     except Exception as e:
-        logger.exception("Unexpected error during OTP creation")
+        logger.exception("予期しないエラーが発生しました", action_category="ERROR")
         raise
 
     return event

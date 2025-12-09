@@ -15,7 +15,6 @@ variable "target_log_group_names" {
   type        = list(string)
 }
 
-# 親で target_log_group_arns = [] を渡しているので、定義が必要です
 variable "target_log_group_arns" {
   description = "List of CloudWatch Log Group ARNs (Optional)"
   type        = list(string)
