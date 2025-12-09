@@ -71,7 +71,7 @@ export const useLoginForm = () => {
 
     // パスキーログイン（usernameを渡す）
     const handlePasskeyLogin = () => {
-        passkeyAuth.handlePasskeyLogin(credentialsAuth.username);
+        void passkeyAuth.handlePasskeyLogin(credentialsAuth.username);
     };
 
     // モーダル完了時の処理
@@ -80,6 +80,10 @@ export const useLoginForm = () => {
         // ★追加: ここでも念のため取得開始
         prefetchMasterData();
         navigate("/entry");
+    };
+
+    const handleBackToLogin = () => {
+        setStep('INPUT_CREDENTIALS');
     };
 
     // エラーを統合（優先度: credentials > otp > passkey）
@@ -104,6 +108,7 @@ export const useLoginForm = () => {
         otp: otpAuth.otp,
         setOtp: otpAuth.setOtp,
         handleVerifyOtp: otpAuth.handleVerifyOtp,
+        handleBackToLogin,
 
         // Passkey
         handlePasskeyLogin,

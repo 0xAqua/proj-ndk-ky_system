@@ -109,7 +109,7 @@ export const EntryForm = () => {
             onClose();
 
             // 3. 結果画面へ遷移
-            navigate(`/result/${jobId}`);
+            navigate('/result', { state: { jobId } });
 
         } catch (e) {
             console.error("Submission failed:", e);
@@ -140,7 +140,10 @@ export const EntryForm = () => {
                 <ConstructionProject
                     masterCategories={constructions}
                     selectedTypeIds={selectedTypeIds}
-                    onChange={setSelectedTypeIds}
+                    onChange={(newTypeIds) => {
+                        setSelectedTypeIds(newTypeIds);
+                        setSelectedProcessIds([]);
+                    }}
                 />
 
                 <ConstructionProcess

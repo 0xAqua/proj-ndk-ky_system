@@ -28,11 +28,18 @@ export const usePasskeyAuth = (onSuccess: OnSuccess) => {
             if (isSignedIn) {
                 onSuccess();
             } else {
-                console.log("Next Step:", nextStep);
+                console.error("Unexpected Next Step:", nextStep);
+                // 即座にログイン完了しなかった場合は、想定外のフローとしてエラーを出す
+                setError("認証を完了できませんでした。別の方法をお試しください。");
             }
         } catch (err: any) {
             console.error("Passkey login failed:", err);
-            setError("パスキー認証に失敗しました。登録されていないか、ブラウザが対応していません。");
+
+            if (err.name === 'NotAllowedError' || err.message.includes('canceled')) {
+                setError(null);
+            } else {
+                setError("パスキー認証に失敗しました。お使いの端末が対応していないか、設定されていません。");
+            }
         } finally {
             setIsLoading(false);
         }

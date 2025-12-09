@@ -3,6 +3,7 @@ import { LuLogOut, LuChevronDown } from "react-icons/lu";
 import { signOut, fetchUserAttributes } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { useUserStore } from "@/stores/useUserStore";
 import logo from '@/assets/logo.png';
 
 import { Avatar } from "@/components/ui/avatar";
@@ -15,6 +16,7 @@ import {
 
 export const Header = () => {
     const navigate = useNavigate();
+    const clearUser = useUserStore((state) => state.clearUser);
 
     // ユーザー情報を保存するState
     const [userEmail, setUserEmail] = useState("");
@@ -41,6 +43,7 @@ export const Header = () => {
     const handleLogoutClick = async () => {
         try {
             await signOut();
+            clearUser();
             navigate('/login');
         } catch (error) {
             console.error("Logout failed", error);
@@ -79,27 +82,21 @@ export const Header = () => {
                     {/*<LuMenu size={24} />*/}
                 </Box>
 
-                {/* --- 中央：タイトル (絶対配置でど真ん中へ) --- */}
-                {/* --- 中央：ロゴ画像とタイトル --- */}
-                <HStack
-                    position="absolute"
-                    left="50%"
-                    transform="translateX(-50%)"
-                    align="center"
-                    gap={2}
-                >
-                    {/* 2. ロゴ画像を表示 (テキストに合わせて少し小さめに h="20px" 程度推奨) */}
-                    <Image src={logo} alt="Logo" h="22px" objectFit="contain" />
-
+                {/* 中央：タイトル */}
+                <HStack align="center" gap={2} flex="1" justify="center" overflow="hidden">
+                    <Image src={logo} alt="Logo" h="22px" objectFit="contain" flexShrink={0} />
                     <Text
                         fontSize="sm"
                         fontWeight="bold"
                         color="gray.800"
                         whiteSpace="nowrap"
+                        overflow="hidden"
+                        textOverflow="ellipsis"
                     >
                         危険予知システム
                     </Text>
                 </HStack>
+
                 {/* --- 右側：アバターメニュー --- */}
                 <MenuRoot positioning={{ placement: "bottom-end" }}>
                     <MenuTrigger asChild>

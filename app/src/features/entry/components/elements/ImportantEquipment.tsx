@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Flex, Text, VStack, Badge, Button, Box, Separator, Dialog } from "@chakra-ui/react";
 import { ContentBox } from "@/features/entry/components/layout/ContentBox";
-import { MdWarning, MdChevronRight, MdClose, MdInfoOutline } from "react-icons/md";
+import { MdWarning, MdClose, MdInfoOutline } from "react-icons/md";
 import { FiTool } from "react-icons/fi";
 import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
 
@@ -62,15 +62,15 @@ export const ImportantEquipment = ({ masterCategories, selectedProcessIds }: Pro
 
                         {/* 詳細ボタン */}
                         {sortedEquipments.length > 4 && (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                colorPalette="blue"
+                            <Text
+                                fontSize="xs"
+                                color="blue.500"
+                                cursor="pointer"
+                                _hover={{ textDecoration: "underline" }}
                                 onClick={() => setIsModalOpen(true)}
                             >
-                                すべて確認 ({sortedEquipments.length})
-                                <MdChevronRight />
-                            </Button>
+                                すべて見る ({sortedEquipments.length})
+                            </Text>
                         )}
                     </Flex>
 

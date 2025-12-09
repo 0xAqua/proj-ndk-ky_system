@@ -2,6 +2,7 @@ import { Checkbox, Flex, Text, Box, VStack, Accordion } from "@chakra-ui/react";
 import { ContentBox } from "@/features/entry/components/layout/ContentBox";
 import { MdBuild, MdChevronRight, MdInfoOutline } from "react-icons/md";
 import type { ProcessCategory } from "@/features/entry/hooks/useConstructionMaster";
+import {useEffect} from "react";
 
 type Props = {
     // 親から受け取るマスタデータ (EntryFormから渡される constructions)
@@ -14,6 +15,21 @@ type Props = {
 };
 
 export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [], onChange }: Props) => {
+
+    useEffect(() => {
+        // 現在有効な種別に含まれる工程IDを取得
+        const validProcessIds = masterCategories
+            .filter(cat => targetTypeIds.includes(cat.id))
+            .flatMap(cat => cat.processes.map(p => p.id));
+
+        // 無効な工程IDを除外
+        const filteredValue = value.filter(id => validProcessIds.includes(id));
+
+        // 変更があれば更新
+        if (filteredValue.length !== value.length) {
+            onChange(filteredValue);
+        }
+    }, [targetTypeIds, masterCategories, value, onChange]);
 
     // 選択された種別ID(targetTypeIds)に一致するものだけを抽出
     const visibleCategories = masterCategories.filter(cat =>
@@ -52,6 +68,14 @@ export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [
         onChange(nextValue);
     };
 
+    // チェックボックス制御ロジック に追加
+    const isCategoryIndeterminate = (items: { id: string }[]) => {
+        if (!items || items.length === 0) return false;
+        const checkedCount = items.filter((p) => value.includes(p.id)).length;
+        return checkedCount > 0 && checkedCount < items.length;
+    };
+
+
     return (
         <Box bg="white" w="full" p={2} borderRadius="2xl" boxShadow="0 4px 16px rgba(0, 0, 0, 0.08)" >
             <ContentBox>
@@ -79,9 +103,15 @@ export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [
                                             <Flex justify="space-between" align="center" w="full">
                                                 <Flex align="center" gap={2}>
                                                     <Checkbox.Root
-                                                        checked={isCategoryChecked(category.processes)}
+                                                        checked={
+                                                            isCategoryChecked(category.processes)
+                                                                ? true
+                                                                : isCategoryIndeterminate(category.processes)
+                                                                    ? "indeterminate"
+                                                                    : false
+                                                        }
                                                         onCheckedChange={() => toggleCategory(category.processes)}
-                                                        colorPalette="blue"
+                                                        colorPalette="green"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <Checkbox.HiddenInput />
@@ -103,7 +133,7 @@ export const ConstructionProcess = ({ masterCategories, targetTypeIds, value = [
                                                             key={process.id}
                                                             checked={value.includes(process.id)}
                                                             onCheckedChange={() => toggleProcess(process.id)}
-                                                            colorPalette="blue"
+                                                            colorPalette="green"
                                                         >
                                                             <Checkbox.HiddenInput />
                                                             <Checkbox.Control />
