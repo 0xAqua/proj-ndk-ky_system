@@ -3,22 +3,24 @@ import json
 import time
 import boto3
 import requests
-from aws_lambda_powertools import Logger
+from aws_lambda_powertools import Logger, Tracer
 
 logger = Logger()
+tracer = Tracer()
 
 # 環境変数
-JOB_TABLE_NAME  = os.environ.get('JOB_TABLE_NAME')
-SQS_QUEUE_URL   = os.environ.get('SQS_QUEUE_URL')
-AUTH_API_URL    = os.environ.get('AUTH_API_URL')
+JOB_TABLE_NAME = os.environ.get('JOB_TABLE_NAME')
+SQS_QUEUE_URL = os.environ.get('SQS_QUEUE_URL')
+AUTH_API_URL = os.environ.get('AUTH_API_URL')
 MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
-CALLBACK_URL    = os.environ.get('CALLBACK_URL')
-VQ_SECRET_ARN   = os.environ.get('VQ_SECRET_ARN')
+CALLBACK_URL = os.environ.get('CALLBACK_URL')
+VQ_SECRET_ARN = os.environ.get('VQ_SECRET_ARN')
 
 dynamodb = boto3.resource('dynamodb')
-table    = dynamodb.Table(JOB_TABLE_NAME)
-sqs      = boto3.client('sqs')
-secrets  = boto3.client('secretsmanager')
+table = dynamodb.Table(JOB_TABLE_NAME)
+sqs = boto3.client('sqs')
+secrets = boto3.client('secretsmanager')
+
 
 def get_vq_credentials(target_tenant_id):
     """Producerと同じ認証情報取得ロジック"""
@@ -28,13 +30,15 @@ def get_vq_credentials(target_tenant_id):
         if isinstance(secret_json, list):
             target_config = next(
                 (item for item in secret_json if item.get("tenant_id") == target_tenant_id), None)
-            if not target_config: raise Exception(f"Tenant config not found for id: {target_tenant_id}")
+            if not target_config:
+                raise Exception(f"Tenant config not found for id: {target_tenant_id}")
             return target_config['secret_data']
         else:
             return secret_json.get('secret_data', secret_json)
     except Exception as e:
-        print(f"Failed to get secret: {e}")
+        logger.exception("シークレット取得に失敗しました", action_category="ERROR")
         raise e
+
 
 def get_auth_token(api_key, login_id):
     resp = requests.post(AUTH_API_URL, json={"api_key": api_key, "login_id": login_id})
@@ -62,7 +66,7 @@ def strip_markdown_code_block(content):
 def is_valid_content(content):
     """VQ API形式のJSON検証"""
     if not content:
-        logger.warning("Validation: content is empty")
+        logger.warning("検証: contentが空です", action_category="ERROR")
         return False
 
     try:
@@ -75,11 +79,11 @@ def is_valid_content(content):
         elif isinstance(parsed, list):
             incidents = parsed
         else:
-            logger.warning("Validation: invalid root structure")
+            logger.warning("検証: ルート構造が不正です", action_category="ERROR")
             return False
 
         if len(incidents) == 0:
-            logger.warning("Validation: incidents list is empty")
+            logger.warning("検証: incidentsリストが空です", action_category="ERROR")
             return False
 
         required_keys = {'id', 'title', 'classification', 'summary', 'cause', 'countermeasures'}
@@ -88,31 +92,37 @@ def is_valid_content(content):
         for idx, incident in enumerate(incidents):
             missing = required_keys - set(incident.keys())
             if missing:
-                logger.warning(f"Validation: incident[{idx}] missing keys: {missing}")
+                logger.warning("検証: 必須キーが不足しています", action_category="ERROR", index=idx, missing_keys=list(missing))
                 return False
 
             for cm_idx, cm in enumerate(incident.get('countermeasures', [])):
                 missing_cm = required_cm_keys - set(cm.keys())
                 if missing_cm:
-                    logger.warning(f"Validation: incident[{idx}].countermeasures[{cm_idx}] missing keys: {missing_cm}")
+                    logger.warning(
+                        "検証: countermeasuresの必須キーが不足しています",
+                        action_category="ERROR",
+                        incident_index=idx,
+                        cm_index=cm_idx,
+                        missing_keys=list(missing_cm)
+                    )
                     return False
 
-        logger.info("Validation: OK")
+        logger.info("検証: OK", action_category="EXECUTE")
         return True
 
     except json.JSONDecodeError as e:
-        logger.warning(f"Validation: JSON parse error - {e}")
+        logger.warning("検証: JSONパースエラー", action_category="ERROR", error=str(e))
         return False
 
 
 def recreate_job(creds, old_job_item, tenant_id):
     """JSONが不正だった場合にジョブを作り直す"""
-    print(f"Re-creating job for old tid: {old_job_item['tid']}")
+    logger.info("ジョブを再作成します", action_category="EXECUTE", old_tid=old_job_item['tid'])
 
     token = get_auth_token(creds['api_key'], creds['login_id'])
 
     headers = {
-        "Authorization": f"Bearer {token}", # ★Bearer付与
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
@@ -129,7 +139,7 @@ def recreate_job(creds, old_job_item, tenant_id):
     new_tid = vq_data.get('tid')
     new_mid = vq_data.get('mid')
 
-    print(f"New ID acquired: {new_tid}")
+    logger.info("新しいIDを取得しました", action_category="EXECUTE", new_tid=new_tid)
 
     # DynamoDB更新 (tid/midを新しいものに書き換え)
     table.update_item(
@@ -153,6 +163,11 @@ def recreate_job(creds, old_job_item, tenant_id):
         })
     )
 
+    logger.info("ジョブ再作成を完了しました", action_category="EXECUTE", job_id=old_job_item['job_id'])
+
+
+@tracer.capture_lambda_handler
+@logger.inject_lambda_context(log_event=False)
 def lambda_handler(event, context):
     for record in event['Records']:
         try:
@@ -162,7 +177,8 @@ def lambda_handler(event, context):
             mid = body.get('mid')
             tenant_id = body.get('tenant_id')
 
-            print(f"Checking Job: {job_id}, tid: {tid}, tenant: {tenant_id}")
+            logger.append_keys(job_id=job_id, tid=tid, tenant_id=tenant_id)
+            logger.info("ジョブをチェックします", action_category="BATCH")
 
             # tenant_id がSQSにない場合の復旧ロジック
             if not tenant_id:
@@ -171,8 +187,8 @@ def lambda_handler(event, context):
                     tenant_id = item_resp['Item'].get('tenant_id')
 
             if not tenant_id:
-                print("Error: Tenant ID missing.")
-                return # 処理不能
+                logger.error("tenant_idがありません", action_category="ERROR")
+                return  # 処理不能
 
             # 1. 認証情報取得
             creds = get_vq_credentials(tenant_id)
@@ -180,20 +196,19 @@ def lambda_handler(event, context):
 
             # 2. ポーリング (GET)
             url = f"{MESSAGE_API_URL}/{tid}/{mid}"
-            headers = {"Authorization": f"Bearer {token}"} # ★Bearer付与
+            headers = {"Authorization": f"Bearer {token}"}
 
             resp = requests.get(url, headers=headers)
             resp.raise_for_status()
             data = resp.json()
 
-            # ★★★ VQからの生の返却値をログに出力 ★★★
-            print(f"DEBUG: VQ API Full Response: {json.dumps(data, ensure_ascii=False)}")
+            logger.debug("VQ APIレスポンス", action_category="BATCH", response=data)
 
             # ステータス確認 (processing / done)
             status = data.get('status')
 
             if status != 'done':
-                # まだ終わってなければ例外 -> SQS Visibility Timeoutでリトライ
+                # まだ終わっていなければ例外 -> SQS Visibility Timeoutでリトライ
                 raise Exception("Job not finished yet")
 
             # 3. 完了時の検証
@@ -201,7 +216,7 @@ def lambda_handler(event, context):
 
             if is_valid_content(result_reply):
                 # 成功: DB更新（Markdownコードブロックを除去して保存）
-                print("Validation OK. Saving to DynamoDB...")
+                logger.info("検証成功 - DynamoDBに保存します", action_category="BATCH")
                 cleaned_reply = strip_markdown_code_block(result_reply)
                 table.update_item(
                     Key={'job_id': job_id},
@@ -213,11 +228,12 @@ def lambda_handler(event, context):
                         ':u': int(time.time())
                     }
                 )
+                logger.info("ジョブ完了", action_category="BATCH", job_id=job_id)
             else:
                 # 失敗: やり直し (Re-create)
-                print("Validation FAILED.")
+                logger.warning("検証失敗 - リトライします", action_category="ERROR")
 
-                # ★追加: 無限ループ防止のための回数チェック
+                # 無限ループ防止のための回数チェック
                 resp = table.get_item(Key={'job_id': job_id})
                 if 'Item' in resp:
                     current_item = resp['Item']
@@ -225,7 +241,7 @@ def lambda_handler(event, context):
 
                     # 例: 3回以上リトライしていたら、あきらめてFAILEDにする
                     if current_retry >= 3:
-                        print(f"Max retries reached ({current_retry}). Marking as FAILED.")
+                        logger.error("リトライ上限に達しました - FAILEDに設定", action_category="ERROR", retry_count=current_retry)
                         table.update_item(
                             Key={'job_id': job_id},
                             UpdateExpression="set #st=:s, updated_at=:u, error_msg=:e",
@@ -236,16 +252,17 @@ def lambda_handler(event, context):
                                 ':e': 'Validation failed multiple times. Invalid JSON format.'
                             }
                         )
-                        return # ここで終了（再送しない）
+                        return  # ここで終了（再送しない）
 
                     # まだ上限に達していなければ再作成
-                    print(f"Retrying... (Count: {current_retry + 1})")
+                    logger.info("リトライ中", action_category="BATCH", retry_count=current_retry + 1)
                     recreate_job(creds, current_item, tenant_id)
 
         except Exception as e:
             if "Job not finished yet" in str(e):
                 # ポーリング継続のための正常な再試行フロー
+                logger.info("ジョブ処理中 - 再試行待ち", action_category="BATCH")
                 raise e
             else:
-                print(f"Worker Error: {e}")
-                raise e # 予期せぬエラーもリトライさせる
+                logger.exception("ワーカーエラーが発生しました", action_category="ERROR")
+                raise e  # 予期せぬエラーもリトライさせる
