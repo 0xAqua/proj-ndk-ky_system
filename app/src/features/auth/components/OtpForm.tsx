@@ -8,7 +8,7 @@ type Props = {
     onOtpChange: (value: string) => void;
     onSubmit: (e: React.FormEvent) => void;
     onBack: () => void;
-    onResend: () => void; // ★追加: 再送信イベント
+    onResend: () => void;
 };
 
 export const OtpForm = ({
@@ -18,11 +18,13 @@ export const OtpForm = ({
                             onOtpChange,
                             onSubmit,
                             onBack,
-                            onResend // ★追加
+                            onResend
                         }: Props) => {
-    // 文字列を配列に変換
+
+    // 配列として適切に変換（undefinedを防ぐ）
     const pinValue = useMemo(() => {
-        return otp.padEnd(6, '').slice(0, 6).split('');
+        const chars = otp.split('');
+        return Array.from({ length: 6 }, (_, i) => chars[i] ?? '');
     }, [otp]);
 
     return (
@@ -36,14 +38,20 @@ export const OtpForm = ({
                         <Center w="full">
                             <PinInput.Root
                                 otp
-                                type="numeric" // ★修正: alphanumeric -> numeric (設計書合わせ)
+                                type="alphanumeric"
                                 value={pinValue}
                                 onValueChange={(details) => {
-                                    const newValue = details.valueAsString ?? details.value.join('');
-                                    onOtpChange(newValue);
+                                    const valueArray = details.value;
+                                    if (Array.isArray(valueArray)) {
+                                        // undefinedを空文字列に置換してから結合
+                                        const newValue = valueArray
+                                            .map(v => v ?? '')
+                                            .join('');
+                                        onOtpChange(newValue);
+                                    }
                                 }}
                                 size="lg"
-                                // disabled={isLoading} // ★ローディング中は入力不可にするのがベター
+                                disabled={isLoading}
                             >
                                 <PinInput.HiddenInput />
                                 <PinInput.Control>
@@ -63,12 +71,11 @@ export const OtpForm = ({
                     w="full"
                     colorPalette="blue"
                     loading={isLoading}
-                    loadingText="確認中..."
+                    loadingText="認証中..."
                 >
                     認証
                 </Button>
 
-                {/* ★追加: 再送信ボタン */}
                 <Button
                     variant="ghost"
                     size="sm"
