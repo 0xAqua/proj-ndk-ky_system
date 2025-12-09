@@ -110,8 +110,9 @@ resource "aws_lambda_function" "this" {
   environment {
     variables = {
       LOG_ARCHIVE_TABLE = var.log_archive_table_name
-      # 収集対象のロググループ名をカンマ区切りで渡す
       TARGET_LOG_GROUPS = join(",", var.target_log_group_names)
+      POWERTOOLS_SERVICE_NAME = "log-archiver"
+      LOG_LEVEL               = "INFO"
     }
   }
 }

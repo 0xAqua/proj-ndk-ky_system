@@ -32,7 +32,7 @@ def get_otp_from_dynamodb(tenant_id: str, email: str) -> dict | None:
         )
         return response.get("Item")
     except ClientError:
-        logger.exception("Failed to get OTP from DynamoDB")
+        logger.exception("DynamoDBからOTP取得に失敗しました", action_category="ERROR")
         return None
 
 
@@ -50,7 +50,7 @@ def increment_attempts(tenant_id: str, email: str) -> None:
             ExpressionAttributeValues={":inc": 1},
         )
     except ClientError:
-        logger.exception("Failed to increment attempts")
+        logger.exception("試行回数の更新に失敗しました", action_category="ERROR")
 
 
 def delete_otp(tenant_id: str, email: str) -> None:
@@ -64,9 +64,9 @@ def delete_otp(tenant_id: str, email: str) -> None:
                 "email": email,
             }
         )
-        logger.info("OTP record deleted after successful verification")
+        logger.info("OTPレコードを削除しました", action_category="AUTH")
     except ClientError:
-        logger.exception("Failed to delete OTP record")
+        logger.exception("OTPレコードの削除に失敗しました", action_category="ERROR")
 
 
 @tracer.capture_lambda_handler
@@ -89,7 +89,7 @@ def lambda_handler(event, context):
     tenant_id = user_attributes.get("custom:tenant_id", "default")
     user_id = user_attributes.get("sub")
 
-    logger.append_keys(tenant_id=tenant_id, user_id=user_id, email=email)
+    logger.append_keys(tenant_id=tenant_id, user_id=user_id)
 
     # ユーザーが入力したOTP
     user_answer = request.get("challengeAnswer", "").strip()
@@ -98,7 +98,7 @@ def lambda_handler(event, context):
     private_params = request.get("privateChallengeParameters", {})
     expected_answer = private_params.get("answer")
 
-    logger.info("Verifying OTP challenge")
+    logger.info("OTP検証を開始", action_category="AUTH")
 
     response = event.get("response", {})
     answer_correct = False
@@ -108,7 +108,7 @@ def lambda_handler(event, context):
         otp_record = get_otp_from_dynamodb(tenant_id, email)
 
         if not otp_record:
-            logger.warning("OTP record not found")
+            logger.warning("OTPレコードが見つかりません", action_category="ERROR")
             response["answerCorrect"] = False
             event["response"] = response
             return event
@@ -120,7 +120,7 @@ def lambda_handler(event, context):
 
         # 有効期限チェック
         if current_time > expires_at:
-            logger.warning("OTP has expired")
+            logger.warning("OTPの有効期限が切れています", action_category="ERROR")
             delete_otp(tenant_id, email)
             response["answerCorrect"] = False
             event["response"] = response
@@ -128,7 +128,7 @@ def lambda_handler(event, context):
 
         # 試行回数チェック
         if attempts >= MAX_ATTEMPTS:
-            logger.warning(f"Max attempts ({MAX_ATTEMPTS}) exceeded")
+            logger.warning("試行回数の上限を超えました", action_category="ERROR", max_attempts=MAX_ATTEMPTS)
             delete_otp(tenant_id, email)
             response["answerCorrect"] = False
             event["response"] = response
@@ -137,12 +137,12 @@ def lambda_handler(event, context):
         # OTP一致チェック（DynamoDB優先、なければprivateChallengeParameters）
         if stored_otp and user_answer == stored_otp:
             answer_correct = True
-            logger.info("OTP verification successful (DynamoDB)")
+            logger.info("OTP検証成功（DynamoDB）", action_category="AUTH")
         elif expected_answer and user_answer == expected_answer:
             answer_correct = True
-            logger.info("OTP verification successful (privateChallengeParameters)")
+            logger.info("OTP検証成功（privateChallengeParameters）", action_category="AUTH")
         else:
-            logger.warning("OTP verification failed - code mismatch")
+            logger.warning("OTP検証失敗 - コード不一致", action_category="ERROR")
             increment_attempts(tenant_id, email)
 
         if answer_correct:
@@ -150,7 +150,7 @@ def lambda_handler(event, context):
             delete_otp(tenant_id, email)
 
     except Exception as e:
-        logger.exception("Error during OTP verification")
+        logger.exception("OTP検証中にエラーが発生しました", action_category="ERROR")
         answer_correct = False
 
     response["answerCorrect"] = answer_correct

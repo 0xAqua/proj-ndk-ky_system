@@ -14,12 +14,14 @@ tracer = Tracer()
 dynamodb = boto3.resource("dynamodb")
 TABLE_NAME = os.environ.get("CONSTRUCTION_MASTER_TABLE_NAME")
 
+
 def create_response(status_code: int, body: dict) -> dict:
     return {
         "statusCode": status_code,
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
+
 
 def build_tree(flat_items: list) -> list:
     """
@@ -63,9 +65,9 @@ def build_tree(flat_items: list) -> list:
 
             if parent:
                 # ★ IDによって格納先を振り分けるロジック
-                if "TASK" in parts[-2]: # IDの最後から2番目が TASK か判定
+                if "TASK" in parts[-2]:  # IDの最後から2番目が TASK か判定
                     parent["tasks"].append(node)
-                elif "SEQ" in parts[-2]: # IDの最後から2番目が SEQ か判定
+                elif "SEQ" in parts[-2]:  # IDの最後から2番目が SEQ か判定
                     parent["safety_equipments"].append(node)
                 else:
                     parent["children"].append(node)
@@ -76,6 +78,7 @@ def build_tree(flat_items: list) -> list:
     # (オプション) 配列をID順などでソートしたい場合はここで各ノードに対してsortを行う
 
     return root_nodes
+
 
 @tracer.capture_lambda_handler
 @event_source(data_class=APIGatewayProxyEventV2)
@@ -95,9 +98,9 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
     tenant_id = raw_claims.get("custom:tenant_id") or raw_claims.get("tenant_id")
 
     if not tenant_id:
-        logger.warning("Missing tenant_id in token.")
+        logger.warning("トークンにtenant_idがありません", action_category="ERROR")
         # デバッグ用にログ出力
-        logger.debug(f"Claims: {raw_claims}")
+        logger.debug("受信したclaims", action_category="EXECUTE", claims=raw_claims)
         return create_response(400, {"message": "Invalid token"})
 
     logger.append_keys(tenant_id=tenant_id)
@@ -105,6 +108,8 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
     # クエリパラメータ取得
     params = event.query_string_parameters or {}
     dept_prefix = params.get("deptId")
+
+    logger.info("工事マスタを取得します", action_category="EXECUTE", dept_prefix=dept_prefix)
 
     try:
         table = dynamodb.Table(TABLE_NAME)
@@ -119,11 +124,13 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
         # 階層構造に変換
         tree_data = build_tree(items)
 
+        logger.info("工事マスタを取得しました", action_category="EXECUTE", item_count=len(items))
+
     except ClientError:
-        logger.exception("DynamoDB Query Error")
+        logger.exception("DynamoDBクエリに失敗しました", action_category="ERROR")
         return create_response(500, {"message": "Database error"})
     except Exception:
-        logger.exception("Unexpected error")
+        logger.exception("予期しないエラーが発生しました", action_category="ERROR")
         return create_response(500, {"message": "Internal server error"})
 
     return create_response(200, tree_data)
