@@ -46,16 +46,29 @@ def lambda_handler(event, context):
 
     # 4. CUSTOM_CHALLENGE 判定
     elif session[-1].get("challengeName") == "CUSTOM_CHALLENGE":
+        # 成功した場合
         if session[-1].get("challengeResult") == True:
-            # OTP正解！ -> トークン発行
             logger.info("Phase 3: OTP認証成功 - トークン発行", action_category="AUTH")
             response["issueTokens"] = True
             response["failAuthentication"] = False
+
+        # 失敗（または再送信リクエスト）の場合
         else:
-            # OTP間違い
-            logger.info("Phase 3: OTP認証失敗", action_category="ERROR")
-            response["issueTokens"] = False
-            response["failAuthentication"] = True
+            # 過去の CUSTOM_CHALLENGE の回数をカウント（今回を含める）
+            attempt_count = len([s for s in session if s["challengeName"] == "CUSTOM_CHALLENGE"])
+            MAX_LOOPS = 4  # 3回間違えるか、再送信を含めて合計4回まで許容
+
+            if attempt_count < MAX_LOOPS:
+                logger.info(f"Phase 3: 再試行/再送信 ({attempt_count}/{MAX_LOOPS})", action_category="AUTH")
+                # ★重要: トークンは発行しないが、認証失敗にもしない
+                response["issueTokens"] = False
+                response["failAuthentication"] = False
+                # ★重要: もう一度 CUSTOM_CHALLENGE を実行（→ create_challenge が走る）
+                response["challengeName"] = "CUSTOM_CHALLENGE"
+            else:
+                logger.info("Phase 3: 試行回数上限により認証失敗", action_category="ERROR")
+                response["issueTokens"] = False
+                response["failAuthentication"] = True
 
     else:
         # 想定外の状態
