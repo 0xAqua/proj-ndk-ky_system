@@ -15,6 +15,7 @@ AUTH_API_URL = os.environ.get('AUTH_API_URL')
 MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
 CALLBACK_URL = os.environ.get('CALLBACK_URL')
 VQ_SECRET_ARN = os.environ.get('VQ_SECRET_ARN')
+POLLING_INTERVAL = int(os.environ.get('POLLING_INTERVAL'))
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(JOB_TABLE_NAME)
@@ -208,10 +209,16 @@ def lambda_handler(event, context):
             status = data.get('status')
 
             if status != 'done':
-                # まだ終わっていなければ例外 -> SQS Visibility Timeoutでリトライ
-                raise Exception("Job not finished yet")
+                logger.info("ジョブは処理中です。再確認します。", action_category="BATCH", status=status)
 
-            # 3. 完了時の検証
+                sqs.send_message(
+                    QueueUrl=SQS_QUEUE_URL,
+                    MessageBody=record['body'],
+                    DelaySeconds=POLLING_INTERVAL
+                )
+                return
+
+                # 3. 完了時の検証
             result_reply = data.get('reply', '')
 
             if is_valid_content(result_reply):
@@ -259,10 +266,6 @@ def lambda_handler(event, context):
                     recreate_job(creds, current_item, tenant_id)
 
         except Exception as e:
-            if "Job not finished yet" in str(e):
-                # ポーリング継続のための正常な再試行フロー
-                logger.info("ジョブ処理中 - 再試行待ち", action_category="BATCH")
-                raise e
-            else:
-                logger.exception("ワーカーエラーが発生しました", action_category="ERROR")
-                raise e  # 予期せぬエラーもリトライさせる
+            # 待機用の例外チェックは不要になったので削除し、予期せぬエラーのみを扱う
+            logger.exception("ワーカーエラーが発生しました", action_category="ERROR")
+            raise e  # 本当のエラーはDLQ行きにするため raise

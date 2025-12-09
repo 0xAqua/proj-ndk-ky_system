@@ -224,6 +224,10 @@ resource "aws_lambda_function" "worker" {
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
       MESSAGE_API_URL  = "${var.external_api_base_url}/public-api/v1/message"
       CALLBACK_URL     = "${var.api_endpoint}/webhook"
+
+      # ★追加: ポーリング間隔をここで管理する
+      POLLING_INTERVAL = "10"
+      AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
     }
   }
 

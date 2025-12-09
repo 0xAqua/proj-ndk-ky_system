@@ -16,7 +16,7 @@ resource "aws_sqs_queue" "main" {
   delay_seconds = 20
 
   # Worker Lambdaのタイムアウト
-  visibility_timeout_seconds = 10
+  visibility_timeout_seconds = 70
 
   # リトライ設定: 3回失敗したらDLQへ送る
   redrive_policy = jsonencode({
