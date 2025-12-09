@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCredentialsAuth } from "./useCredentialsAuth";
 import { useOtpAuth } from "./useOtpAuth";
 import { usePasskeyAuth } from "./usePasskeyAuth";
-import {fetchConstructionMaster} from "@/api/constructionApi.ts";
+import { fetchConstructionMaster } from "@/api/constructionApi.ts";
 
 export type LoginStep = 'INPUT_CREDENTIALS' | 'INPUT_OTP';
 
@@ -16,48 +16,40 @@ export const useLoginForm = () => {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
 
     const navigate = useNavigate();
-    // ★追加: QueryClientの取得
     const queryClient = useQueryClient();
 
-    // ★追加: マスタデータのプリフェッチ関数
-    // 画面遷移前にこれを呼ぶことで、次の画面のロード時間を短縮します
     const prefetchMasterData = () => {
         void queryClient.prefetchQuery({
             queryKey: ['constructionMaster'],
             queryFn: fetchConstructionMaster,
-            staleTime: 1000 * 60 * 60, // 1時間はキャッシュ有効
+            staleTime: 1000 * 60 * 60,
         });
     };
 
-    // 認証成功時の遷移処理
     const handleSuccess = () => {
-        // ★追加: 遷移前にデータ取得を開始（awaitしないのがポイント）
         prefetchMasterData();
         navigate("/entry");
     };
 
-    // パスキー登録モーダル表示
     const handlePasskeyPrompt = () => {
         setShowPasskeyModal(true);
     };
 
-    // OTP入力画面への切り替え
     const handleOtpRequired = () => {
         setStep('INPUT_OTP');
     };
 
     // 各認証hookを初期化
+    // ※ useCredentialsAuth の更新（rememberDevice受け渡し）がまだの場合は、引数に追加せずそのままでOKです
     const credentialsAuth = useCredentialsAuth(handleOtpRequired);
     const otpAuth = useOtpAuth(handleSuccess, handlePasskeyPrompt);
     const passkeyAuth = usePasskeyAuth(handleSuccess);
 
-    // 初期ロード時のセッションチェック
     useEffect(() => {
         const checkAuth = async () => {
             try {
                 await getCurrentUser();
                 console.log("Already logged in");
-                // ★追加: ログイン済みの場合も遷移前に取得開始
                 prefetchMasterData();
                 navigate("/entry", { replace: true });
             } catch (err) {
@@ -67,17 +59,14 @@ export const useLoginForm = () => {
             }
         };
         void checkAuth();
-    }, [navigate]); // queryClientは安定しているため依存配列に入れなくてもOKですが、入れても問題ありません
+    }, [navigate]);
 
-    // パスキーログイン（usernameを渡す）
     const handlePasskeyLogin = () => {
         void passkeyAuth.handlePasskeyLogin(credentialsAuth.username);
     };
 
-    // モーダル完了時の処理
     const handleModalComplete = () => {
         setShowPasskeyModal(false);
-        // ★追加: ここでも念のため取得開始
         prefetchMasterData();
         navigate("/entry");
     };
@@ -86,10 +75,7 @@ export const useLoginForm = () => {
         setStep('INPUT_CREDENTIALS');
     };
 
-    // エラーを統合（優先度: credentials > otp > passkey）
     const error = credentialsAuth.error || otpAuth.error || passkeyAuth.error;
-
-    // ローディング状態を統合
     const isLoading = credentialsAuth.isLoading || otpAuth.isLoading || passkeyAuth.isLoading;
 
     return {
@@ -109,6 +95,10 @@ export const useLoginForm = () => {
         setOtp: otpAuth.setOtp,
         handleVerifyOtp: otpAuth.handleVerifyOtp,
         handleBackToLogin,
+
+        // ★追加: 再送信機能（useOtpAuthから取得）
+        handleResend: otpAuth.handleResend,
+        resendMessage: otpAuth.resendMessage,
 
         // Passkey
         handlePasskeyLogin,

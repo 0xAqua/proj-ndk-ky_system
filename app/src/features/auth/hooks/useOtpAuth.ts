@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { confirmSignIn, fetchUserAttributes } from "aws-amplify/auth";
+import { getAuthErrorMessage } from "@/features/auth/utils/authErrors";
 
 type OnSuccess = () => void;
 type OnPasskeyPrompt = () => void;
@@ -8,6 +9,8 @@ export const useOtpAuth = (onSuccess: OnSuccess, onPasskeyPrompt: OnPasskeyPromp
     const [otp, setOtp] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // ★追加: 再送信成功メッセージ用
+    const [resendMessage, setResendMessage] = useState<string | null>(null);
 
     const handleVerifyOtp = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -19,6 +22,7 @@ export const useOtpAuth = (onSuccess: OnSuccess, onPasskeyPrompt: OnPasskeyPromp
 
         setIsLoading(true);
         setError(null);
+        setResendMessage(null);
 
         try {
             const { isSignedIn } = await confirmSignIn({
@@ -41,11 +45,40 @@ export const useOtpAuth = (onSuccess: OnSuccess, onPasskeyPrompt: OnPasskeyPromp
 
                 onSuccess();
             } else {
-                setError("認証が完了しませんでした。もう一度お試しください。");
+                // Lambda側で失敗カウントが増えたが、まだリトライ可能な場合ここに来ます
+                setError("認証コードが間違っています。");
             }
         } catch (err: any) {
             console.error("OTP verification failed:", err);
-            setError("認証コードが間違っているか、有効期限切れです。");
+            // ★変更: 共通エラーメッセージを使用
+            setError(getAuthErrorMessage(err));
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // ★追加: 再送信処理
+    const handleResend = async () => {
+        setIsLoading(true);
+        setError(null);
+        setResendMessage(null);
+
+        try {
+            // Lambda ("verify_challenge") に "RESEND" を送る
+            // Lambda ("define_auth") がこれを検知して、新しいコードを発行してループさせます
+            const { nextStep } = await confirmSignIn({
+                challengeResponse: "RESEND"
+            });
+
+            if (nextStep.signInStep === "CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE") {
+                setResendMessage("新しい認証コードを送信しました。メールをご確認ください。");
+                setOtp(""); // 入力欄をクリア
+            } else {
+                setError("再送信中に予期せぬエラーが発生しました。");
+            }
+        } catch (err: any) {
+            console.error("Resend failed:", err);
+            setError(getAuthErrorMessage(err));
         } finally {
             setIsLoading(false);
         }
@@ -59,7 +92,9 @@ export const useOtpAuth = (onSuccess: OnSuccess, onPasskeyPrompt: OnPasskeyPromp
         setOtp,
         isLoading,
         error,
+        resendMessage, // ★追加: Form側で表示するために返す
         handleVerifyOtp,
+        handleResend,  // ★追加: Form側でボタンに紐付ける
         clearError,
         resetOtp
     };

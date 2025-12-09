@@ -24,7 +24,9 @@ export const LoginForm = () => {
         setShowPasskeyModal,
         handlePasskeyLogin,
         handleModalComplete,
-        handleBackToLogin
+        handleBackToLogin,
+        handleResend,
+        resendMessage
     } = useLoginForm();
 
     if (isCheckingSession) {
@@ -62,10 +64,17 @@ export const LoginForm = () => {
                     )}
                 </VStack>
 
-                {/* エラー表示エリア */}
+                {/* エラー表示エリア (赤) */}
                 {error && (
                     <Text color="red.500" fontSize="sm" textAlign="center" fontWeight="bold">
                         {error}
+                    </Text>
+                )}
+
+                {/* ★追加: 再送信成功メッセージ (緑) - OTP画面時のみ */}
+                {step === 'INPUT_OTP' && resendMessage && (
+                    <Text color="green.500" fontSize="sm" textAlign="center" fontWeight="bold">
+                        {resendMessage}
                     </Text>
                 )}
 
@@ -96,6 +105,8 @@ export const LoginForm = () => {
                         onOtpChange={setOtp}
                         onSubmit={handleVerifyOtp}
                         onBack={handleBackToLogin}
+                        // ★追加: 再送信機能
+                        onResend={handleResend}
                     />
                 )}
 
