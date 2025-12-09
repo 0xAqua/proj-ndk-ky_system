@@ -1,3 +1,6 @@
+# Subscription Filter
+# これを導入するかEventBridgeで対応するのか
+
 resource "aws_dynamodb_table" "operation_history" {
   name         = "${local.name_prefix}-operation-history"
   billing_mode = "PAY_PER_REQUEST"
