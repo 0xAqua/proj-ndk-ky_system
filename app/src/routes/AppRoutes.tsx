@@ -30,7 +30,7 @@ export const AppRoutes = () => {
 
             {/* 結果表示画面 (URLパラメータ :jobId を受け取る) */}
             <Route
-                path="/result/:jobId"
+                path="/result"
                 element={
                     <AuthGuard>
                         <ResultPage />
