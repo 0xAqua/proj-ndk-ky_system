@@ -25,6 +25,7 @@ export const CredentialsForm = ({
                     <Input
                         name="email"
                         autoComplete="email"
+                        maxLength={255}
                         placeholder="メールアドレス"
                         value={username}
                         onChange={(e) => onUsernameChange(e.target.value)}
@@ -35,6 +36,7 @@ export const CredentialsForm = ({
                     <Input
                         name="password"
                         type="password"
+                        maxLength={64}
                         autoComplete="current-password"
                         placeholder="パスワード"
                         value={password}

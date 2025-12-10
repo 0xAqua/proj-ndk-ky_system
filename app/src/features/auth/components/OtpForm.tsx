@@ -1,5 +1,5 @@
 import { VStack, Text, Button, Field, Center, PinInput, HStack } from "@chakra-ui/react";
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 
 type Props = {
     username: string;
@@ -8,6 +8,7 @@ type Props = {
     onOtpChange: (value: string) => void;
     onSubmit: (e: React.FormEvent) => void;
     onBack: () => void;
+    onResend: () => void;
 };
 
 export const OtpForm = ({
@@ -16,25 +17,15 @@ export const OtpForm = ({
                             isLoading,
                             onOtpChange,
                             onSubmit,
-                            onBack
+                            onBack,
+                            onResend
                         }: Props) => {
-    // 内部では配列で管理（公式推奨）
-    const [pinValue, setPinValue] = useState<string[]>(["", "", "", "", "", ""]);
 
-    // 親のotpが変わったら配列に反映
-    useEffect(() => {
-        const arr = otp.split('').slice(0, 6);
-        const padded = [...arr, ...Array(6 - arr.length).fill('')];
-        setPinValue(padded);
+    // 配列として適切に変換（undefinedを防ぐ）
+    const pinValue = useMemo(() => {
+        const chars = otp.split('');
+        return Array.from({ length: 6 }, (_, i) => chars[i] ?? '');
     }, [otp]);
-
-    const handleValueChange = (details: { value: string[] }) => {
-        // undefined を空文字に変換
-        const safeValue = details.value.map(v => v ?? '');
-        setPinValue(safeValue);
-        // 親には文字列で渡す
-        onOtpChange(safeValue.join(''));
-    };
 
     return (
         <form onSubmit={onSubmit} style={{ width: '100%' }}>
@@ -49,8 +40,18 @@ export const OtpForm = ({
                                 otp
                                 type="alphanumeric"
                                 value={pinValue}
-                                onValueChange={handleValueChange}
+                                onValueChange={(details) => {
+                                    const valueArray = details.value;
+                                    if (Array.isArray(valueArray)) {
+                                        // undefinedを空文字列に置換してから結合
+                                        const newValue = valueArray
+                                            .map(v => v ?? '')
+                                            .join('');
+                                        onOtpChange(newValue);
+                                    }
+                                }}
                                 size="lg"
+                                disabled={isLoading}
                             >
                                 <PinInput.HiddenInput />
                                 <PinInput.Control>
@@ -70,9 +71,20 @@ export const OtpForm = ({
                     w="full"
                     colorPalette="blue"
                     loading={isLoading}
-                    loadingText="確認中..."
+                    loadingText="認証中..."
                 >
-                    ログイン
+                    認証
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onResend}
+                    disabled={isLoading}
+                    fontSize="xs"
+                    color="blue.500"
+                >
+                    コードが届かない場合は再送信
                 </Button>
 
                 <Button
