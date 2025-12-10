@@ -74,14 +74,11 @@ def delete_otp(tenant_id: str, email: str) -> None:
 def lambda_handler(event, context):
     """
     OTPコードの検証
-
-    1. ユーザー入力のOTPを取得
-    2. DynamoDBから保存されたOTPを取得
-    3. 有効期限チェック
-    4. 試行回数チェック
-    5. コード一致チェック
     """
     request = event.get("request", {})
+    # ★修正: responseの初期化を一番上に移動
+    response = event.get("response", {})
+
     user_attributes = request.get("userAttributes", {})
 
     # ユーザー情報
@@ -94,13 +91,21 @@ def lambda_handler(event, context):
     # ユーザーが入力したOTP
     user_answer = request.get("challengeAnswer", "").strip()
 
+    # ★追加: 再送信リクエストの検知
+    if user_answer == "RESEND":
+        logger.info("再送信リクエストを受信しました", action_category="AUTH")
+        # 認証は「失敗」扱いにすることで define_auth に戻すが
+        # DynamoDBの試行回数は増やさない
+        response["answerCorrect"] = False
+        event["response"] = response
+        return event
+
     # privateChallengeParameters から期待値を取得（バックアップ）
     private_params = request.get("privateChallengeParameters", {})
     expected_answer = private_params.get("answer")
 
     logger.info("OTP検証を開始", action_category="AUTH")
 
-    response = event.get("response", {})
     answer_correct = False
 
     try:

@@ -55,85 +55,8 @@ def send_otp_email(email: str, otp: str) -> None:
     subject = "【認証コード】ログイン確認"
 
     # プレーンテキスト版（シンプルに）
-    body_text = (
-        "ログイン認証コードのお知らせ\n\n"
-        f"認証コード: {otp}\n"
-        f"このコードは {OTP_EXPIRY_SECONDS // 60} 分間有効です。\n\n"
-        "心当たりがない場合は、このメールは破棄してください。\n"
+    body_text = (otp
     )
-
-    # HTML版（ギャル仕様💅）
-    body_html = f"""
-<html>
-<head></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #fff4fb; padding: 24px; color: #333;">
-  <div style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; padding: 24px 22px 20px; box-shadow: 0 6px 18px rgba(255,105,180,0.25); border: 1px solid #ffd5ef;">
-    
-    <!-- ヘッダー -->
-    <div style="text-align: center; margin-bottom: 12px;">
-      <div style="font-size: 40px; margin-bottom: 6px;">💖🔐✨</div>
-      <h2 style="margin: 0; font-size: 22px; letter-spacing: 1px;">
-        ログイン認証コードだよ〜💅
-      </h2>
-      <p style="margin: 8px 0 0; font-size: 13px; color: #777; line-height: 1.6;">
-        安心・安全にログインするための<br/>
-        ワンタイムパスコード送るね💌
-      </p>
-    </div>
-
-    <hr style="border: none; border-top: 1px dashed #ffc3e5; margin: 18px 0;" />
-
-    <!-- 説明 -->
-    <p style="font-size: 14px; line-height: 1.8; margin: 0 0 12px;">
-      下の <span style="font-weight: 600;">認証コード</span> を<br/>
-      ログイン画面にそのまま入力してね〜😉💫<br/>
-      コピペしてもぜんぜんOKだよ✂️
-    </p>
-
-    <!-- OTP 本体 -->
-    <div style="
-      background: linear-gradient(135deg, #ffe6f5, #ffeefc);
-      padding: 22px 16px;
-      text-align: center;
-      font-size: 32px;
-      letter-spacing: 12px;
-      margin: 20px 0 14px;
-      border-radius: 14px;
-      border: 1px solid #ffb6e1;
-      color: #d9007b;
-      text-shadow: 0 0 4px rgba(255,255,255,0.9);
-    ">
-      <strong style="font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;">{otp}</strong>
-    </div>
-
-    <!-- 有効期限とか -->
-    <p style="font-size: 14px; margin: 0 0 6px;">
-      ⏰ このコードは <strong style="color:#d9007b;">{OTP_EXPIRY_SECONDS // 60}分間だけ</strong> 有効だよ〜！
-    </p>
-    <p style="font-size: 13px; margin: 0 0 16px; color: #777;">
-      時間オーバーしちゃったら、<br/>
-      もう一回コード発行してあげてね🙇‍♀️💦
-    </p>
-
-    <!-- 注意ボックス -->
-    <div style="background-color: #fff7e0; border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #8a6d3b; border: 1px solid #ffe1a8; margin-bottom: 16px; line-height: 1.7;">
-      ⚠️ <strong>心当たりない人へ</strong><br/>
-      「え、ログインしようとしてないんだけど？」って人は、<br/>
-      このメールはそっと閉じちゃってOKだよ🙅‍♀️<br/>
-      もし変なアクセスが続くようなら、<br/>
-      すぐに管理者さんに相談してね📢
-    </div>
-
-    <!-- フッター -->
-    <p style="font-size: 12px; color: #999; margin: 0; text-align: center; line-height: 1.7;">
-      いつも利用してくれてありがと〜🫶💗<br/>
-      このメールは自動送信だから、お返事はできないの🥺<br/>
-      なにかあれば、別途サポート窓口に連絡してね📮
-    </p>
-  </div>
-</body>
-</html>
-"""
 
     ses.send_email(
         Source=SENDER_EMAIL,
@@ -142,7 +65,6 @@ def send_otp_email(email: str, otp: str) -> None:
             "Subject": {"Data": subject, "Charset": "UTF-8"},
             "Body": {
                 "Text": {"Data": body_text, "Charset": "UTF-8"},
-                "Html": {"Data": body_html, "Charset": "UTF-8"},
             },
         },
     )
