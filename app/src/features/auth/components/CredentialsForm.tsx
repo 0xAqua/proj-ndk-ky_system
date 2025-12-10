@@ -51,7 +51,7 @@ export const CredentialsForm = ({
                     loading={isLoading}
                     loadingText="認証中..."
                 >
-                    次へ
+                    ログイン
                 </Button>
             </VStack>
         </form>

@@ -1,32 +1,34 @@
 import { VStack, Text, Image, Link, Center, Spinner } from "@chakra-ui/react";
 import logo from '@/assets/logo.png';
 import { useLoginForm } from "./hooks/useLoginForm.ts";
-import { PasskeyPromotionModal } from "./components/PasskeyPromotionModal.tsx";
 import { CredentialsForm } from "./components/CredentialsForm.tsx";
-import { OtpForm } from "./components/OtpForm.tsx";
-import { PasskeyLoginButton } from "./components/PasskeyLoginButton.tsx";
+
+// 将来使うかもしれないのでimportだけ残してコメントアウトするか、完全に消してもOKです
+// import { PasskeyPromotionModal } from "./components/PasskeyPromotionModal.tsx";
+// import { OtpForm } from "./components/OtpForm.tsx";
+// import { PasskeyLoginButton } from "./components/PasskeyLoginButton.tsx";
 
 export const LoginForm = () => {
     const {
-        step,
+        // step, // 今回はstepによる画面切り替えを行わないため未使用
         username,
         setUsername,
         password,
         setPassword,
-        otp,
-        setOtp,
+        // otp,          // 未使用
+        // setOtp,       // 未使用
         handleLogin,
-        handleVerifyOtp,
+        // handleVerifyOtp,     // 未使用
         isLoading,
         error,
         isCheckingSession,
-        showPasskeyModal,
-        setShowPasskeyModal,
-        handlePasskeyLogin,
-        handleModalComplete,
-        handleBackToLogin,
-        handleResend,
-        resendMessage
+        // showPasskeyModal,    // 未使用
+        // setShowPasskeyModal, // 未使用
+        // handlePasskeyLogin,  // 未使用
+        // handleModalComplete, // 未使用
+        // handleBackToLogin,   // 未使用
+        // handleResend,        // 未使用
+        // resendMessage        // 未使用
     } = useLoginForm();
 
     if (isCheckingSession) {
@@ -39,14 +41,9 @@ export const LoginForm = () => {
 
     return (
         <>
-            <PasskeyPromotionModal
-                isOpen={showPasskeyModal}
-                onClose={() => {
-                    setShowPasskeyModal(false);
-                    handleModalComplete();
-                }}
-                onComplete={handleModalComplete}
-            />
+            {/* ★Passkey訴求モーダルは削除（またはコメントアウト） */}
+            {/* <PasskeyPromotionModal ... /> */}
+
             <VStack gap={6}>
                 <Image src={logo} alt="KY System logo" width="78px" mt="4" />
                 <Text fontSize="2xl" fontWeight="bold" mb="2" mt="2">
@@ -57,66 +54,43 @@ export const LoginForm = () => {
                     <Text fontSize="sm" color="gray.600">
                         危険予知システムへようこそ
                     </Text>
-                    {step === 'INPUT_CREDENTIALS' ? (
-                        <Text fontSize="sm" color="gray.600">ログイン情報を入力してください</Text>
-                    ) : (
-                        <Text fontSize="sm" color="gray.600">メールに届いた6桁のコードを入力してください</Text>
-                    )}
+                    {/* 文言も固定化 */}
+                    <Text fontSize="sm" color="gray.600">ログイン情報を入力してください</Text>
                 </VStack>
 
-                {/* エラー表示エリア (赤) */}
+                {/* エラー表示エリア */}
                 {error && (
                     <Text color="red.500" fontSize="sm" textAlign="center" fontWeight="bold">
                         {error}
                     </Text>
                 )}
 
-                {/* ★追加: 再送信成功メッセージ (緑) - OTP画面時のみ */}
-                {step === 'INPUT_OTP' && resendMessage && (
-                    <Text color="green.500" fontSize="sm" textAlign="center" fontWeight="bold">
-                        {resendMessage}
-                    </Text>
-                )}
+                {/* ★OTP再送信メッセージ表示エリアは削除 */}
 
-                {/* Step 1: ID/PASS入力フォーム */}
-                {step === 'INPUT_CREDENTIALS' && (
-                    <>
-                        <CredentialsForm
-                            username={username}
-                            password={password}
-                            isLoading={isLoading}
-                            onUsernameChange={setUsername}
-                            onPasswordChange={setPassword}
-                            onSubmit={handleLogin}
-                        />
-                        <PasskeyLoginButton
-                            isLoading={isLoading}
-                            onClick={handlePasskeyLogin}
-                        />
-                    </>
-                )}
+                {/* Step 1: ID/PASS入力フォーム (条件分岐を外して常に表示) */}
+                <CredentialsForm
+                    username={username}
+                    password={password}
+                    isLoading={isLoading}
+                    onUsernameChange={setUsername}
+                    onPasswordChange={setPassword}
+                    onSubmit={handleLogin}
+                />
 
-                {/* Step 2: OTP入力フォーム */}
-                {step === 'INPUT_OTP' && (
-                    <OtpForm
-                        username={username}
-                        otp={otp}
-                        isLoading={isLoading}
-                        onOtpChange={setOtp}
-                        onSubmit={handleVerifyOtp}
-                        onBack={handleBackToLogin}
-                        // ★追加: 再送信機能
-                        onResend={handleResend}
-                    />
-                )}
+                {/* ★Passkeyログインボタンは削除 */}
+                {/* <PasskeyLoginButton ... /> */}
 
-                {step === 'INPUT_CREDENTIALS' && (
-                    <Text textAlign="left" mt={2} fontSize="sm">
-                        <Link color="blue.500" href="#">
-                            パスワードをお忘れですか？
-                        </Link>
-                    </Text>
-                )}
+
+                {/* ★Step 2: OTP入力フォームは削除（将来復活する場合はここに戻す） */}
+                {/* {step === 'INPUT_OTP' && ( ... )} */}
+
+
+                {/* パスワード忘れリンク */}
+                <Text textAlign="left" mt={2} fontSize="sm">
+                    <Link color="blue.500" href="#">
+                        パスワードをお忘れですか？
+                    </Link>
+                </Text>
             </VStack>
         </>
     );
