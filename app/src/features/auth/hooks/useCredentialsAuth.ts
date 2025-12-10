@@ -2,9 +2,7 @@ import { useState } from "react";
 import { signIn } from "aws-amplify/auth";
 import { getAuthErrorMessage } from "@/features/auth/utils/authErrors";
 
-type OnOtpRequired = () => void;
-
-export const useCredentialsAuth = (onOtpRequired: OnOtpRequired) => {
+export const useCredentialsAuth = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -22,27 +20,37 @@ export const useCredentialsAuth = (onOtpRequired: OnOtpRequired) => {
         setError(null);
 
         try {
+            // ★変更1: authFlowType: "CUSTOM_WITH_SRP" を削除
+            // これにより標準のパスワード認証 (USER_SRP_AUTH) が行われます
             const { nextStep } = await signIn({
                 username,
                 password,
-                options: {
-                    authFlowType: "CUSTOM_WITH_SRP"
-                }
             });
 
-            // パスワード認証成功後、Custom Authフロー（OTP）へ遷移することを確認
-            if (nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE') {
-                console.log("Password verified, OTP sent.");
-                onOtpRequired();
+            // ★変更2: パスワードだけで完了 (DONE) した場合を成功とする
+            if (nextStep.signInStep === 'DONE') {
+                console.log("Login successful.");
+                // AmplifyのAuth状態が更新されるため、
+                // アプリケーション側（App.tsxなど）でログイン状態を検知して画面遷移します。
+
+                // 明示的にリロードが必要な構成ならここで行いますが、通常はそのままでOK
+                window.location.href = "/";
+            }
+            // もし何らかの理由でMFAが要求された場合のハンドリング
+            else if (
+                nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE' ||
+                nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' ||
+                nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_SMS_CODE'
+            ) {
+                console.warn("MFA required but UI is hidden.");
+                setError("MFA設定が有効になっていますが、現在のログイン画面は対応していません。管理者に連絡してください。");
             } else {
-                // セキュリティ要件: OTPフロー以外の完了は認めない
-                console.error("Unexpected step in Password Flow:", nextStep.signInStep);
-                setError("認証エラー: 二要素認証がスキップされました。システム管理者に連絡してください。");
+                console.error("Unexpected step:", nextStep.signInStep);
+                setError("予期せぬログインステータスです。");
             }
 
         } catch (err: any) {
             console.error("Sign in failed:", err);
-            // ★変更: 共通ユーティリティでメッセージ変換
             const message = getAuthErrorMessage(err);
             setError(message);
         } finally {
