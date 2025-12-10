@@ -55,11 +55,7 @@ def send_otp_email(email: str, otp: str) -> None:
     subject = "【認証コード】ログイン確認"
 
     # プレーンテキスト版（シンプルに）
-    body_text = (
-        "ログイン認証コード"
-        f"認証コード: {otp}\n"
-        f"このコードは {OTP_EXPIRY_SECONDS // 60} 分間有効です。\n\n"
-        "心当たりがない場合は、このメールは破棄してください。\n"
+    body_text = (otp
     )
 
     ses.send_email(
