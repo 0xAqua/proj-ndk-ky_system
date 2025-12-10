@@ -15,6 +15,9 @@ export const useLoginForm = () => {
     const [showPasskeyModal, setShowPasskeyModal] = useState(false);
     const [isCheckingSession, setIsCheckingSession] = useState(true);
 
+    // ★追加: デバイス記憶のチェック状態管理
+    const [rememberDevice, setRememberDevice] = useState(false);
+
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
@@ -35,13 +38,10 @@ export const useLoginForm = () => {
         setShowPasskeyModal(true);
     };
 
-    const handleOtpRequired = () => {
-        setStep('INPUT_OTP');
-    };
-
     // 各認証hookを初期化
-    // ※ useCredentialsAuth の更新（rememberDevice受け渡し）がまだの場合は、引数に追加せずそのままでOKです
-    const credentialsAuth = useCredentialsAuth(handleOtpRequired);
+    // ★修正: rememberDevice を第2引数として渡す
+    const credentialsAuth = useCredentialsAuth();
+
     const otpAuth = useOtpAuth(handleSuccess, handlePasskeyPrompt);
     const passkeyAuth = usePasskeyAuth(handleSuccess);
 
@@ -90,13 +90,17 @@ export const useLoginForm = () => {
         setPassword: credentialsAuth.setPassword,
         handleLogin: credentialsAuth.handleLogin,
 
+        // ★追加: UI側でチェックボックスをバインドするために公開
+        rememberDevice,
+        setRememberDevice,
+
         // OTP
         otp: otpAuth.otp,
         setOtp: otpAuth.setOtp,
         handleVerifyOtp: otpAuth.handleVerifyOtp,
         handleBackToLogin,
 
-        // ★追加: 再送信機能（useOtpAuthから取得）
+        // 再送信機能
         handleResend: otpAuth.handleResend,
         resendMessage: otpAuth.resendMessage,
 
