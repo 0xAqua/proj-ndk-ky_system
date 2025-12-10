@@ -28,11 +28,15 @@ resource "aws_cognito_user_pool" "this" {
   # ─────────────────────────────
   # MFA設定
   # ─────────────────────────────
-  mfa_configuration = "OPTIONAL"
+  mfa_configuration = var.is_mfa_enabled ? "OPTIONAL" : "OFF"
 
-  software_token_mfa_configuration {
-    enabled = true
+  dynamic "software_token_mfa_configuration" {
+    for_each = var.is_mfa_enabled ? [1] : []
+    content {
+      enabled = true
+    }
   }
+
   # ─────────────────────────────
   # Passkey (WebAuthn) 設定
   # ドメイン取得後に有効化

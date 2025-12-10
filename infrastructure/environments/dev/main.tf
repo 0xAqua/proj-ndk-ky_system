@@ -38,6 +38,8 @@ module "auth" {
     "https://${module.frontend.cloudfront_domain}"
   ]
 
+  # Passkeyの有無
+  is_mfa_enabled = var.enable_advanced_auth
   # Email OTP トリガー（Step 2で有効化）
   define_auth_lambda_arn = module.auth_challenge.define_auth_lambda_arn
   create_auth_lambda_arn = module.auth_challenge.create_challenge_lambda_arn

@@ -73,3 +73,10 @@ variable "webauthn_relying_party_id" {
   description = "WebAuthn Relying Party ID (frontend domain)"
   type        = string
 }
+
+variable "is_mfa_enabled" {
+  description = "MFA設定を有効にするかどうか (true=OPTIONAL, false=OFF)"
+  type        = bool
+  default     = false
+}
+
