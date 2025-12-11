@@ -2,11 +2,14 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser } from "aws-amplify/auth";
 import { Spinner, Center } from "@chakra-ui/react";
+import { useAutoLogout } from "@/features/auth/hooks/useAutoLogout";
 
 export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     const [isChecked, setIsChecked] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
+
+    useAutoLogout();
 
     useEffect(() => {
         const checkAuth = async () => {
