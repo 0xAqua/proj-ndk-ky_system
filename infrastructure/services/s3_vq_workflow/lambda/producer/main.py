@@ -115,6 +115,7 @@ def handle_post(event, context):
         job_id = tid  # 今回はtidを主キーとする
 
         # DynamoDB登録
+        # ★修正: Workerのリトライロジックに合わせて retry_count: 0 を初期設定に追加
         item = {
             'job_id': job_id,
             'tenant_id': tenant_id,
@@ -123,6 +124,7 @@ def handle_post(event, context):
             'mid': mid,
             'input_message': input_message,
             'status': 'PENDING',
+            'retry_count': 0,
             'created_at': int(time.time()),
             'updated_at': int(time.time())
         }
@@ -195,6 +197,7 @@ def handle_get(event, context):
 
         logger.info("ジョブを取得しました", action_category="EXECUTE", job_id=job_id)
 
+        # error_msg や retry_count がある場合もそのまま返却されます
         return {
             "statusCode": 200,
             "headers": {"Content-Type": "application/json"},
