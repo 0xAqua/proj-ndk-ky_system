@@ -18,15 +18,13 @@ import type { IncidentData, RawIncident } from "@/features/result/types";
 export const ResultForm = () => {
 
     const location = useLocation();
-    const jobId = location.state?.jobId as string | undefined;
+    // stateがnullの場合も考慮して安全に取得
+    const state = location.state as { jobId?: string } | null;
+    const jobId = state?.jobId;
 
-    if (!jobId) {
-        return <Navigate to="/" replace />;
-    }
-
-    // ① Hooks
+    // jobIdがない場合は空文字を渡してクラッシュを防ぐ（実際には直後にリダイレクトされるためAPIは走りきりません）
     const { status, result, error, isLoading } = useJobResult({
-        jobId,
+        jobId: jobId ?? "",
         intervalMs: 3000,
     });
 
@@ -44,6 +42,14 @@ export const ResultForm = () => {
         [rawIncidents],
     );
 
+    // ──────────────────────────────────────────
+    // ★ここでリダイレクト判定
+    // ──────────────────────────────────────────
+    if (!jobId) {
+        // jobIdがないなら強制的にトップへ戻す（履歴も置き換え）
+        return <Navigate to="/" replace />;
+    }
+
     const handleCaseClick = (caseId: string) => {
         setSelectedCases((prev) =>
             prev.includes(caseId)
@@ -52,7 +58,9 @@ export const ResultForm = () => {
         );
     };
 
-    // ② 描画分岐
+    // ──────────────────────────────────────────
+    // 描画分岐
+    // ──────────────────────────────────────────
 
     // ローディング
     if (isLoading && !result && !error) {
