@@ -277,7 +277,6 @@ module "s4_log_archiver" {
     "/aws/lambda/${local.project}-${local.environment}-s3-vq-producer",
     "/aws/lambda/${local.project}-${local.environment}-s3-vq-worker",
     "/aws/lambda/${local.project}-${local.environment}-s4-log",
-    "/aws/lambda/${local.project}-${local.environment}-dev-api",
     "/aws/lambda/${local.project}-${local.environment}-auth-create-challenge",
     "/aws/lambda/${local.project}-${local.environment}-auth-define-auth",
     "/aws/lambda/${local.project}-${local.environment}-auth-verify-challenge"
