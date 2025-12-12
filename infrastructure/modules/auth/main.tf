@@ -52,7 +52,7 @@ resource "aws_cognito_user_pool" "this" {
 
   # パスワードポリシー（強化済み）
   password_policy {
-    minimum_length    = 12
+    minimum_length    = 10
     require_lowercase = true
     require_numbers   = true
     require_symbols   = true
@@ -139,14 +139,14 @@ resource "aws_cognito_user_pool_client" "web" {
   prevent_user_existence_errors = "ENABLED"
 
   # トークン有効期限
-  access_token_validity  = 60   # 分
-  id_token_validity      = 60   # 分
-  refresh_token_validity = 30   # 日
+  # access_token_validity  = 60   # 分
+  # id_token_validity      = 60   # 分
+  # refresh_token_validity = 30   # 日
 
-  # access_token_validity  = 15   # 15分
-  # id_token_validity      = 15   # 15分
-  # refresh_token_validity = 1    # 1日
-  #
+  access_token_validity  = 15   # 15分
+  id_token_validity      = 15   # 15分
+  refresh_token_validity = 1    # 1日
+
   token_validity_units {
     access_token  = "minutes"
     id_token      = "minutes"
