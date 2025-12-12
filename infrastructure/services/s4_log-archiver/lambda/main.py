@@ -133,15 +133,7 @@ def lambda_handler(event, context):
             return
 
         results = response["results"]
-        # === テスト用コード開始: 検索結果を無視して、不正なログ1件に差し替える ===
-        results = [
-            [
-                {'field': '@timestamp', 'value': '2025-12-11T12:00:00.000Z'},
-                {'field': 'tenant_id',  'value': 'TEST_JSON_ERROR_TENANT'},
-                {'field': '@message',   'value': 'このメッセージはJSON形式ではありません！ただのテキストです。'}
-            ]
-        ]
-        # === テスト用コード終了 ===
+
         logger.info("ログを取得しました", action_category="BATCH", log_count=len(results))
 
         # 5. DynamoDBへ書き込み
