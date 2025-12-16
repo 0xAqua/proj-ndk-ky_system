@@ -82,7 +82,7 @@ export const SiteConditionConfirmModal = ({
                         <VStack align="stretch" gap={6}>
                             <Box bg="orange.50" p={4} borderRadius="md">
                                 <Text fontSize="sm" color="orange.800" fontWeight="bold">
-                                    以下の内容で検索します。よろしいですか？
+                                    以下の内容でよろしいですか？
                                 </Text>
                             </Box>
 
@@ -258,7 +258,7 @@ export const SiteConditionConfirmModal = ({
                                 px={8}
                                 boxShadow="0 2px 8px rgba(52, 199, 89, 0.3)"
                             >
-                                検索
+                                確定する
                             </Button>
                         </Flex>
                     </Dialog.Footer>
