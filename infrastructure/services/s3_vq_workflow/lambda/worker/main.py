@@ -116,7 +116,7 @@ def is_valid_content(content):
         return False
 
 
-def recreate_job(creds, old_job_item, tenant_id):
+def recreate_job(creds, old_job_item, tenant_id, error_reason=None):
     """JSONが不正だった場合にジョブを作り直す"""
     logger.info("ジョブを再作成します", action_category="EXECUTE", old_tid=old_job_item['tid'])
 
@@ -142,15 +142,27 @@ def recreate_job(creds, old_job_item, tenant_id):
 
     logger.info("新しいIDを取得しました", action_category="EXECUTE", new_tid=new_tid)
 
-    # DynamoDB更新 (tid/midを新しいものに書き換え)
+    # DynamoDB更新
+    # error_reasonがある場合は error_msg カラムも更新する
+    update_expression = "set tid=:t, mid=:m, #st=:s, updated_at=:u, retry_count=if_not_exists(retry_count, :zero) + :inc"
+    expression_values = {
+        ':t': new_tid,
+        ':m': new_mid,
+        ':s': 'PENDING',
+        ':u': int(time.time()),
+        ':zero': 0,
+        ':inc': 1
+    }
+
+    if error_reason:
+        update_expression += ", error_msg=:e"
+        expression_values[':e'] = error_reason
+
     table.update_item(
         Key={'job_id': old_job_item['job_id']},
-        UpdateExpression="set tid=:t, mid=:m, #st=:s, updated_at=:u, retry_count=if_not_exists(retry_count, :zero) + :inc",
+        UpdateExpression=update_expression,
         ExpressionAttributeNames={'#st': 'status'},
-        ExpressionAttributeValues={
-            ':t': new_tid, ':m': new_mid, ':s': 'PENDING',
-            ':u': int(time.time()), ':zero': 0, ':inc': 1
-        }
+        ExpressionAttributeValues=expression_values
     )
 
     # 新しいSQSメッセージを送信 (Worker自身へ再送)
@@ -218,7 +230,7 @@ def lambda_handler(event, context):
                 )
                 return
 
-                # 3. 完了時の検証
+            # 3. 完了時の検証
             result_reply = data.get('reply', '')
 
             if is_valid_content(result_reply):
@@ -263,7 +275,7 @@ def lambda_handler(event, context):
 
                     # まだ上限に達していなければ再作成
                     logger.info("リトライ中", action_category="BATCH", retry_count=current_retry + 1)
-                    recreate_job(creds, current_item, tenant_id)
+                    recreate_job(creds, current_item, tenant_id, error_reason="Validation failed: Invalid JSON format.")
 
         except Exception as e:
             # 待機用の例外チェックは不要になったので削除し、予期せぬエラーのみを扱う
