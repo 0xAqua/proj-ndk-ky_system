@@ -1,5 +1,5 @@
 import { VStack, Text, Image, Link, Center, Spinner } from "@chakra-ui/react";
-import logo from '@/assets/logo.png';
+import logo from '@/assets/logo.jpg';
 import { useLoginForm } from "./hooks/useLoginForm.ts";
 import { CredentialsForm } from "./components/CredentialsForm.tsx";
 

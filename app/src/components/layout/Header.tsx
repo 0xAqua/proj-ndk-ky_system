@@ -4,7 +4,7 @@ import { signOut, fetchUserAttributes } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useUserStore } from "@/stores/useUserStore";
-import logo from '@/assets/logo.png';
+import logo from '@/assets/logo.jpg';
 
 import { Avatar } from "@/components/ui/avatar";
 import {
