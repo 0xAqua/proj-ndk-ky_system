@@ -214,6 +214,8 @@ resource "aws_lambda_function" "worker" {
   source_code_hash = data.archive_file.worker_zip.output_base64sha256
   kms_key_arn = var.lambda_kms_key_arn
 
+  reserved_concurrent_executions = 10
+
   environment {
     variables = {
       JOB_TABLE_NAME   = var.job_table_name
