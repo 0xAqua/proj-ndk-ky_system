@@ -167,7 +167,7 @@ export const EntryForm = () => {
                     onClick={handleCheckAndOpen}
                     loading={isSubmitting}
                 >
-                    登録内容を確認
+                    入力内容の確認
                 </SubmitButton>
 
                 <SiteConditionConfirmModal

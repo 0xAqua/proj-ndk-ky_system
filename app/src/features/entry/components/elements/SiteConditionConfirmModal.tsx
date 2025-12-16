@@ -75,14 +75,14 @@ export const SiteConditionConfirmModal = ({
                     mx={4}
                 >
                     <Dialog.Header fontWeight="bold" fontSize="lg" py={4}>
-                        <Text>登録内容の確認</Text>
+                        <Text>入力内容の確認</Text>
                     </Dialog.Header>
 
                     <Dialog.Body py={6}>
                         <VStack align="stretch" gap={6}>
                             <Box bg="orange.50" p={4} borderRadius="md">
                                 <Text fontSize="sm" color="orange.800" fontWeight="bold">
-                                    以下の内容で登録します。よろしいですか？
+                                    以下の内容でよろしいですか？
                                 </Text>
                             </Box>
 
