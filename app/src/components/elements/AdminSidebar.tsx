@@ -63,10 +63,10 @@ const NavItem = ({ icon, to, label, isExpanded, isExternal, iconColor, iconBg }:
                                     cursor="pointer"
                                     borderRadius="lg"
                                     transition="all 0.2s"
-                                    bg={activeState ? "orange.100" : "transparent"}
+                                    bg={activeState ? "#f5f0e8" : "transparent"}
                                     color="black"
                                     _hover={{
-                                        bg: activeState ? "orange.200" : "orange.50",
+                                        bg: activeState ? "#ebe5db" : "#faf5f0",
                                     }}
                                     overflow="hidden"
                                     position="relative"
