@@ -62,7 +62,6 @@ def handle(event, ctx):
                 {"Name": "given_name", "Value": given_name},
                 {"Name": "family_name", "Value": family_name},
                 {"Name": "custom:tenant_id", "Value": tenant_id},
-                {"Name": "custom:user_id", "Value": user_id},
             ],
             MessageAction="SUPPRESS"
         )
