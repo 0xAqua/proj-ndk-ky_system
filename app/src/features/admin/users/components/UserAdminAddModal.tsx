@@ -28,6 +28,8 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
     const [password, setPassword] = useState("");
     const [role, setRole] = useState<"admin" | "user">("user");
 
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
     const resetForm = () => {
         setFamilyName("");
         setGivenName("");
@@ -36,24 +38,50 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
         setPassword("");
         setRole("user");
     };
+    const validate = (): string | null => {
+        if (!familyName.trim()) return "姓を入力してください";
+        if (!givenName.trim()) return "名を入力してください";
+        if (!department.trim()) return "部署を入力してください";
+        if (!email.trim()) return "Emailを入力してください";
+        if (!password) return "パスワードを入力してください";
+
+        if (password.length < 10 || password.length > 64) {
+            return "パスワードは10文字以上64文字以下で入力してください";
+        }
+
+        return null;
+    };
 
     const handleSubmit = () => {
+        const error = validate();
+        if (error) {
+            setErrorMessage(error);
+            return;
+        }
+
+        setErrorMessage(null);
+
         mutate(
             {
                 email,
                 password,
                 family_name: familyName,
                 given_name: givenName,
-                departments: {
-                    main: department,
-                },
+                departments: { main: department },
                 role,
             },
             {
                 onSuccess: () => {
                     resetForm();
                     onClose();
-                },            }
+                },
+                onError: (error: any) => {
+                    const message =
+                        error?.response?.data?.message ??
+                        "登録に失敗しました。入力内容を確認してください。";
+                    setErrorMessage(message);
+                },
+            }
         );
     };
 
@@ -63,6 +91,18 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
             <DialogContent>
                 <DialogHeader>
                     <Heading size="lg">ユーザーを追加</Heading>
+                    {errorMessage && (
+                        <Box
+                            bg="red.50"
+                            border="1px solid"
+                            borderColor="red.200"
+                            borderRadius="md"
+                            px={3}
+                            py={2}
+                        >
+                            {errorMessage}
+                        </Box>
+                    )}
 
                     <DialogCloseTrigger>
                         <Box
