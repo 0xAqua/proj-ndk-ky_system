@@ -114,7 +114,7 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
             },
             {
                 onSuccess: () => {
-                    notify.success("ユーザーを追加しました"); // ← グローバル通知
+                    notify.success("ユーザーを追加しました");
                     resetForm();
                     onClose();
                 },
