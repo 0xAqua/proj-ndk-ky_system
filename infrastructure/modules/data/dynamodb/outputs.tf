@@ -56,3 +56,5 @@ output "tenant_master_table_name" {
 output "tenant_master_table_arn" {
   value = aws_dynamodb_table.tenant_master.arn
 }
+
+

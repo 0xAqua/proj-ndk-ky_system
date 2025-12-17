@@ -146,6 +146,30 @@ module "s5_admin_user" {
   lambda_kms_key_arn = module.kms.lambda_key_arn
 }
 
+
+# ─────────────────────────────
+# 6-6. バックエンドサービス (S6 VQ Jobs)
+# ─────────────────────────────
+module "s6_vq_jobs" {
+  source = "../../services/s6_vq-jobs"
+
+  project     = local.project
+  environment = local.environment
+  name_prefix = "${local.project}-${local.environment}-s6-vq-jobs"
+
+  # API Gateway
+  api_gateway_id            = module.api_gateway.api_id
+  api_gateway_execution_arn = module.api_gateway.api_execution_arn
+  authorizer_id             = module.api_gateway.authorizer_id
+
+  # DynamoDB
+  tenant_vq_manager_table_name = module.dynamodb.tenant_vq_manager_table_name
+  tenant_vq_manager_table_arn  = module.dynamodb.tenant_vq_manager_table_arn
+
+  # KMS
+  lambda_kms_key_arn = module.kms.lambda_key_arn
+}
+
 # ─────────────────────────────
 # 7. セキュリティ (WAF)
 # ─────────────────────────────
