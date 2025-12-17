@@ -1,10 +1,7 @@
-import { useState } from "react";
-import { Flex, Box, Heading, Text, Button } from "@chakra-ui/react";
-import { PiPlus } from "react-icons/pi";
-import { UserAdminAddModal } from "./UserAdminAddModal";
+import { Flex, Box, Heading, Text } from "@chakra-ui/react";
+
 
 export const UserAdminHeader = () => {
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     return (
         <>
@@ -17,21 +14,8 @@ export const UserAdminHeader = () => {
                         システムを利用するユーザーのアカウント、権限、ステータスを管理します。
                     </Text>
                 </Box>
-                <Button
-                    size="md"
-                    bg="orange.500"
-                    color="white"
-                    _hover={{ bg: "orange.600" }}
-                    _active={{ bg: "orange.700" }}
-                    onClick={() => setIsAddModalOpen(true)}
-                >
-                    <PiPlus />
-                    ユーザーを追加
-                </Button>
 
             </Flex>
-
-            <UserAdminAddModal open={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
         </>
     );
 };

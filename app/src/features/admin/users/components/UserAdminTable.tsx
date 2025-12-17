@@ -18,8 +18,9 @@ import {
     PiCaretRight  // 追加: ページ送りアイコン
 } from "react-icons/pi";
 import { Avatar } from "@/components/ui/avatar";
-import { useDeleteUser } from "@/features/admin/users/hooks/useAdminUsers";
 import type { User } from "@/features/admin/users/types/types";
+
+
 
 const StatusBadge = ({ status }: { status: string }) => {
     const config: Record<string, { color: string; label: string }> = {
@@ -43,24 +44,15 @@ const RoleBadge = ({ role }: { role: string }) => {
 
 type Props = {
     users: User[];
+    onDeleteClick: (userId: string, email: string) => void;
 };
 
 const ITEMS_PER_PAGE = 20;
 
-export const UserAdminTable = ({ users }: Props) => {
-    // --- ページネーション用ロジック ---
+export const UserAdminTable = ({ users, onDeleteClick }: Props) => {
+
     const [currentPage, setCurrentPage] = useState(1);
 
-    const { mutate: deleteUser, isPending: isDeleting } = useDeleteUser();
-
-    const handleDelete = (userId: string, email: string) => {
-        const ok = window.confirm(`${email} を削除します。よろしいですか？`);
-        if (!ok) return;
-
-        deleteUser(userId);
-    };
-
-    
     // 検索などで母数が変わったら1ページ目に戻す
     const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
     useEffect(() => {
@@ -103,7 +95,7 @@ export const UserAdminTable = ({ users }: Props) => {
             <Table.Root size="md" interactive>
                 <Table.Header bg="gray.50">
                     <Table.Row>
-                        <Table.ColumnHeader py={4}>氏名 / メール</Table.ColumnHeader>
+                        <Table.ColumnHeader py={4}>名前 / メール</Table.ColumnHeader>
                         <Table.ColumnHeader>部署</Table.ColumnHeader>
                         <Table.ColumnHeader>権限</Table.ColumnHeader>
                         <Table.ColumnHeader>ステータス</Table.ColumnHeader>
@@ -167,12 +159,10 @@ export const UserAdminTable = ({ users }: Props) => {
                                             <Menu.Item
                                                 value="delete"
                                                 color="red.500"
-                                                onClick={() => handleDelete(user.user_id, user.email)}
-                                                disabled={isDeleting}
+                                                onClick={() => onDeleteClick(user.user_id, user.email)}
                                             >
                                                 <PiTrash /> 削除
                                             </Menu.Item>
-
                                         </Menu.Content>
                                     </Menu.Positioner>
                                 </Menu.Root>
@@ -210,6 +200,8 @@ export const UserAdminTable = ({ users }: Props) => {
                     </HStack>
                 )}
             </Flex>
+
         </>
+
     );
 };

@@ -1,5 +1,5 @@
-import { Button, Box, Input, Heading, VStack, HStack, Text } from "@chakra-ui/react";
-import { PiX } from "react-icons/pi";
+import {Button, Box, Input, Heading, VStack, HStack, Text, Spinner} from "@chakra-ui/react";
+import {PiCheckCircle, PiX} from "react-icons/pi";
 import { Field } from "@/components/ui/field";
 import {
     DialogRoot,
@@ -14,6 +14,7 @@ import { useState } from "react";
 import { useCreateUser } from "@/features/admin/users/hooks/useAdminUsers";
 import { PiCheckBold, PiXBold } from "react-icons/pi";
 import {useNotification} from "@/hooks/useNotification.ts";
+import { motion } from "framer-motion";
 
 interface UserAdminAddModalProps {
     open: boolean;
@@ -24,6 +25,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => {
     const { mutate, isPending } = useCreateUser();
+    const [isSuccess, setIsSuccess] = useState(false); // ← これを追加
 
     const [familyName, setFamilyName] = useState("");
     const [givenName, setGivenName] = useState("");
@@ -114,21 +116,17 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
             },
             {
                 onSuccess: () => {
+                    setIsSuccess(true);
                     notify.success("ユーザーを追加しました");
-                    resetForm();
-                    onClose();
-                },
-                onError: (error: any) => {
-                    const message =
-                        error?.response?.data?.message ??
-                        "登録に失敗しました。入力内容を確認してください。";
-
-                    notify.error(message);
+                    setTimeout(() => {
+                        resetForm();
+                        setIsSuccess(false);
+                        onClose();
+                    }, 1500);
                 },
             }
         );
     };
-
 
     return (
         <DialogRoot open={open} onOpenChange={(e) => !e.open && onClose()} size="lg">
@@ -251,9 +249,21 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
                         <Button
                             colorPalette="blue"
                             onClick={handleSubmit}
-                            disabled={isPending}
+                            disabled={isPending || isSuccess}
                         >
-                            追加
+                            {isPending ? (
+                                <Spinner size="sm" />
+                            ) : isSuccess ? (
+                                <motion.div
+                                    initial={{ scale: 0, rotate: -180 }}
+                                    animate={{ scale: 1, rotate: 0 }}
+                                    transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                                >
+                                    <PiCheckCircle size={20} />
+                                </motion.div>
+                            ) : (
+                                "追加"
+                            )}
                         </Button>
                     </HStack>
                 </DialogFooter>

@@ -51,6 +51,7 @@ const NavItem = ({ icon, to, label, isExpanded, isExternal, iconColor, iconBg }:
                 positioning={{ placement: "right" }}
                 showArrow
                 disabled={isExpanded}
+                openDelay={0}
             >
                 <ChakraLink asChild unstyled>
                     <NavLink to={to} end={to === "/admin"}>
