@@ -28,6 +28,15 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
     const [password, setPassword] = useState("");
     const [role, setRole] = useState<"admin" | "user">("user");
 
+    const resetForm = () => {
+        setFamilyName("");
+        setGivenName("");
+        setDepartment("");
+        setEmail("");
+        setPassword("");
+        setRole("user");
+    };
+
     const handleSubmit = () => {
         mutate(
             {
@@ -41,8 +50,10 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
                 role,
             },
             {
-                onSuccess: onClose,
-            }
+                onSuccess: () => {
+                    resetForm();
+                    onClose();
+                },            }
         );
     };
 
