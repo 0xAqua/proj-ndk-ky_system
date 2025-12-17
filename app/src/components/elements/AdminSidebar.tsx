@@ -8,7 +8,7 @@ import {
     Text,
     Center,
     Icon,
-    IconButton
+    IconButton, Image
 } from "@chakra-ui/react";
 import { Tooltip } from "@/components/ui/tooltip.tsx";
 import { Avatar } from "@/components/ui/avatar.tsx";
@@ -19,12 +19,16 @@ import {
     PiUsers,
     PiFileText,
     PiGear,
+    PiSparkle,
     PiPencilSimple,
     PiListChecks,
     PiList,
     PiSidebarSimple,
+    PiDatabase,
 } from "react-icons/pi";
+import logo from '@/assets/logo.jpg';
 import type { IconType } from "react-icons";
+
 
 // ----------------------------------------------------------------
 // ナビゲーションアイテム
@@ -35,9 +39,11 @@ type NavItemProps = {
     label: string;
     isExpanded: boolean;
     isExternal?: boolean;
+    iconColor?: string;
+    iconBg?: string;
 };
 
-const NavItem = ({ icon, to, label, isExpanded, isExternal }: NavItemProps) => {
+const NavItem = ({ icon, to, label, isExpanded, isExternal, iconColor, iconBg }: NavItemProps) => {
     return (
         <Box w="full" px={2} mb={2}>
             <Tooltip
@@ -57,16 +63,23 @@ const NavItem = ({ icon, to, label, isExpanded, isExternal }: NavItemProps) => {
                                     cursor="pointer"
                                     borderRadius="lg"
                                     transition="all 0.2s"
-                                    bg={activeState ? "gray.100" : "transparent"}
+                                    bg={activeState ? "orange.100" : "transparent"}
                                     color="black"
                                     _hover={{
-                                        bg: activeState ? "gray.300" : "gray.300",
+                                        bg: activeState ? "orange.200" : "orange.50",
                                     }}
                                     overflow="hidden"
                                     position="relative"
                                 >
                                     <Center w="48px" h="40px" flexShrink={0}>
-                                        <Icon as={icon} fontSize="2xl" />
+                                        <Center
+                                            w={iconBg ? "32px" : "auto"}
+                                            h={iconBg ? "32px" : "auto"}
+                                            bg={iconBg}
+                                            borderRadius="full"
+                                        >
+                                            <Icon as={icon} fontSize={iconBg ? "lg" : "2xl"} color={iconColor} />
+                                        </Center>
                                     </Center>
 
                                     <Box
@@ -93,10 +106,20 @@ const NavItem = ({ icon, to, label, isExpanded, isExternal }: NavItemProps) => {
 // サイドバー本体
 // ----------------------------------------------------------------
 export const AdminSidebar = () => {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(() => {
+        return localStorage.getItem("sidebar-expanded") === "true";
+    });
+
+    const toggleExpanded = () => {
+        setIsExpanded((prev) => {
+            const next = !prev;
+            localStorage.setItem("sidebar-expanded", String(next));
+            return next;
+        });
+    };
 
     const COLLAPSED_W = "64px";
-    const EXPANDED_W = "260px";
+    const EXPANDED_W = "240px";
     const width = isExpanded ? EXPANDED_W : COLLAPSED_W;
 
     const user = {
@@ -142,21 +165,22 @@ export const AdminSidebar = () => {
                         whiteSpace="nowrap"
                         transition="all 0.3s cubic-bezier(0.2, 0, 0, 1)"
                         ml={isExpanded ? 2 : 0}
+                        mt={4}
                     >
-                        <Center w="24px" h="24px" bg="black" borderRadius="md" color="white" fontSize="xs" fontWeight="bold" flexShrink={0}>G</Center>
-                        <Text fontWeight="bold" fontSize="lg" color="black">Genba Admin</Text>
+                        <Image src={logo} alt="Logo" h="62px"  objectFit="contain" flexShrink={0} />
                     </Flex>
 
                     {/* 開閉ボタン (常に表示) */}
                     <IconButton
                         aria-label="Toggle Menu"
-                        onClick={() => setIsExpanded(!isExpanded)}
+                        onClick={toggleExpanded}
                         variant="ghost"
                         size="md"
                         color="black"
                         borderRadius="lg"
                         _hover={{ bg: "gray.300" }}
                         transition="all 0.2s"
+                        mt={4}
                     >
                         {isExpanded ? <PiSidebarSimple size={24} style={{ transform: "rotate(180deg)" }} /> : <PiList size={24} />}
                     </IconButton>
@@ -164,10 +188,12 @@ export const AdminSidebar = () => {
                 </Flex>
 
                 {/* 2. ナビゲーションリスト */}
-                <VStack gap={0} flex={1} w="full" align="flex-start" overflowX="hidden">
+                <VStack gap={0} flex={1} w="full" align="flex-start" overflowX="hidden" mt={4}>
                     <NavItem to="/sample" icon={PiSquaresFour} label="ダッシュボード" isExpanded={isExpanded} />
                     <NavItem to="/users" icon={PiUsers} label="ユーザー管理" isExpanded={isExpanded} />
-                    <NavItem to="/result-list" icon={PiListChecks} label="結果一覧" isExpanded={isExpanded} />
+                    <NavItem to="/results" icon={PiListChecks} label="結果一覧" isExpanded={isExpanded} />
+                    <NavItem to="/master" icon={PiDatabase} label="工事マスタ管理" isExpanded={isExpanded} />
+                    <NavItem to="/advanced-settings" icon={PiSparkle} label="高度な設定" isExpanded={isExpanded} />
                     <NavItem to="/logs" icon={PiFileText} label="操作ログ・履歴" isExpanded={isExpanded} />
                 </VStack>
 
@@ -176,7 +202,16 @@ export const AdminSidebar = () => {
 
                     <Box w="full" px={2}><Box w="full" h="1px" bg="gray.200" my={2} /></Box>
 
-                    <NavItem to="/entry" icon={PiPencilSimple} label="入力画面へ" isExpanded={isExpanded} isExternal />
+                    <NavItem
+                        to="/entry"
+                        icon={PiPencilSimple}
+                        label="新規登録"
+                        isExpanded={isExpanded}
+                        isExternal
+                        iconColor="white"
+                        iconBg="orange.500"
+                    />
+
                     <NavItem to="/settings" icon={PiGear} label="設定" isExpanded={isExpanded} />
 
                     <Box w="full" px={2} mt={2}>

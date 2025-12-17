@@ -18,8 +18,12 @@ const customConfig = defineConfig({
             minHeight: "100vh",
             color: "gray.800",
 
-            backgroundImage: "linear-gradient(-45deg, #eff6ff, #dbeafe, #ffedd5, #eff6ff)",
-            backgroundSize: "400% 400%",
+            backgroundColor: "#faf9f7",
+            backgroundImage: `
+            radial-gradient(ellipse at 100% 100%, rgba(191, 219, 254, 0.4) 0%, transparent 50%),
+            linear-gradient(-45deg, #faf9f7, #f5f3ef, #faf5f0, #faf9f7)
+        `,
+            backgroundSize: "100% 100%, 400% 400%",
             animation: "aurora 25s ease infinite",
 
             overflow: "auto",

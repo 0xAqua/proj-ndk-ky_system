@@ -83,8 +83,8 @@ export const Header = () => {
                 </Box>
 
                 {/* 中央：タイトル */}
-                <HStack align="center" gap={2} flex="1" justify="center" overflow="hidden">
-                    <Image src={logo} alt="Logo" h="22px" objectFit="contain" flexShrink={0} />
+                <HStack align="center" gap={3} flex="1" justify="center" overflow="hidden">
+                    <Image src={logo} alt="Logo" h="42px" objectFit="contain" flexShrink={0} />
                     <Text
                         fontSize="sm"
                         fontWeight="bold"
