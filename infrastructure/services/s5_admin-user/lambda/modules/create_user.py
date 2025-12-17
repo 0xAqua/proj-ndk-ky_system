@@ -21,6 +21,7 @@ def create_response(status_code: int, body: dict) -> dict:
 
 
 @tracer.capture_method
+@tracer.capture_method
 def handle(event, ctx):
     """ユーザー新規作成（Cognito + DynamoDB）"""
     tenant_id = ctx["tenant_id"]
@@ -44,6 +45,10 @@ def handle(event, ctx):
     family_name = body["family_name"]
     given_name = body["given_name"]
     departments = body.get("departments", {})
+
+    # COMMONを強制的に追加（全ユーザーに必須）
+    departments["COMMON"] = "共通"
+
     role = body.get("role", "viewer")
 
     user_id = str(uuid.uuid4())
@@ -85,7 +90,7 @@ def handle(event, ctx):
             "email": email,
             "family_name": family_name,
             "given_name": given_name,
-            "departments": departments,
+            "departments": departments,  # COMMONが含まれている
             "role": role,
             "status": "ACTIVE",
             "created_at": now,
@@ -114,7 +119,6 @@ def handle(event, ctx):
         logger.exception("予期しないエラーが発生しました", action_category="ERROR")
         _rollback_cognito_user(email)
         return create_response(500, {"message": "予期しないエラーが発生しました"})
-
 
 def _rollback_cognito_user(email: str):
     """ロールバック: Cognitoユーザー削除"""

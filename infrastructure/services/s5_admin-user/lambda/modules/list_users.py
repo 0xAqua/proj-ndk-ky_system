@@ -33,6 +33,15 @@ def handle(event, ctx):
         )
         users = response.get("Items", [])
 
+        # COMMONを除外（全ユーザーに強制で入るため）
+        for user in users:
+            if "departments" in user:
+                user["departments"] = {
+                    k: v for k, v in user["departments"].items()
+                    if k != "COMMON"
+                }
+
+
         logger.info(f"ユーザー一覧取得完了: {len(users)}件", action_category="EXECUTE")
 
         return create_response(200, {
