@@ -67,13 +67,14 @@ export const AppRoutes = () => {
             />
 
             <Route
-                path="/result-list"
+                path="/results"
                 element={
                     <AuthGuard>
                         <ResultListPage />
                     </AuthGuard>
                 }
             />
+
 
             <Route
                 path="/logs"
