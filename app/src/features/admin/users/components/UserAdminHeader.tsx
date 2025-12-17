@@ -17,9 +17,18 @@ export const UserAdminHeader = () => {
                         システムを利用するユーザーのアカウント、権限、ステータスを管理します。
                     </Text>
                 </Box>
-                <Button colorPalette="blue" size="md" onClick={() => setIsAddModalOpen(true)}>
-                    <PiPlus /> ユーザーを追加
+                <Button
+                    size="md"
+                    bg="orange.500"
+                    color="white"
+                    _hover={{ bg: "orange.600" }}
+                    _active={{ bg: "orange.700" }}
+                    onClick={() => setIsAddModalOpen(true)}
+                >
+                    <PiPlus />
+                    ユーザーを追加
                 </Button>
+
             </Flex>
 
             <UserAdminAddModal open={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
