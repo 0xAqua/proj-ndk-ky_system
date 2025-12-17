@@ -120,6 +120,33 @@ module "s2_tenant_context" {
 }
 
 # ─────────────────────────────
+# 6-5. バックエンドサービス (S5 Admin User)
+# ─────────────────────────────
+module "s5_admin_user" {
+  source = "../../services/s5_admin-user"
+
+  name_prefix = "${local.project}-${local.environment}-s5-admin-user"
+
+  # Cognito
+  user_pool_id  = module.auth.user_pool_id
+  user_pool_arn = module.auth.user_pool_arn
+
+  # DynamoDB
+  tenant_master_table_name      = module.dynamodb.tenant_master_table_name
+  tenant_master_table_arn       = module.dynamodb.tenant_master_table_arn
+  tenant_user_master_table_name = module.dynamodb.tenant_user_master_table_name
+  tenant_user_master_table_arn  = module.dynamodb.tenant_user_master_table_arn
+
+  # API Gateway
+  api_gateway_id            = module.api_gateway.api_id
+  api_gateway_execution_arn = module.api_gateway.api_execution_arn
+  authorizer_id             = module.api_gateway.authorizer_id
+
+  # KMS
+  lambda_kms_key_arn = module.kms.lambda_key_arn
+}
+
+# ─────────────────────────────
 # 7. セキュリティ (WAF)
 # ─────────────────────────────
 module "waf" {

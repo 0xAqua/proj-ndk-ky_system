@@ -48,3 +48,11 @@ output "otp_codes_table_arn" {
   description = "OTP codes table ARN"
   value       = aws_dynamodb_table.otp_codes.arn
 }
+
+output "tenant_master_table_name" {
+  value = aws_dynamodb_table.tenant_master.name
+}
+
+output "tenant_master_table_arn" {
+  value = aws_dynamodb_table.tenant_master.arn
+}
