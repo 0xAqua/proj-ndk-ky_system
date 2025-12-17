@@ -1,4 +1,4 @@
-import { Button, Box, Input, Heading, VStack, HStack } from "@chakra-ui/react";
+import { Button, Box, Input, Heading, VStack, HStack, Text } from "@chakra-ui/react";
 import { PiX } from "react-icons/pi";
 import { Field } from "@/components/ui/field";
 import {
@@ -12,11 +12,15 @@ import {
 } from "@/components/ui/dialog";
 import { useState } from "react";
 import { useCreateUser } from "@/features/admin/users/hooks/useAdminUsers";
+import { PiCheckBold, PiXBold } from "react-icons/pi";
+import {useNotification} from "@/hooks/useNotification.ts";
 
 interface UserAdminAddModalProps {
     open: boolean;
     onClose: () => void;
 }
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => {
     const { mutate, isPending } = useCreateUser();
@@ -27,8 +31,7 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [role, setRole] = useState<"admin" | "user">("user");
-
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const notify = useNotification();
 
     const resetForm = () => {
         setFamilyName("");
@@ -43,6 +46,11 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
         if (!givenName.trim()) return "名を入力してください";
         if (!department.trim()) return "部署を入力してください";
         if (!email.trim()) return "Emailを入力してください";
+
+        if (!EMAIL_REGEX.test(email)) {
+            return "正しいメールアドレス形式で入力してください";
+        }
+
         if (!password) return "パスワードを入力してください";
 
         if (password.length < 10 || password.length > 64) {
@@ -51,15 +59,49 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
 
         return null;
     };
+    const passwordChecks = {
+        length: password.length >= 10 && password.length <= 64,
+        upper: /[A-Z]/.test(password),
+        lower: /[a-z]/.test(password),
+        digit: /\d/.test(password),
+        symbol: /[^A-Za-z0-9]/.test(password),
+    };
+    const PasswordCheckItem = ({
+                                   ok,
+                                   label,
+                               }: {
+        ok: boolean;
+        label: string;
+    }) => (
+        <HStack gap={2} align="center">
+            <Box
+                w="16px"
+                h="16px"
+                borderRadius="full"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                bg={ok ? "green.500" : "transparent"}
+            >
+                {ok ? (
+                    <PiCheckBold size={10} color="white" />
+                ) : (
+                    <PiXBold size={12} color="gray" />
+                )}
+            </Box>
+
+            <Text fontSize="xs" color={ok ? "green.600" : "gray.500"}>
+                {label}
+            </Text>
+        </HStack>
+    );
 
     const handleSubmit = () => {
         const error = validate();
         if (error) {
-            setErrorMessage(error);
+            notify.error(error);
             return;
         }
-
-        setErrorMessage(null);
 
         mutate(
             {
@@ -72,6 +114,7 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
             },
             {
                 onSuccess: () => {
+                    notify.success("ユーザーを追加しました"); // ← グローバル通知
                     resetForm();
                     onClose();
                 },
@@ -79,11 +122,13 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
                     const message =
                         error?.response?.data?.message ??
                         "登録に失敗しました。入力内容を確認してください。";
-                    setErrorMessage(message);
+
+                    notify.error(message);
                 },
             }
         );
     };
+
 
     return (
         <DialogRoot open={open} onOpenChange={(e) => !e.open && onClose()} size="lg">
@@ -91,19 +136,6 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
             <DialogContent>
                 <DialogHeader>
                     <Heading size="lg">ユーザーを追加</Heading>
-                    {errorMessage && (
-                        <Box
-                            bg="red.50"
-                            border="1px solid"
-                            borderColor="red.200"
-                            borderRadius="md"
-                            px={3}
-                            py={2}
-                        >
-                            {errorMessage}
-                        </Box>
-                    )}
-
                     <DialogCloseTrigger>
                         <Box
                             cursor="pointer"
@@ -163,6 +195,29 @@ export const UserAdminAddModal = ({ open, onClose }: UserAdminAddModalProps) => 
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                             />
+
+                            <VStack align="start" mt={2} gap={1}>
+                                <PasswordCheckItem
+                                    ok={passwordChecks.length}
+                                    label="10文字以上64文字以下"
+                                />
+                                <PasswordCheckItem
+                                    ok={passwordChecks.upper}
+                                    label="英大文字を含む"
+                                />
+                                <PasswordCheckItem
+                                    ok={passwordChecks.lower}
+                                    label="英小文字を含む"
+                                />
+                                <PasswordCheckItem
+                                    ok={passwordChecks.digit}
+                                    label="数字を含む"
+                                />
+                                <PasswordCheckItem
+                                    ok={passwordChecks.symbol}
+                                    label="記号を含む"
+                                />
+                            </VStack>
                         </Field>
 
                         {/* Role */}
