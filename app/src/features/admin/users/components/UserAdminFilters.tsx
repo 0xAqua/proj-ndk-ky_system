@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Flex, Box, Input, Button } from "@chakra-ui/react";
 import { PiMagnifyingGlass, PiFunnel } from "react-icons/pi";
 import { UserAdminFilterModal } from "./UserAdminFilterModal";
@@ -44,6 +44,7 @@ export const UserAdminFilters = ({ onSearch }: UserAdminFiltersProps) => {
                         value={searchText}
                         onChange={handleSearchChange}
                     />
+
                 </Box>
 
                 {/* フィルターボタン */}
@@ -54,12 +55,16 @@ export const UserAdminFilters = ({ onSearch }: UserAdminFiltersProps) => {
                     <PiFunnel />
                     フィルター
                 </Button>
+
+
             </Flex>
 
             <UserAdminFilterModal
                 open={isFilterModalOpen}
                 onClose={() => setIsFilterModalOpen(false)}
             />
+
+
         </>
     );
 };

@@ -18,9 +18,8 @@ import {
     PiCaretRight  // 追加: ページ送りアイコン
 } from "react-icons/pi";
 import { Avatar } from "@/components/ui/avatar";
+import { useDeleteUser } from "@/features/admin/users/hooks/useAdminUsers";
 import type { User } from "@/features/admin/users/types/types";
-
-// --- 内部用サブコンポーネント (そのまま維持) ---
 
 const StatusBadge = ({ status }: { status: string }) => {
     const config: Record<string, { color: string; label: string }> = {
@@ -41,7 +40,6 @@ const RoleBadge = ({ role }: { role: string }) => {
     return <Badge colorPalette={color} variant="subtle">{label}</Badge>;
 };
 
-// --- メインコンポーネント ---
 
 type Props = {
     users: User[];
@@ -53,6 +51,16 @@ export const UserAdminTable = ({ users }: Props) => {
     // --- ページネーション用ロジック ---
     const [currentPage, setCurrentPage] = useState(1);
 
+    const { mutate: deleteUser, isPending: isDeleting } = useDeleteUser();
+
+    const handleDelete = (userId: string, email: string) => {
+        const ok = window.confirm(`${email} を削除します。よろしいですか？`);
+        if (!ok) return;
+
+        deleteUser(userId);
+    };
+
+    
     // 検索などで母数が変わったら1ページ目に戻す
     const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
     useEffect(() => {
@@ -156,9 +164,15 @@ export const UserAdminTable = ({ users }: Props) => {
                                             <Menu.Item value="edit">
                                                 <PiPencilSimple /> 編集
                                             </Menu.Item>
-                                            <Menu.Item value="delete" color="red.500">
+                                            <Menu.Item
+                                                value="delete"
+                                                color="red.500"
+                                                onClick={() => handleDelete(user.user_id, user.email)}
+                                                disabled={isDeleting}
+                                            >
                                                 <PiTrash /> 削除
                                             </Menu.Item>
+
                                         </Menu.Content>
                                     </Menu.Positioner>
                                 </Menu.Root>
