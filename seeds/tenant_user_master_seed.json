@@ -9,7 +9,10 @@
     "role": "admin",
     "status": "ACTIVE",
     "created_at": "2025-12-03T00:00:00Z",
-    "updated_at": "2025-12-03T00:00:00Z"
+    "updated_at": "2025-12-03T00:00:00Z",
+    "email": "suzuki.kousuke@ndisol.com",
+    "family_name": "鈴木",
+    "given_name": "宏輔"
   },
   {
     "tenant_id": "tenant-a",
@@ -22,7 +25,10 @@
     "role": "user",
     "status": "ACTIVE",
     "created_at": "2025-12-03T00:00:00Z",
-    "updated_at": "2025-12-03T00:00:00Z"
+    "updated_at": "2025-12-03T00:00:00Z",
+    "email": "ogura.ayaka@ndisol.com",
+    "family_name": "小倉",
+    "given_name": "彩香"
   },
   {
     "tenant_id": "tenant-a",
@@ -34,7 +40,10 @@
     "role": "admin",
     "status": "ACTIVE",
     "created_at": "2025-12-03T00:00:00Z",
-    "updated_at": "2025-12-03T00:00:00Z"
+    "updated_at": "2025-12-03T00:00:00Z",
+    "email": "tsuji.kodai@ndisol.com",
+    "family_name": "辻",
+    "given_name": "航大"
   },
   {
     "tenant_id": "tenant-a",
@@ -46,6 +55,9 @@
     "role": "user",
     "status": "ACTIVE",
     "created_at": "2025-12-03T00:00:00Z",
-    "updated_at": "2025-12-03T00:00:00Z"
+    "updated_at": "2025-12-03T00:00:00Z",
+    "email": "yazama.takako@ndisol.com",
+    "family_name": "矢間",
+    "given_name": "貴子"
   }
 ]
