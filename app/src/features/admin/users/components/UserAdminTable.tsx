@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
     Box,
     Flex,
@@ -13,11 +14,13 @@ import {
     PiDotsThreeOutline,
     PiPencilSimple,
     PiTrash,
+    PiCaretLeft,  // 追加: ページ送りアイコン
+    PiCaretRight  // 追加: ページ送りアイコン
 } from "react-icons/pi";
 import { Avatar } from "@/components/ui/avatar";
 import type { User } from "@/features/admin/users/types/types";
 
-// --- 内部用サブコンポーネント ---
+// --- 内部用サブコンポーネント (そのまま維持) ---
 
 const StatusBadge = ({ status }: { status: string }) => {
     const config: Record<string, { color: string; label: string }> = {
@@ -44,11 +47,35 @@ type Props = {
     users: User[];
 };
 
+const ITEMS_PER_PAGE = 20;
+
 export const UserAdminTable = ({ users }: Props) => {
-    // 氏名を結合して表示
+    // --- ページネーション用ロジック ---
+    const [currentPage, setCurrentPage] = useState(1);
+
+    // 検索などで母数が変わったら1ページ目に戻す
+    const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
+    useEffect(() => {
+        if (currentPage > totalPages && totalPages > 0) {
+            setCurrentPage(1);
+        }
+    }, [users.length, totalPages, currentPage]);
+
+    // 表示データの計算
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const currentUsers = users.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    // フッター表示用の件数
+    const rangeStart = users.length === 0 ? 0 : startIndex + 1;
+    const rangeEnd = Math.min(startIndex + ITEMS_PER_PAGE, users.length);
+
+    // ページ切り替え関数
+    const handlePrev = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
+    const handleNext = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+
+    // --- 表示用ヘルパー ---
     const getFullName = (user: User) => `${user.family_name} ${user.given_name}`;
 
-    // 部署をBadge配列に変換
     const getDepartmentBadges = (departments: Record<string, string>) => {
         return Object.entries(departments).map(([code, name]) => (
             <Badge
@@ -77,7 +104,8 @@ export const UserAdminTable = ({ users }: Props) => {
                     </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                    {users.map((user) => (
+                    {/* currentUsers (20件分) を回す */}
+                    {currentUsers.map((user) => (
                         <Table.Row key={user.user_id} _hover={{ bg: "gray.50" }}>
 
                             {/* 1. 氏名・メール */}
@@ -143,12 +171,30 @@ export const UserAdminTable = ({ users }: Props) => {
             {/* フッター */}
             <Flex p={4} justify="space-between" align="center" borderTopWidth="1px" borderColor="gray.100">
                 <Text fontSize="xs" color="gray.500">
-                    全 {users.length} 件中 1 - {users.length} 件を表示
+                    全 {users.length} 件中 {rangeStart} - {rangeEnd} 件を表示
                 </Text>
-                <HStack>
-                    <Button size="xs" variant="outline" disabled>前へ</Button>
-                    <Button size="xs" variant="outline" disabled>次へ</Button>
-                </HStack>
+
+                {/* 20件より多いときだけボタンを表示 */}
+                {users.length > ITEMS_PER_PAGE && (
+                    <HStack gap={2}>
+                        <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={handlePrev}
+                            disabled={currentPage === 1}
+                        >
+                            <PiCaretLeft /> 前へ
+                        </Button>
+                        <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={handleNext}
+                            disabled={currentPage >= totalPages}
+                        >
+                            次へ <PiCaretRight />
+                        </Button>
+                    </HStack>
+                )}
             </Flex>
         </>
     );

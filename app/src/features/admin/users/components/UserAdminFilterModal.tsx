@@ -84,7 +84,7 @@ export const UserAdminFilterModal = ({ open, onClose }: UserAdminFilterModalProp
                                 bg="white"
                                 fontSize="sm"
                             >
-                                <option value="">全ての権限</option>
+                                <option value=""></option>
                                 <option value="admin">管理者</option>
                                 <option value="user">一般ユーザー</option>
                             </Box>
