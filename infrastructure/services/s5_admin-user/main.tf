@@ -17,6 +17,10 @@ resource "aws_lambda_function" "admin_user" {
   timeout          = 30
   memory_size      = 256
 
+  layers = [
+    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:7"
+  ]
+
   environment {
     variables = {
       USER_POOL_ID              = var.user_pool_id
