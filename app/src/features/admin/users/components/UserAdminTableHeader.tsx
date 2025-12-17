@@ -1,26 +1,57 @@
 import React, { useState } from "react";
 import {Flex, Box, Input, Button} from "@chakra-ui/react";
-import {PiMagnifyingGlass, PiFunnel, PiPlus} from "react-icons/pi";
-import { UserAdminFilterModal } from "./UserAdminFilterModal";
+import {PiMagnifyingGlass, PiFunnel, PiPlus, PiArrowCounterClockwise} from "react-icons/pi";
+import {type FilterConditions, UserAdminFilterModal} from "./UserAdminFilterModal";
 import {UserAdminAddModal} from "@/features/admin/users/components/UserAdminAddModal";
 import {Tooltip} from "@/components/ui/tooltip"
 
 type UserAdminFiltersProps = {
-    onSearch: (text: string) => void; // 検索文字が変わったときに呼ばれる関数
+    onSearch: (text: string) => void;
+    onFilterChange: (filters: FilterConditions) => void;
 };
 
-export const UserAdminTableHeader = ({ onSearch }: UserAdminFiltersProps) => {
+export const UserAdminTableHeader = ({ onSearch, onFilterChange }: UserAdminFiltersProps) => {
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [currentFilters, setCurrentFilters] = useState<FilterConditions>({
+        status: [],
+        departments: [],
+        role: [],
+        sortBy: undefined,      // ← 追加
+        sortOrder: undefined,   // ← 追加
+    });
 
-    // 1. 検索ワードを管理するStateを作成
+    const handleFilterApply = (filters: FilterConditions) => {
+        setCurrentFilters(filters);
+        onFilterChange(filters);
+    };
+
+    // フィルターまたはソートがかかっているかチェック
+    const hasActiveFilters =
+        currentFilters.status.length > 0 ||
+        currentFilters.departments.length > 0 ||
+        currentFilters.role.length > 0 ||
+        currentFilters.sortBy !== undefined;  // ← 追加
+
+    // フィルターとソートをリセット
+    const handleFilterReset = () => {
+        const emptyFilters: FilterConditions = {
+            status: [],
+            departments: [],
+            role: [],
+            sortBy: undefined,      // ← 追加
+            sortOrder: undefined,   // ← 追加
+        };
+        setCurrentFilters(emptyFilters);
+        onFilterChange(emptyFilters);
+    };
+
     const [searchText, setSearchText] = useState("");
 
-    // 2. 入力欄が変わったときの処理
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        setSearchText(value); // 自分のStateを更新（表示用）
-        onSearch(value);      // 親コンポーネントに通知（フィルタ処理用）
+        setSearchText(value);
+        onSearch(value);
     };
 
     return (
@@ -62,7 +93,7 @@ export const UserAdminTableHeader = ({ onSearch }: UserAdminFiltersProps) => {
                     {/* フィルターボタン */}
                     <Tooltip
                         content="フィルター"
-                        positioning={{ placement: "right" }}
+                        positioning={{ placement: hasActiveFilters ? "top" : "right" }}
                         showArrow
                         openDelay={0}
                     >
@@ -75,6 +106,26 @@ export const UserAdminTableHeader = ({ onSearch }: UserAdminFiltersProps) => {
                             <PiFunnel />
                         </Button>
                     </Tooltip>
+
+                    {/* リセットボタン（フィルターまたはソートがかかっているときのみ表示） */}
+                    {hasActiveFilters && (
+                        <Tooltip
+                            content="フィルターをリセット"
+                            positioning={{ placement: "right" }}
+                            showArrow
+                            openDelay={0}
+                        >
+                            <Button
+                                variant="outline"
+                                aria-label="フィルターをリセット"
+                                onClick={handleFilterReset}
+                                px={3}
+                                colorScheme="red"
+                            >
+                                <PiArrowCounterClockwise />
+                            </Button>
+                        </Tooltip>
+                    )}
                 </Flex>
 
                 {/* 右側：ユーザー追加 */}
@@ -102,17 +153,15 @@ export const UserAdminTableHeader = ({ onSearch }: UserAdminFiltersProps) => {
                         <PiPlus />
                     </Button>
                 </Tooltip>
-
-
             </Flex>
 
             <UserAdminFilterModal
                 open={isFilterModalOpen}
                 onClose={() => setIsFilterModalOpen(false)}
+                onApply={handleFilterApply}
+                initialFilters={currentFilters}
             />
             <UserAdminAddModal open={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-
-
         </>
     );
 };

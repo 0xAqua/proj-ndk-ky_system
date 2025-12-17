@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Box, Container, Flex, Spinner, Text } from "@chakra-ui/react";
 import { useUsers, useDeleteUser } from "@/features/admin/users/hooks/useAdminUsers";
 import { UserAdminHeader } from "@/features/admin/users/components/UserAdminHeader";
@@ -6,9 +6,18 @@ import { UserAdminTableHeader } from "@/features/admin/users/components/UserAdmi
 import { UserAdminTable } from "@/features/admin/users/components/UserAdminTable";
 import { DeleteConfirmDialog } from "@/features/admin/users/components/DeleteConfirmDialog";
 import { useNotification } from "@/hooks/useNotification";
+import type { FilterConditions } from "@/features/admin/users/components/UserAdminFilterModal";
+import { filterAndSortUsers } from "@/features/admin/users/utils/userFilters";
 
 export const UserAdminForm = () => {
     const [filterText, setFilterText] = useState("");
+    const [filters, setFilters] = useState<FilterConditions>({
+        status: [],
+        departments: [],
+        role: [],
+        sortBy: undefined,
+        sortOrder: undefined,
+    });
     const [deleteTarget, setDeleteTarget] = useState<{ id: string; email: string } | null>(null);
 
     const { data, isLoading, isError, error } = useUsers();
@@ -42,20 +51,19 @@ export const UserAdminForm = () => {
 
     const users = data?.users ?? [];
 
-    const filteredUsers = users.filter((user) => {
-        if (!filterText) return true;
-        const search = filterText.toLowerCase();
-        const fullName = `${user.family_name}${user.given_name}`;
-        return (
-            fullName.includes(filterText) ||
-            user.email.toLowerCase().includes(search)
-        );
-    });
+    // フィルタリング＆ソート処理
+    const filteredAndSortedUsers = useMemo(
+        () => filterAndSortUsers(users, filterText, filters),
+        [users, filterText, filters]
+    );
 
     return (
         <Container maxW="container.xl" p={0}>
             <UserAdminHeader />
-            <UserAdminTableHeader onSearch={(text) => setFilterText(text)} />
+            <UserAdminTableHeader
+                onSearch={(text) => setFilterText(text)}
+                onFilterChange={(newFilters) => setFilters(newFilters)}
+            />
 
             <Box
                 bg="white"
@@ -66,8 +74,8 @@ export const UserAdminForm = () => {
                 borderColor="gray.100"
             >
                 <UserAdminTable
-                    users={filteredUsers}
-                    onDeleteClick={(id, email) => setDeleteTarget({ id, email })}  // ← これを追加
+                    users={filteredAndSortedUsers}
+                    onDeleteClick={(id, email) => setDeleteTarget({ id, email })}
                 />
             </Box>
 

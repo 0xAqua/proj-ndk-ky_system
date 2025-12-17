@@ -22,6 +22,7 @@
     "react-hook-form": "^7.67.0",
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.9.6",
+    "react-select": "^5.10.2",
     "zustand": "^5.0.9"
   },
   "devDependencies": {
