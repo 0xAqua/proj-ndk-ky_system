@@ -3,8 +3,23 @@ import { Flex, Box, Input, Button } from "@chakra-ui/react";
 import { PiMagnifyingGlass, PiFunnel } from "react-icons/pi";
 import { UserAdminFilterModal } from "./UserAdminFilterModal";
 
-export const UserAdminFilters = () => {
+// 親コンポーネントに検索ワードを渡すためのPropsを定義
+type UserAdminFiltersProps = {
+    onSearch: (text: string) => void; // 検索文字が変わったときに呼ばれる関数
+};
+
+export const UserAdminFilters = ({ onSearch }: UserAdminFiltersProps) => {
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+    // 1. 検索ワードを管理するStateを作成
+    const [searchText, setSearchText] = useState("");
+
+    // 2. 入力欄が変わったときの処理
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchText(value); // 自分のStateを更新（表示用）
+        onSearch(value);      // 親コンポーネントに通知（フィルタ処理用）
+    };
 
     return (
         <>
@@ -25,6 +40,9 @@ export const UserAdminFilters = () => {
                     <Input
                         placeholder="名前やメールで検索..."
                         pl={10}
+                        // 3. Stateと紐付け
+                        value={searchText}
+                        onChange={handleSearchChange}
                     />
                 </Box>
 

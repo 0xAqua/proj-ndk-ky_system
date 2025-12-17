@@ -1,3 +1,4 @@
+import { useState } from "react"; // 1. useStateをインポート
 import { Box, Container, Flex, Spinner, Text } from "@chakra-ui/react";
 import { useUsers } from "@/features/admin/users/hooks/useAdminUsers";
 import { UserAdminHeader } from "@/features/admin/users/components/UserAdminHeader";
@@ -5,6 +6,9 @@ import { UserAdminFilters } from "@/features/admin/users/components/UserAdminFil
 import { UserAdminTable } from "@/features/admin/users/components/UserAdminTable";
 
 export const UserAdminForm = () => {
+    // 2. 検索ワードを管理するStateを定義
+    const [filterText, setFilterText] = useState("");
+
     const { data, isLoading, isError, error } = useUsers();
 
     if (isLoading) {
@@ -25,10 +29,30 @@ export const UserAdminForm = () => {
         );
     }
 
+    // 3. フィルタリング処理（ここが重要！）
+    const users = data?.users ?? [];
+
+    const filteredUsers = users.filter((user) => {
+        // 検索ワードが空なら全員表示
+        if (!filterText) return true;
+
+        const search = filterText.toLowerCase(); // 大文字小文字を無視するために変換
+
+        const fullName = `${user.family_name}${user.given_name}`;
+
+        return (
+            fullName.includes(filterText) ||
+            user.email.toLowerCase().includes(search)
+        );
+    });
+
     return (
         <Container maxW="container.xl" p={0}>
             <UserAdminHeader />
-            <UserAdminFilters />
+
+            {/* 4. ここで setFilterText を渡す（これで検索窓とつながります） */}
+            <UserAdminFilters onSearch={(text) => setFilterText(text)} />
+
             <Box
                 bg="white"
                 borderRadius="xl"
@@ -37,7 +61,8 @@ export const UserAdminForm = () => {
                 border="1px solid"
                 borderColor="gray.100"
             >
-                <UserAdminTable users={data?.users ?? []} />
+                {/* 5. 全件(users)ではなく、絞り込んだ結果(filteredUsers)を渡す */}
+                <UserAdminTable users={filteredUsers} />
             </Box>
         </Container>
     );
