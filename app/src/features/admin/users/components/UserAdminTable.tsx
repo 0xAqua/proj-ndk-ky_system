@@ -32,8 +32,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 const RoleBadge = ({ role }: { role: string }) => {
     const config: Record<string, { color: string; label: string }> = {
         admin: { color: "purple", label: "管理者" },
-        editor: { color: "blue", label: "編集者" },
-        viewer: { color: "teal", label: "閲覧者" },
+        user: { color: "blue", label: "一般" },
     };
     const { color, label } = config[role] || { color: "gray", label: role };
     return <Badge colorPalette={color} variant="subtle">{label}</Badge>;

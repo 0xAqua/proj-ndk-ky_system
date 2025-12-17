@@ -5,7 +5,7 @@ export interface User {
     family_name: string;
     given_name: string;
     departments: Record<string, string>;  // { "COMMON": "共通", "ACCESS": "アクセス" }
-    role: "admin" | "editor" | "viewer";
+    role: "admin" | "user";
     status: "ACTIVE" | "INACTIVE" | "LOCKED";
     created_at: string;
     updated_at: string;
@@ -22,13 +22,13 @@ export interface CreateUserInput {
     family_name: string;
     given_name: string;
     departments?: Record<string, string>;
-    role?: "admin" | "editor" | "viewer";
+    role?: "admin" | "user";
 }
 
 export interface UpdateUserInput {
     family_name?: string;
     given_name?: string;
     departments?: Record<string, string>;
-    role?: "admin" | "editor" | "viewer";
+    role?: "admin" | "user";
     status?: "ACTIVE" | "INACTIVE" | "LOCKED";
 }
