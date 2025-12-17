@@ -102,18 +102,18 @@ def handle(event, ctx):
 
     except cognito.exceptions.UsernameExistsException:
         logger.warning(f"ユーザーは既に存在します: {email}", action_category="ERROR")
-        return create_response(409, {"message": "User already exists"})
+        return create_response(409, {"message": "ユーザーは既に存在します"})
 
     except ClientError as e:
         logger.exception("ユーザー作成に失敗しました", action_category="ERROR")
         # ロールバック
         _rollback_cognito_user(email)
-        return create_response(500, {"message": "Failed to create user"})
+        return create_response(500, {"message": "ユーザー作成に失敗しました"})
 
     except Exception:
         logger.exception("予期しないエラーが発生しました", action_category="ERROR")
         _rollback_cognito_user(email)
-        return create_response(500, {"message": "Internal server error"})
+        return create_response(500, {"message": "予期しないエラーが発生しました"})
 
 
 def _rollback_cognito_user(email: str):
