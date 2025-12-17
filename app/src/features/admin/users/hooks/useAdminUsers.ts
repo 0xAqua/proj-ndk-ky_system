@@ -1,15 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { User, UsersResponse, CreateUserInput, UpdateUserInput } from "@/features/admin/users/types/types";
+import {sortUsersByRole} from "@/features/admin/users/utils/sortUsersByRole";
 
 // ユーザー一覧取得
 export const useUsers = () => {
     return useQuery({
         queryKey: ["admin", "users"],
         queryFn: async () => {
-            const res = await api.get<UsersResponse>("/admin/users");
-            return res.data;
+            const { data } = await api.get<UsersResponse>("/admin/users");
+            return data;
         },
+        select: (data) => ({
+            ...data,
+            users: sortUsersByRole(data.users),
+        }),
     });
 };
 
