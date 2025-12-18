@@ -31,6 +31,15 @@ export const UserAdminForm = () => {
         setDeleteTarget(null);
     };
 
+    const users = data?.users ?? [];
+
+    // フィルタリング＆ソート処理
+    const filteredAndSortedUsers = useMemo(
+        () => filterAndSortUsers(users, filterText, filters),
+        [users, filterText, filters]
+    );
+
+
     if (isLoading) {
         return (
             <Flex justify="center" align="center" minH="200px">
@@ -48,14 +57,6 @@ export const UserAdminForm = () => {
             </Container>
         );
     }
-
-    const users = data?.users ?? [];
-
-    // フィルタリング＆ソート処理
-    const filteredAndSortedUsers = useMemo(
-        () => filterAndSortUsers(users, filterText, filters),
-        [users, filterText, filters]
-    );
 
     return (
         <Container maxW="container.xl" p={0}>

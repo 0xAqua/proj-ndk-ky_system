@@ -1,4 +1,3 @@
-// CountermeasureItem.tsx (先ほどの最終案を採用)
 import { Badge, Box, Flex, Text, Stack, HStack, Icon } from "@chakra-ui/react";
 import { FiCheckCircle, FiFileText, FiUsers } from "react-icons/fi";
 import type { CountermeasureData } from "@/features/result/types";
