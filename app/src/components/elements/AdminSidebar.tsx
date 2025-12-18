@@ -213,7 +213,7 @@ export const AdminSidebar = () => {
                         iconBg="orange.500"
                     />
 
-                    <NavItem to="/settings" icon={PiGear} label="設定" isExpanded={isExpanded} />
+                    <NavItem to="/settings" icon={PiGear} label="システム設定" isExpanded={isExpanded} />
 
                     <Box w="full" px={2} mt={2}>
                         <Tooltip

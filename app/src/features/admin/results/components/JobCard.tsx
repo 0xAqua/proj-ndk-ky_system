@@ -12,13 +12,7 @@ interface JobCardProps {
 export const JobCard = ({ job }: JobCardProps) => {
     const navigate = useNavigate();
 
-    const incidentCount = job.reply?.incidents?.length || 0;
-    const incidents = job.reply?.incidents || [];
-
-    // エラーまたはインシデント0件の場合は表示しない
-    if (job.error_msg || incidentCount === 0) {
-        return null;
-    }
+    const incidents = job.incidents || [];
 
     const handleClick = () => {
         navigate("/result", { state: { jobId: job.job_id } });
@@ -71,7 +65,7 @@ export const JobCard = ({ job }: JobCardProps) => {
                     fontWeight="500"
                     color="gray.500"
                 >
-                    {incidentCount}件
+                    {incidents.length}件
                 </Text>
             </Flex>
 
@@ -82,8 +76,8 @@ export const JobCard = ({ job }: JobCardProps) => {
                         const isPast = incident.classification === "過去に起きたインシデント";
                         const themeColor = isPast ? "orange" : "pink";
                         const StatusIcon = isPast ? MdWarning : HiSparkles;
-                        const truncatedSummary = incident.summary.length > 15
-                            ? `${incident.summary.slice(0, 15)}...`
+                        const truncatedSummary = incident.summary.length > 40
+                            ? `${incident.summary.slice(0, 40)}...`
                             : incident.summary;
 
                         return (

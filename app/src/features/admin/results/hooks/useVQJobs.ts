@@ -1,34 +1,18 @@
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api'; // 既存のaxiosインスタンス
+import { api } from '@/lib/api';
 
-export interface Countermeasure {
-    no: number;
-    title: string;
-    description: string;
-    responsible: string;
-}
-
-export interface Incident {
+// 最適化されたレスポンスに合わせた型定義
+export interface VQJobIncident {
     id: number;
     title: string;
-    classification: string;
     summary: string;
-    cause: string;
-    countermeasures: Countermeasure[];
-}
-
-export interface Reply {
-    incidents: Incident[];
+    classification: string;  // "過去に起きたインシデント" | "推測されるインシデント"
 }
 
 export interface VQJob {
     job_id: string;
-    reply: Reply;
-    updated_at: number;
     created_at: number;
-    status: string;
-    user_id: string;
-    error_msg?: string;
+    incidents: VQJobIncident[];
 }
 
 interface VQJobsResponse {
@@ -58,11 +42,11 @@ export const useVQJobs = () => {
                 params.last_evaluated_key = lastKey;
             }
 
-            console.log('Fetching VQ jobs with params:', params); // デバッグ用
+            console.log('Fetching VQ jobs with params:', params);
 
             const response = await api.get<VQJobsResponse>('/vq-jobs', { params });
 
-            console.log('Response received:', response.data); // デバッグ用
+            console.log('Response received:', response.data);
 
             const data = response.data;
 
@@ -112,7 +96,7 @@ export const useVQJobs = () => {
 
     const loadMore = () => {
         if (hasMore && !loading) {
-            fetchJobs(true);
+            void fetchJobs(true);
         }
     };
 
@@ -120,12 +104,12 @@ export const useVQJobs = () => {
         setJobs([]);
         setLastKey(null);
         setHasMore(true);
-        fetchJobs(false);
+        void fetchJobs(false);
     };
 
     // 初回読み込み
     useEffect(() => {
-        fetchJobs();
+        void fetchJobs();
     }, []);
 
     return {

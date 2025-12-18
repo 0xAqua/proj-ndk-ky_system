@@ -49,7 +49,7 @@ export const AppRoutes = () => {
             />
 
             <Route
-                path="/settings"
+                path="/advanced-settings"
                 element={
                     <AuthGuard>
                         <SettingsPage />
