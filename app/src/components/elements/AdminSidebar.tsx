@@ -69,6 +69,9 @@ const NavItem = ({ icon, to, label, isExpanded, isExternal, iconColor, iconBg }:
                                     _hover={{
                                         bg: activeState ? "#ebe5db" : "#faf5f0",
                                     }}
+                                    _active={{
+                                        transform: "scale(0.90)"
+                                    }}
                                     overflow="hidden"
                                     position="relative"
                                 >
@@ -89,7 +92,7 @@ const NavItem = ({ icon, to, label, isExpanded, isExternal, iconColor, iconBg }:
                                         transition="all 0.3s cubic-bezier(0.2, 0, 0, 1)"
                                         whiteSpace="nowrap"
                                     >
-                                        <Text fontSize="sm" fontWeight={activeState ? "bold" : "medium"} ml={1}>
+                                        <Text fontSize="sm" ml={1}>
                                             {label}
                                         </Text>
                                     </Box>
@@ -179,7 +182,8 @@ export const AdminSidebar = () => {
                         size="md"
                         color="black"
                         borderRadius="lg"
-                        _hover={{ bg: "gray.300" }}
+                        _hover={{ bg: "#ebe5db" }}
+                        _active={{ transform: "scale(0.95)" }}
                         transition="all 0.2s"
                         mt={4}
                     >
@@ -229,7 +233,8 @@ export const AdminSidebar = () => {
                                 h="40px"
                                 borderRadius="lg"
                                 transition="all 0.2s"
-                                _hover={{ bg: "gray.200" }}
+                                _hover={{ bg: "#ebe5db" }}
+                                _active={{ transform: "scale(0.90)" }}
                                 overflow="hidden"
                                 cursor="pointer"
                             >
