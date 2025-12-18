@@ -95,7 +95,7 @@ export const AccessLogsTable = ({
 
                     <Box w="1px" h="20px" bg="gray.200" /> {/* セパレーターを入れると整理されます */}
 
-                    <Tooltip content="CSV形式でダウンロード" showArrow positioning={{ placement: "bottom" }}>
+                    <Tooltip content="CSV形式でダウンロード" showArrow positioning={{ placement: "bottom" }} openDelay={0}>
                         <Button
                             aria-label="CSV出力"
                             variant="solid"

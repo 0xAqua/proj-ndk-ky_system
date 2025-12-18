@@ -3,16 +3,16 @@ import { LuLogOut, LuChevronDown } from "react-icons/lu";
 import { signOut, fetchUserAttributes } from "aws-amplify/auth";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { useUserStore } from "@/stores/useUserStore";
+import { useUserStore } from "@/stores/useUserStore.ts";
 import logo from '@/assets/logo.jpg';
 
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar } from "@/components/ui/avatar.tsx";
 import {
     MenuContent,
     MenuItem,
     MenuRoot,
     MenuTrigger,
-} from "@/components/ui/menu";
+} from "@/components/ui/menu.tsx";
 
 export const Header = () => {
     const navigate = useNavigate();

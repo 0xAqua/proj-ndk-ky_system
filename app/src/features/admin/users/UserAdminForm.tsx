@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
-import { Box, Container, Flex, Spinner, Text } from "@chakra-ui/react";
+import { Box, Container, Text } from "@chakra-ui/react";
 import { useUsers, useDeleteUser } from "@/features/admin/users/hooks/useAdminUsers";
 import { UserAdminHeader } from "@/features/admin/users/components/UserAdminHeader";
 import { UserAdminTableHeader } from "@/features/admin/users/components/UserAdminTableHeader.tsx";
 import { UserAdminTable } from "@/features/admin/users/components/UserAdminTable";
+import { UserAdminTableSkeleton } from "@/features/admin/users/components/UserAdminTableSkeleton";
 import { DeleteConfirmDialog } from "@/features/admin/users/components/DeleteConfirmDialog";
 import { useNotification } from "@/hooks/useNotification";
 import type { FilterConditions } from "@/features/admin/users/components/UserAdminFilterModal";
@@ -20,7 +21,7 @@ export const UserAdminForm = () => {
     });
     const [deleteTarget, setDeleteTarget] = useState<{ id: string; email: string } | null>(null);
 
-    const { data, isLoading, isError, error } = useUsers();
+    const { data, isLoading: isQueryLoading, isError, error } = useUsers();
     const { mutate: deleteUser } = useDeleteUser();
     const notify = useNotification();
 
@@ -33,20 +34,12 @@ export const UserAdminForm = () => {
 
     const users = data?.users ?? [];
 
-    // フィルタリング＆ソート処理
+    const isLoading = isQueryLoading;
+
     const filteredAndSortedUsers = useMemo(
         () => filterAndSortUsers(users, filterText, filters),
         [users, filterText, filters]
     );
-
-
-    if (isLoading) {
-        return (
-            <Flex justify="center" align="center" minH="200px">
-                <Spinner size="lg" color="blue.500" />
-            </Flex>
-        );
-    }
 
     if (isError) {
         return (
@@ -73,11 +66,16 @@ export const UserAdminForm = () => {
                 overflow="hidden"
                 border="1px solid"
                 borderColor="gray.100"
+
             >
-                <UserAdminTable
-                    users={filteredAndSortedUsers}
-                    onDeleteClick={(id, email) => setDeleteTarget({ id, email })}
-                />
+                {isLoading ? (
+                    <UserAdminTableSkeleton />
+                ) : (
+                    <UserAdminTable
+                        users={filteredAndSortedUsers}
+                        onDeleteClick={(id, email) => setDeleteTarget({ id, email })}
+                    />
+                )}
             </Box>
 
             <DeleteConfirmDialog

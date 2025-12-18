@@ -1,6 +1,6 @@
 import type {ReactNode} from 'react';
 import { Box, Container } from '@chakra-ui/react';
-import { Header } from './Header';
+import { Header } from '../elements/Header.tsx';
 
 type MainLayoutProps = {
     children: ReactNode;

@@ -45,7 +45,7 @@ export const LogsForm = () => {
     };
 
     return (
-        <Flex h="100%" bg="#fcfaf2"> {/* 全体の背景色を少し調整して統一感を出す */}
+        <Flex h="100%"> {/* 全体の背景色を少し調整して統一感を出す */}
             <LogsSidebar
                 selectedLog={selectedLog}
                 onSelectLog={handleLogTypeChange}

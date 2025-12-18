@@ -1,4 +1,4 @@
-import { useState } from "react";
+import {useEffect, useState} from "react";
 import { NavLink } from "react-router-dom";
 import {
     Box,
@@ -8,10 +8,12 @@ import {
     Text,
     Center,
     Icon,
-    IconButton, Image
+    IconButton, Image, MenuRoot, MenuTrigger, MenuContent, Separator, MenuItem, Portal, MenuPositioner
 } from "@chakra-ui/react";
+import { LuLogOut, LuChevronDown } from "react-icons/lu";
 import { Tooltip } from "@/components/ui/tooltip.tsx";
 import { Avatar } from "@/components/ui/avatar.tsx";
+import {fetchUserAttributes, signOut} from 'aws-amplify/auth';
 
 // Phosphor Icons (pi)
 import {
@@ -114,6 +116,49 @@ export const AdminSidebar = () => {
         return localStorage.getItem("sidebar-expanded") === "true";
     });
 
+    const handleLogoutClick = async () => {
+        try {
+            await signOut();
+            // 必要に応じてリダイレクト処理
+            window.location.href = "/login";
+        } catch (error) {
+            console.error("ログアウトに失敗しました", error);
+        }
+    };
+
+    // ユーザー情報を保存するState
+    const [userEmail, setUserEmail] = useState("");
+    const [userName, setUserName] = useState("読込中...");
+
+    // 画面表示時にユーザー情報を取得する
+    useEffect(() => {
+        const getUserData = async () => {
+            try {
+                const attributes = await fetchUserAttributes();
+                if (attributes.email) {
+                    setUserEmail(attributes.email);
+                }
+
+                // 姓名を結合してフルネームを作成
+                let displayName = attributes.name; // まずnameを試す
+                if (!displayName && (attributes.family_name || attributes.given_name)) {
+                    // family_name と given_name から作成
+                    displayName = `${attributes.family_name || ''} ${attributes.given_name || ''}`.trim();
+                }
+                if (!displayName) {
+                    displayName = attributes.email || "ユーザー";
+                }
+
+                setUserName(displayName);
+            } catch (error) {
+                console.error("ユーザー情報の取得に失敗しました", error);
+                setUserName("ユーザー");
+            }
+        };
+
+        void getUserData();
+    }, []);
+
     const toggleExpanded = () => {
         setIsExpanded((prev) => {
             const next = !prev;
@@ -127,9 +172,9 @@ export const AdminSidebar = () => {
     const width = isExpanded ? EXPANDED_W : COLLAPSED_W;
 
     const user = {
-        name: "管理者 太郎",
-        email: "admin@example.com",
-        avatarUrl: "https://bit.ly/broken-link"
+        name: userName,
+        email: userEmail,
+        avatarUrl: undefined
     };
 
     return (
@@ -220,42 +265,84 @@ export const AdminSidebar = () => {
                     <NavItem to="/settings" icon={PiGear} label="システム設定" isExpanded={isExpanded} />
 
                     <Box w="full" px={2} mt={2}>
-                        <Tooltip
-                            content="ログアウト: 管理者太郎"
-                            positioning={{ placement: "right" }}
-                            showArrow
-                            disabled={isExpanded}
-                        >
-                            <Flex
-                                as="button"
-                                w="full"
-                                align="center"
-                                h="40px"
-                                borderRadius="lg"
-                                transition="all 0.2s"
-                                _hover={{ bg: "#ebe5db" }}
-                                _active={{ transform: "scale(0.90)" }}
-                                overflow="hidden"
-                                cursor="pointer"
-                            >
-                                <Center w="48px" h="40px" flexShrink={0}>
-                                    <Avatar name={user.name} src={user.avatarUrl} size="xs" />
-                                </Center>
-
-                                <Box
-                                    opacity={isExpanded ? 1 : 0}
-                                    width={isExpanded ? "auto" : 0}
-                                    transition="all 0.3s cubic-bezier(0.2, 0, 0, 1)"
-                                    whiteSpace="nowrap"
-                                    textAlign="left"
-                                    ml={1}
+                        <MenuRoot>
+                            <MenuTrigger asChild>
+                                <Flex
+                                    as="button"
+                                    w="full"
+                                    align="center"
+                                    h="40px"
+                                    borderRadius="lg"
+                                    transition="all 0.2s"
+                                    _hover={{ bg: "#ebe5db" }}
+                                    overflow="hidden"
+                                    cursor="pointer"
                                 >
-                                    <Text fontSize="sm" fontWeight="bold" color="black">{user.name}</Text>
-                                    <Text fontSize="xs" color="gray.500">{user.email}</Text>
-                                </Box>
-                            </Flex>
-                        </Tooltip>
+                                    <Center w="48px" h="40px" flexShrink={0}>
+                                        <Avatar name={user.name} size="xs" />
+                                    </Center>
+
+                                    <Box
+                                        opacity={isExpanded ? 1 : 0}
+                                        width={isExpanded ? "auto" : 0}
+                                        transition="all 0.3s cubic-bezier(0.2, 0, 0, 1)"
+                                        whiteSpace="nowrap"
+                                        textAlign="left"
+                                        ml={1}
+                                        flex={1}
+                                    >
+                                        <Text fontSize="sm" fontWeight="bold" color="black">{user.name}</Text>
+                                        <Text fontSize="xs" color="gray.500">{user.email}</Text>
+                                    </Box>
+
+                                    {isExpanded && (
+                                        <Box color="gray.400" mr={2}>
+                                            <LuChevronDown size={14} />
+                                        </Box>
+                                    )}
+                                </Flex>
+                            </MenuTrigger>
+
+                            <Portal>
+                                <MenuPositioner>
+                                    <MenuContent
+                                        minW="220px"
+                                        shadow="xl"
+                                        borderWidth="1px"
+                                        borderColor="gray.200"
+                                        bg="#fffffe"
+                                        zIndex={1000}
+                                        css={{
+                                            animation: "none !important",
+                                            transition: "none !important",
+                                            transform: "none !important"
+                                        }}
+                                    >
+                                        <Box px={3} py={2}>
+                                            <Text fontSize="sm" color="gray.500">
+                                                {user.email || "読み込み中..."}
+                                            </Text>
+                                        </Box>
+
+                                        <Separator />
+
+                                        <MenuItem
+                                            value="logout"
+                                            color="red.600"
+                                            _hover={{ bg: "red.50", color: "red.700" }}
+                                            onClick={handleLogoutClick}
+                                            gap={2}
+                                            cursor="pointer"
+                                        >
+                                            <LuLogOut />
+                                            <Text fontWeight="bold">ログアウト</Text>
+                                        </MenuItem>
+                                    </MenuContent>
+                                </MenuPositioner>
+                            </Portal>
+                        </MenuRoot>
                     </Box>
+
                 </VStack>
 
             </Flex>
