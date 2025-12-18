@@ -1,6 +1,6 @@
-import { Box, Center, Flex, Icon, Stack, Text } from "@chakra-ui/react";
+import { Box, Center, Flex, Icon, Stack, Text, Badge } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
-import { HiSparkles } from "react-icons/hi";
+import { HiSparkles, HiChevronRight } from "react-icons/hi";
 import { MdWarning } from "react-icons/md";
 import { formatDate } from "../utils/formatDate";
 import type { VQJob } from "../hooks/useVQJobs";
@@ -11,7 +11,6 @@ interface JobCardProps {
 
 export const JobCard = ({ job }: JobCardProps) => {
     const navigate = useNavigate();
-
     const incidents = job.incidents || [];
 
     const handleClick = () => {
@@ -20,100 +19,97 @@ export const JobCard = ({ job }: JobCardProps) => {
 
     return (
         <Box
+            as="article"
             position="relative"
-            bg="linear-gradient(135deg, #fdfcfb 0%, #f7f5f2 100%)"
-            borderRadius="2xl"
-            overflow="hidden"
+            bg="white"
+            borderRadius="xl"
+            border="1px solid"
+            borderColor="gray.100"
             cursor="pointer"
             onClick={handleClick}
-            transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-            boxShadow="0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)"
+            transition="all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
             _hover={{
-                transform: "translateY(-4px)",
-                boxShadow: "0 12px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.04)",
-            }}
-            _before={{
-                content: '""',
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                height: "3px",
-                bgGradient: "linear(to-r, #d4af37, #f9d423, #d4af37)",
-                opacity: 0.8,
+                transform: "translateY(-2px)",
+                boxShadow: "0 12px 20px -8px rgba(0, 0, 0, 0.1)",
+                borderColor: "blue.200",
             }}
         >
-            {/* ヘッダー部分 */}
+            {/* ヘッダー: 日付と件数 */}
             <Flex
-                py={4}
+                py={3}
                 px={5}
                 align="center"
                 justify="space-between"
+                bg="gray.50"
+                borderTopRadius="xl"
                 borderBottomWidth="1px"
-                borderBottomColor="rgba(0, 0, 0, 0.05)"
+                borderColor="gray.100"
             >
-                <Text
-                    fontSize="sm"
-                    fontWeight="600"
-                    color="gray.700"
-                >
-                    {formatDate(job.created_at)}
+                <Text fontSize="xs" fontWeight="bold" color="gray.500" letterSpacing="wider">
+                    {formatDate(job.created_at).toUpperCase()}
                 </Text>
-
-                <Text
-                    fontSize="xs"
-                    fontWeight="500"
-                    color="gray.500"
-                >
-                    {incidents.length}件
-                </Text>
+                <Badge colorScheme="blue" variant="subtle" px={2} borderRadius="full">
+                    {incidents.length} Incidents
+                </Badge>
             </Flex>
 
-            {/* インシデント一覧 */}
-            <Box px={5} py={4}>
+            {/* コンテンツエリア */}
+            <Box px={5} py={5}>
                 <Stack gap={3}>
-                    {incidents.map((incident) => {
+                    {incidents.slice(0, 3).map((incident) => {
                         const isPast = incident.classification === "過去に起きたインシデント";
-                        const themeColor = isPast ? "orange" : "pink";
+                        const themeColor = isPast ? "orange" : "purple";
                         const StatusIcon = isPast ? MdWarning : HiSparkles;
-                        const truncatedSummary = incident.summary.length > 40
-                            ? `${incident.summary.slice(0, 40)}...`
-                            : incident.summary;
 
                         return (
-                            <Stack key={incident.id} gap={1}>
-                                <Flex gap={2.5} align="flex-start">
+                            <Box
+                                key={incident.id}
+                                p={3}
+                                borderRadius="lg"
+                                bg={`${themeColor}.50`}
+                                border="1px solid"
+                                borderColor={`${themeColor}.100`}
+                            >
+                                <Flex gap={3} align="flex-start">
                                     <Center
-                                        boxSize="22px"
-                                        bg={`${themeColor}.100`}
-                                        borderRadius="md"
+                                        boxSize="24px"
+                                        bg="white"
+                                        borderRadius="full"
+                                        shadow="sm"
                                         flexShrink={0}
                                     >
-                                        <Icon as={StatusIcon} boxSize={3.5} color={`${themeColor}.600`} />
+                                        <Icon as={StatusIcon} boxSize={3.5} color={`${themeColor}.500`} />
                                     </Center>
-                                    <Text
-                                        fontSize="sm"
-                                        color="gray.800"
-                                        lineHeight="1.5"
-                                        fontWeight="500"
-                                        flex={1}
-                                    >
-                                        {incident.title}
-                                    </Text>
+                                    <Box flex={1}>
+                                        <Text
+                                            fontSize="sm"
+                                            color="gray.800"
+                                            fontWeight="bold"
+                                            lineHeight="1.4"
+                                        >
+                                            {incident.title}
+                                        </Text>
+                                        <Text
+                                            fontSize="xs"
+                                            color="gray.600"
+                                            mt={1}
+                                            lineHeight="1.5"
+                                        >
+                                            {incident.summary}
+                                        </Text>
+                                    </Box>
                                 </Flex>
-                                <Box pl="30px">
-                                    <Text
-                                        fontSize="xs"
-                                        color="gray.500"
-                                        lineHeight="1.5"
-                                    >
-                                        {truncatedSummary}
-                                    </Text>
-                                </Box>
-                            </Stack>
+                            </Box>
                         );
                     })}
                 </Stack>
+
+                <Flex mt={4} align="center" justify="center">
+                    <Text fontSize="xs" fontWeight="bold" color="blue.500">
+                        詳細を表示
+                    </Text>
+                    <Icon as={HiChevronRight} color="blue.500" />
+                </Flex>
             </Box>
         </Box>
     );

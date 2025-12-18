@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import {Flex, Box, Input, Button} from "@chakra-ui/react";
-import {PiMagnifyingGlass, PiFunnel, PiPlus, PiArrowCounterClockwise} from "react-icons/pi";
-import {type FilterConditions, UserAdminFilterModal} from "./UserAdminFilterModal";
-import {UserAdminAddModal} from "@/features/admin/users/components/UserAdminAddModal";
-import {Tooltip} from "@/components/ui/tooltip"
+import { Flex, Box, Input, Button, HStack } from "@chakra-ui/react";
+import { PiMagnifyingGlass, PiFunnel, PiPlus, PiArrowCounterClockwise } from "react-icons/pi";
+import { type FilterConditions, UserAdminFilterModal } from "./UserAdminFilterModal";
+import { UserAdminAddModal } from "@/features/admin/users/components/UserAdminAddModal";
+import { Tooltip } from "@/components/ui/tooltip";
 
 type UserAdminFiltersProps = {
     onSearch: (text: string) => void;
@@ -17,8 +17,8 @@ export const UserAdminTableHeader = ({ onSearch, onFilterChange }: UserAdminFilt
         status: [],
         departments: [],
         role: [],
-        sortBy: undefined,      // ← 追加
-        sortOrder: undefined,   // ← 追加
+        sortBy: undefined,
+        sortOrder: undefined,
     });
 
     const handleFilterApply = (filters: FilterConditions) => {
@@ -26,21 +26,19 @@ export const UserAdminTableHeader = ({ onSearch, onFilterChange }: UserAdminFilt
         onFilterChange(filters);
     };
 
-    // フィルターまたはソートがかかっているかチェック
     const hasActiveFilters =
         currentFilters.status.length > 0 ||
         currentFilters.departments.length > 0 ||
         currentFilters.role.length > 0 ||
-        currentFilters.sortBy !== undefined;  // ← 追加
+        currentFilters.sortBy !== undefined;
 
-    // フィルターとソートをリセット
     const handleFilterReset = () => {
         const emptyFilters: FilterConditions = {
             status: [],
             departments: [],
             role: [],
-            sortBy: undefined,      // ← 追加
-            sortOrder: undefined,   // ← 追加
+            sortBy: undefined,
+            sortOrder: undefined,
         };
         setCurrentFilters(emptyFilters);
         onFilterChange(emptyFilters);
@@ -64,12 +62,12 @@ export const UserAdminTableHeader = ({ onSearch, onFilterChange }: UserAdminFilt
                 shadow="sm"
                 align="center"
                 justify="space-between"
-                wrap="wrap"
-                gap={4}
+                borderWidth="1px"
+                borderColor="gray.100" // 境界線を追加
             >
                 {/* 左側：検索 + フィルター */}
-                <Flex align="center" gap={4} wrap="wrap">
-                    {/* 検索ボックス */}
+                <Flex align="center" gap={4}>
+                    {/* 検索ボックス：AccessLogsTable と同じ質感 */}
                     <Box position="relative" w="300px">
                         <Box
                             position="absolute"
@@ -78,81 +76,74 @@ export const UserAdminTableHeader = ({ onSearch, onFilterChange }: UserAdminFilt
                             transform="translateY(-50%)"
                             zIndex={1}
                             pointerEvents="none"
-                            fontSize="xl"
                         >
-                            <PiMagnifyingGlass color="gray" />
+                            <PiMagnifyingGlass color="#A0AEC0" size={20} />
                         </Box>
                         <Input
                             placeholder="名前やメールで検索..."
                             pl={10}
+                            size="md"
+                            variant="subtle"
+                            bg="#f8f9fa"
+                            borderRadius="lg"
                             value={searchText}
                             onChange={handleSearchChange}
+                            _focus={{ bg: "white", borderColor: "blue.400", boxShadow: "sm" }}
                         />
                     </Box>
 
-                    {/* フィルターボタン */}
-                    <Tooltip
-                        content="フィルター"
-                        positioning={{ placement: hasActiveFilters ? "top" : "right" }}
-                        showArrow
-                        openDelay={0}
-                    >
-                        <Button
-                            variant="outline"
-                            aria-label="フィルター"
-                            onClick={() => setIsFilterModalOpen(true)}
-                            px={3}
-                        >
-                            <PiFunnel />
-                        </Button>
-                    </Tooltip>
-
-                    {/* リセットボタン（フィルターまたはソートがかかっているときのみ表示） */}
-                    {hasActiveFilters && (
-                        <Tooltip
-                            content="フィルターをリセット"
-                            positioning={{ placement: "right" }}
-                            showArrow
-                            openDelay={0}
-                        >
+                    {/* フィルターボタン一式 */}
+                    <HStack gap={2}>
+                        <Tooltip content="条件で絞り込む" showArrow>
                             <Button
                                 variant="outline"
-                                aria-label="フィルターをリセット"
-                                onClick={handleFilterReset}
-                                px={3}
-                                colorScheme="red"
+                                size="md"
+                                onClick={() => setIsFilterModalOpen(true)}
+                                borderRadius="lg"
+                                bg="white"
+                                _hover={{ bg: "gray.50" }}
                             >
-                                <PiArrowCounterClockwise />
+                                <PiFunnel />
                             </Button>
                         </Tooltip>
-                    )}
+
+                        {hasActiveFilters && (
+                            <Tooltip content="フィルターをリセット" showArrow>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleFilterReset}
+                                    colorScheme="red"
+                                    borderRadius="lg"
+                                >
+                                    <PiArrowCounterClockwise />
+                                </Button>
+                            </Tooltip>
+                        )}
+                    </HStack>
                 </Flex>
 
-                {/* 右側：ユーザー追加 */}
-                <Tooltip
-                    content="ユーザーを追加"
-                    positioning={{ placement: "left" }}
-                    showArrow
-                    openDelay={0}
-                >
+                {/* ユーザー追加ボタン：伸縮アニメーション追加 */}
+                <Tooltip content="新規ユーザーを追加" positioning={{ placement: "bottom" }} showArrow>
                     <Button
                         aria-label="ユーザーを追加"
+                        variant="solid"
                         bg="orange.500"
                         color="white"
                         borderRadius="full"
-                        minW="40px"
-                        h="40px"
+                        shadow="md"
+                        boxShadow="md" // 少しだけ影をつけると浮き上がって見えます
+                        minW="42px" h="42px"
                         p={0}
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                        _hover={{ bg: "orange.600" }}
-                        _active={{ bg: "orange.700" }}
+                        _hover={{ bg: "orange.600", }}
+                        _active={{ transform: "scale(0.92)" }}
+                        transition="all 0.2s cubic-bezier(.08,.52,.52,1)"
                         onClick={() => setIsAddModalOpen(true)}
                     >
-                        <PiPlus />
+                        <PiPlus size={22} />
                     </Button>
                 </Tooltip>
+
             </Flex>
 
             <UserAdminFilterModal
