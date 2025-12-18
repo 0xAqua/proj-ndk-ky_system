@@ -1,6 +1,9 @@
 """
-VQジョブ履歴取得 Lambda
+VQジョブ履歴取得 Lambda（最適化版）
 DynamoDBから tenant_vq_manager テーブルのデータを取得してフロントに返す
+- エラーのあるjobを除外
+- インシデント0件のjobを除外
+- 必要な情報のみ返す（job_id, created_at, incidents の一部フィールド）
 """
 import os
 import json
@@ -45,11 +48,67 @@ def get_tenant_id_from_event(event: dict) -> str:
         raise ValueError("Invalid JWT structure") from e
 
 
+def filter_and_transform_job(item: dict) -> dict | None:
+    """
+    ジョブデータをフィルタリング・変換する
+
+    除外条件:
+    - error_msg が存在する
+    - incidents が0件
+
+    Returns:
+        変換後のジョブデータ、または除外する場合は None
+    """
+    # error_msg がある場合は除外
+    if "error_msg" in item and item["error_msg"]:
+        logger.debug("エラーのあるジョブを除外", job_id=item.get("job_id"))
+        return None
+
+    # replyの解析
+    reply = item.get("reply")
+    if isinstance(reply, str):
+        try:
+            reply = json.loads(reply)
+        except json.JSONDecodeError:
+            logger.warning("reply のパースに失敗", job_id=item.get("job_id"))
+            return None
+
+    # incidents の取得
+    incidents = []
+    if reply and isinstance(reply, dict):
+        incidents = reply.get("incidents", [])
+
+    # incidents が0件の場合は除外
+    if not incidents or len(incidents) == 0:
+        logger.debug("インシデント0件のジョブを除外", job_id=item.get("job_id"))
+        return None
+
+    # 必要な情報だけ抽出
+    filtered_incidents = []
+    for incident in incidents:
+        filtered_incident = {
+            "id": incident.get("id"),
+            "title": incident.get("title"),
+            "summary": incident.get("summary"),
+            "classification": incident.get("classification")
+        }
+        filtered_incidents.append(filtered_incident)
+
+    # 最終的なジョブデータ
+    job = {
+        "job_id": item.get("job_id"),
+        "created_at": item.get("created_at"),
+        "incidents": filtered_incidents
+    }
+
+    return job
+
+
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event, context):
     """
-    VQジョブ履歴を取得する
+    VQジョブ履歴を取得する（最適化版）
 
     Query Parameters:
     - limit: 取得件数（デフォルト: 20、最大: 100）
@@ -60,12 +119,15 @@ def lambda_handler(event, context):
       "jobs": [
         {
           "job_id": "...",
-          "reply": {...},
-          "updated_at": 1234567890,
           "created_at": 1234567890,
-          "status": "...",
-          "error_msg": "...",
-          "user_id": "..."
+          "incidents": [
+            {
+              "id": 1,
+              "title": "...",
+              "summary": "...",
+              "classification": "..."
+            }
+          ]
         }
       ],
       "last_evaluated_key": "..." // 次のページがある場合のみ
@@ -131,39 +193,21 @@ def lambda_handler(event, context):
         response = table.query(**query_params_dynamodb)
 
         items = response.get("Items", [])
+
+        # 5. フィルタリングと変換
+        jobs = []
+        for item in items:
+            filtered_job = filter_and_transform_job(item)
+            if filtered_job:
+                jobs.append(filtered_job)
+
         logger.info(
             "VQジョブ履歴を取得しました",
             action_category="EXECUTE",
             tenant_id=tenant_id,
-            job_count=len(items)
+            total_items=len(items),
+            filtered_jobs=len(jobs)
         )
-
-        # 5. レスポンス整形
-        jobs = []
-        for item in items:
-            # replyがJSON文字列の場合はパース
-            reply = item.get("reply")
-            if isinstance(reply, str):
-                try:
-                    reply = json.loads(reply)
-                except json.JSONDecodeError:
-                    # パースできない場合はそのまま
-                    pass
-
-            job = {
-                "job_id": item.get("job_id"),
-                "reply": reply,
-                "updated_at": item.get("updated_at"),
-                "created_at": item.get("created_at"),
-                "status": item.get("status"),
-                "user_id": item.get("user_id"),
-            }
-
-            # error_msg は存在する場合のみ追加
-            if "error_msg" in item:
-                job["error_msg"] = item["error_msg"]
-
-            jobs.append(job)
 
         # 6. 次のページのキーを生成
         result = {
