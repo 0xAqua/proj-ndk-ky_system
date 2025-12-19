@@ -120,6 +120,7 @@ resource "aws_cognito_user_pool_client" "web" {
   # パスワード認証(SRP)と、カスタム認証(OTP)の両方を許可します
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
+    "ALLOW_USER_PASSWORD_AUTH",
     "ALLOW_CUSTOM_AUTH",
     "ALLOW_REFRESH_TOKEN_AUTH",
     "ALLOW_USER_AUTH"
