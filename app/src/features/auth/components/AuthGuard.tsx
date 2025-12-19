@@ -12,19 +12,21 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     useAutoLogout();
 
     useEffect(() => {
+// AuthGuard.tsx の useEffect内
         const checkAuth = async () => {
             try {
-                // ★変更: BFF APIでセッションチェック
                 const session = await bffAuth.checkSession();
+                console.log("Session response:", session); // ★ここで中身を確認
 
                 if (session.authenticated) {
-                    setIsChecked(true); // OKなら通す
+                    console.log("Auth OK - Stay in protected route");
+                    setIsChecked(true);
                 } else {
-                    // NGならログイン画面へ飛ばす
+                    console.warn("Auth NG - Redirecting to login");
                     navigate("/login", { state: { from: location }, replace: true });
                 }
             } catch (err) {
-                // エラー時もログイン画面へ
+                console.error("Session check error:", err);
                 navigate("/login", { state: { from: location }, replace: true });
             }
         };

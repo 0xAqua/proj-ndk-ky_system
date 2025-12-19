@@ -49,9 +49,13 @@ export const useLoginForm = () => {
 
     // ★修正: e.preventDefault() を追加
     const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();  // デフォルトの送信を阻止
+        console.log("★ handleLogin called!");  // ★追加
+        e.preventDefault();
 
+        console.log("★ About to call credentialsAuth.handleLogin");  // ★追加
         const result = await credentialsAuth.handleLogin();
+        console.log("★ Result:", result);  // ★追加
+
         if (result?.success) {
             handleSuccess();
         }

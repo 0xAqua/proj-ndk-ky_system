@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import {create} from 'zustand';
 
 export interface Department {
     id: string;
@@ -26,9 +26,7 @@ export const useUserStore = create<UserState>((set) => ({
         const nestedDepts = data.tenantUser?.departments;
 
         // データの取得（優先順位: 直下 > tenantUser配下 > 空）
-        const rawDepts = nestedDepts;
-
-        const formattedDepts: Department[] = Object.entries(rawDepts).map(([key, value]) => ({
+        const formattedDepts: Department[] = Object.entries(nestedDepts).map(([key, value]) => ({
             id: key,
             name: String(value)
         }));
