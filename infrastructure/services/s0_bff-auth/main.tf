@@ -1,15 +1,12 @@
 # ─────────────────────────────
 # BFF認証API (HttpOnly Cookie管理)
-# セッションベース認証のバックエンド層
 # ─────────────────────────────
 
 locals {
   lambda_src_dir = "${path.module}/lambda"
 }
 
-# ─────────────────────────────
-# IAM AssumeRole ポリシー
-# ─────────────────────────────
+# 1. IAM Role & AssumeRole (変更なし)
 data "aws_iam_policy_document" "assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -20,121 +17,86 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
-# ─────────────────────────────
-# IAM Role
-# ─────────────────────────────
 resource "aws_iam_role" "bff_auth" {
   name               = "${var.name_prefix}-role"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
-# 基本実行ロール
 resource "aws_iam_role_policy_attachment" "basic_execution" {
   role       = aws_iam_role.bff_auth.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# ─────────────────────────────
-# Cognito権限
-# ─────────────────────────────
-data "aws_iam_policy_document" "cognito" {
-  statement {
-    effect = "Allow"
-    actions = [
-      "cognito-idp:InitiateAuth",
-      "cognito-idp:RespondToAuthChallenge",
-      "cognito-idp:GetUser",
-    ]
-    resources = ["*"]  # Cognitoは特定のリソースARNを指定できないため
-  }
-}
-
+# 2. Cognito権限 (変更なし)
 resource "aws_iam_role_policy" "cognito" {
-  name   = "cognito-access"
-  role   = aws_iam_role.bff_auth.id
-  policy = data.aws_iam_policy_document.cognito.json
+  name = "cognito-access"
+  role = aws_iam_role.bff_auth.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "cognito-idp:InitiateAuth",
+        "cognito-idp:RespondToAuthChallenge",
+        "cognito-idp:GetUser"
+      ]
+      Resource = ["*"]
+    }]
+  })
 }
 
-# ─────────────────────────────
-# DynamoDB権限 (セッション管理)
-# ─────────────────────────────
-data "aws_iam_policy_document" "dynamodb" {
-  statement {
-    effect = "Allow"
-    actions = [
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:UpdateItem",
-      "dynamodb:DeleteItem",
-    ]
-    resources = [var.auth_sessions_table_arn]
-  }
-}
-
+# 3. DynamoDB権限 ★修正: ユーザーマスタへの読み取りを追加
 resource "aws_iam_role_policy" "dynamodb" {
-  name   = "dynamodb-access"
-  role   = aws_iam_role.bff_auth.id
-  policy = data.aws_iam_policy_document.dynamodb.json
+  name = "dynamodb-access"
+  role = aws_iam_role.bff_auth.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        # セッション管理テーブル
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
+        Resource = [var.auth_sessions_table_arn]
+      },
+      {
+        # ★追加: ユーザーマスタテーブル (role取得用)
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
+        Resource = [var.tenant_user_master_table_arn]
+      }
+    ]
+  })
 }
 
-# ─────────────────────────────
-# KMS権限 (環境変数暗号化用)
-# ─────────────────────────────
-data "aws_iam_policy_document" "kms" {
-  statement {
-    effect    = "Allow"
-    actions   = ["kms:Decrypt"]
-    resources = [var.lambda_kms_key_arn]
-  }
-}
-
+# 4. KMS権限 (変更なし)
 resource "aws_iam_role_policy" "kms" {
-  name   = "kms-decrypt-access"
-  role   = aws_iam_role.bff_auth.id
-  policy = data.aws_iam_policy_document.kms.json
+  name = "kms-decrypt-access"
+  role = aws_iam_role.bff_auth.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["kms:Decrypt"]
+      Resource = [var.lambda_kms_key_arn]
+    }]
+  })
 }
 
-# ─────────────────────────────
-# Lambda依存ライブラリのインストール
-# ─────────────────────────────
-resource "null_resource" "deps" {
-  triggers = {
-    requirements = filesha256("${local.lambda_src_dir}/requirements.txt")
-  }
-
-  provisioner "local-exec" {
-    working_dir = local.lambda_src_dir
-
-    command = <<-EOT
-      echo "[bff-auth] install deps with pip"
-      rm -rf boto3* botocore* __pycache__
-      pip install -r requirements.txt -t .
-      echo "[bff-auth] deps installed"
-    EOT
-  }
-}
-
-# ─────────────────────────────
-# Lambda デプロイパッケージ
-# ─────────────────────────────
+# 5. Lambdaパッケージング ★他サービスに合わせ null_resource 削除
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = local.lambda_src_dir
   output_path = "${path.module}/bff_auth_payload.zip"
   excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
-
-  depends_on = [null_resource.deps]
 }
 
-# ─────────────────────────────
-# Lambda Function
-# ─────────────────────────────
+# 6. Lambda Function ★環境変数を追加
 resource "aws_lambda_function" "bff_auth" {
   function_name = var.name_prefix
   role          = aws_iam_role.bff_auth.arn
   handler       = "main.lambda_handler"
   runtime       = "python3.12"
-  architectures = ["x86_64"]  # ★layerに合わせてarm64からx86_64に変更
+  architectures = ["x86_64"]
   timeout       = 30
   memory_size   = 256
 
@@ -149,68 +111,39 @@ resource "aws_lambda_function" "bff_auth" {
 
   environment {
     variables = {
-      USER_POOL_ID        = var.user_pool_id
-      CLIENT_ID           = var.user_pool_client_id
-      SESSION_TABLE       = var.auth_sessions_table_name
-      ALLOWED_ORIGINS     = join(",", var.allowed_origins)
-      LOG_LEVEL           = "INFO"
-      # ★Powertools用環境変数追加
-      POWERTOOLS_SERVICE_NAME = "BFFAuth"
-      POWERTOOLS_LOG_LEVEL    = "INFO"
+      USER_POOL_ID             = var.user_pool_id
+      CLIENT_ID                = var.user_pool_client_id
+      SESSION_TABLE            = var.auth_sessions_table_name
+      # ★ Python側の KeyError 解消のために追加
+      TENANT_USER_MASTER_TABLE = var.tenant_user_master_table_name
+      ALLOWED_ORIGINS          = join(",", var.allowed_origins)
+      POWERTOOLS_SERVICE_NAME  = "BFFAuth"
+      POWERTOOLS_LOG_LEVEL     = "INFO"
     }
   }
 }
 
-# ─────────────────────────────
-# CloudWatch Logs
-# ─────────────────────────────
+# 7. CloudWatch Logs
 resource "aws_cloudwatch_log_group" "bff_auth" {
   name              = "/aws/lambda/${var.name_prefix}"
   retention_in_days = 30
 }
 
-# ─────────────────────────────
-# API Gateway v2 (HTTP API) 統合
-# ─────────────────────────────
-
-# Lambda統合
+# 8. API Gateway v2 統合 & 権限 (変更なし)
 resource "aws_apigatewayv2_integration" "bff_auth" {
   api_id           = var.api_gateway_id
   integration_type = "AWS_PROXY"
-
-  connection_type      = "INTERNET"
-  description          = "BFF Auth Lambda integration"
-  integration_method   = "POST"
-  integration_uri      = aws_lambda_function.bff_auth.invoke_arn
+  integration_uri  = aws_lambda_function.bff_auth.invoke_arn
   payload_format_version = "2.0"
 }
 
-# ルート定義
-resource "aws_apigatewayv2_route" "login" {
+resource "aws_apigatewayv2_route" "routes" {
+  for_each  = toset(["POST /bff/auth/login", "POST /bff/auth/logout", "GET /bff/auth/session", "POST /bff/auth/refresh"])
   api_id    = var.api_gateway_id
-  route_key = "POST /bff/auth/login"
+  route_key = each.key
   target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"
 }
 
-resource "aws_apigatewayv2_route" "logout" {
-  api_id    = var.api_gateway_id
-  route_key = "POST /bff/auth/logout"
-  target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"
-}
-
-resource "aws_apigatewayv2_route" "session" {
-  api_id    = var.api_gateway_id
-  route_key = "GET /bff/auth/session"
-  target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"
-}
-
-resource "aws_apigatewayv2_route" "refresh" {
-  api_id    = var.api_gateway_id
-  route_key = "POST /bff/auth/refresh"
-  target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"
-}
-
-# Lambda呼び出し権限
 resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"

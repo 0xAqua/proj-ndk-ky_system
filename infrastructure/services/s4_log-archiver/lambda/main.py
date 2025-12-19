@@ -5,6 +5,7 @@
 import os
 import json
 import time
+
 import datetime
 import boto3
 from botocore.exceptions import ClientError
@@ -16,8 +17,12 @@ tracer = Tracer()
 logs_client = boto3.client("logs")
 dynamodb = boto3.resource("dynamodb")
 
-TABLE_NAME = os.environ["LOG_ARCHIVE_TABLE"]
-TARGET_LOG_GROUPS = os.environ["TARGET_LOG_GROUPS"].split(",")
+TABLE_NAME = os.environ["LOG_ARCHIVE_TABLE_NAME"]
+try:
+    TARGET_LOG_GROUPS = json.loads(os.environ["TARGET_LOG_GROUPS"])
+except Exception:
+    # 万が一カンマ区切りで届いた場合のフォールバック
+    TARGET_LOG_GROUPS = os.environ["TARGET_LOG_GROUPS"].split(",")
 
 # 有効なaction_categoryの一覧
 VALID_ACTION_CATEGORIES = {"EXECUTE", "DELETE", "BATCH", "AUTH", "LOGIN", "ERROR"}

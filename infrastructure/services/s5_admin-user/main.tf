@@ -23,11 +23,12 @@ resource "aws_lambda_function" "admin_user" {
 
   environment {
     variables = {
-      USER_POOL_ID              = var.user_pool_id
-      TENANT_MASTER_TABLE       = var.tenant_master_table_name
-      TENANT_USER_MASTER_TABLE  = var.tenant_user_master_table_name
-      SESSION_TABLE_NAME        = var.session_table_name
-      LOG_LEVEL                 = "INFO"
+      SESSION_TABLE          = var.session_table_name
+      TENANT_MASTER_TABLE    = var.tenant_master_table_name
+      TENANT_USER_MASTER_TABLE = var.tenant_user_master_table_name
+      USER_POOL_ID           = var.user_pool_id
+      POWERTOOLS_SERVICE_NAME = "AdminUser"
+      LOG_LEVEL               = "INFO"
     }
   }
 

@@ -79,32 +79,14 @@ resource "aws_iam_role_policy" "dynamodb_access" {
   policy = data.aws_iam_policy_document.dynamodb_access.json
 }
 
-# ─────────────────────────────
-# Lambda のビルド・デプロイ設定
-# ─────────────────────────────
 
-resource "null_resource" "lambda_deps" {
-  triggers = {
-    requirements = filesha256("${local.lambda_src_dir}/requirements.txt")
-  }
-
-  provisioner "local-exec" {
-    working_dir = local.lambda_src_dir
-    command = <<-EOT
-      echo "[s4_log-archiver] install deps with pip"
-      rm -rf aws_lambda_powertools* boto3* __pycache__
-      pip install -r requirements.txt -t .
-      echo "[s4_log-archiver] deps installed"
-    EOT
-  }
-}
 
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = local.lambda_src_dir
   output_path = "${path.module}/lambda_payload.zip"
   excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
-  depends_on  = [null_resource.lambda_deps]
+
 }
 
 resource "aws_lambda_function" "this" {
@@ -120,6 +102,10 @@ resource "aws_lambda_function" "this" {
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
+  layers = [
+    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+  ]
 
   environment {
     variables = {

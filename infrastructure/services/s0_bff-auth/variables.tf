@@ -42,3 +42,13 @@ variable "allowed_origins" {
   description = "CORS allowed origins"
   type        = list(string)
 }
+
+variable "tenant_user_master_table_name" {
+  description = "ユーザーマスタのテーブル名"
+  type        = string
+}
+
+variable "tenant_user_master_table_arn" {
+  description = "ユーザーマスタのARN (IAM権限用)"
+  type        = string
+}

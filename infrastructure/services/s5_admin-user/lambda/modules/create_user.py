@@ -55,7 +55,7 @@ def handle(event, ctx):
 
     try:
         # 1. Cognito にユーザー作成
-        cognito.admin_create_user(
+        response = cognito.admin_create_user(
             UserPoolId=USER_POOL_ID,
             Username=email,
             UserAttributes=[
@@ -67,6 +67,13 @@ def handle(event, ctx):
             ],
             MessageAction="SUPPRESS"
         )
+
+        # ★ 修正: Cognito が発行した一意の ID (sub) を取得する
+        attributes = response.get("User", {}).get("Attributes", [])
+        cognito_sub = next(attr["Value"] for attr in attributes if attr["Name"] == "sub")
+
+        # この ID を DynamoDB のキーに使用する
+        user_id = cognito_sub
 
         # 2. パスワードを設定
         cognito.admin_set_user_password(

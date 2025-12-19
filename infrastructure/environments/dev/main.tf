@@ -472,7 +472,11 @@ module "guard-duty" {
 module "bff_auth" {
   source = "../../services/s0_bff-auth"
 
-  name_prefix = "${local.project}-${local.environment}-bff-auth"
+  name_prefix = "${local.project}-${local.environment}-s0-bff-auth"
+
+  # ★ 修正: module.dynamodb から直接取得するように変更
+  tenant_user_master_table_name = module.dynamodb.tenant_user_master_table_name
+  tenant_user_master_table_arn  = module.dynamodb.tenant_user_master_table_arn
 
   # Cognito
   user_pool_id        = module.auth.user_pool_id
