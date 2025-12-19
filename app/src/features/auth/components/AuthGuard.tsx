@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { getCurrentUser } from "aws-amplify/auth";
+import { bffAuth } from "@/lib/bffAuth"; // ★変更
 import { Spinner, Center } from "@chakra-ui/react";
 import { useAutoLogout } from "@/features/auth/hooks/useAutoLogout";
 
@@ -14,17 +14,24 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                await getCurrentUser(); // セッションチェック
-                setIsChecked(true);     // OKなら通す
+                // ★変更: BFF APIでセッションチェック
+                const session = await bffAuth.checkSession();
+
+                if (session.authenticated) {
+                    setIsChecked(true); // OKなら通す
+                } else {
+                    // NGならログイン画面へ飛ばす
+                    navigate("/login", { state: { from: location }, replace: true });
+                }
             } catch (err) {
-                // NGならログイン画面へ飛ばす
+                // エラー時もログイン画面へ
                 navigate("/login", { state: { from: location }, replace: true });
             }
         };
         void checkAuth();
     }, [navigate, location]);
 
-    // チェック中はローディング画面（真っ白だと不安になるので）
+    // チェック中はローディング画面
     if (!isChecked) {
         return (
             <Center h="100vh" bg="gray.50">

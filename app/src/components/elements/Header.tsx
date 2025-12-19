@@ -1,6 +1,6 @@
 import { Box, Flex, Text, Image, HStack, Separator } from "@chakra-ui/react";
 import { LuLogOut, LuChevronDown } from "react-icons/lu";
-import { signOut, fetchUserAttributes } from "aws-amplify/auth";
+import { bffAuth } from '@/lib/bffAuth'; // ★変更
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useUserStore } from "@/stores/useUserStore.ts";
@@ -22,15 +22,24 @@ export const Header = () => {
     const [userEmail, setUserEmail] = useState("");
     const [userName, setUserName] = useState("");
 
-    // 画面表示時にユーザー情報を取得する
+    // ★修正: BFF APIからユーザー情報を取得
     useEffect(() => {
         const getUserData = async () => {
             try {
-                const attributes = await fetchUserAttributes();
-                if (attributes.email) {
-                    setUserEmail(attributes.email);
+                const session = await bffAuth.checkSession();
+
+                if (!session.authenticated || !session.user) {
+                    setUserName("ゲスト");
+                    return;
                 }
-                const name = attributes.name || attributes.given_name || attributes.email || "User";
+
+                const user = session.user;
+
+                if (user.email) {
+                    setUserEmail(user.email);
+                }
+
+                const name = user.name || user.given_name || user.email || "User";
                 setUserName(name);
             } catch (error) {
                 console.error("ユーザー情報の取得に失敗しました", error);
@@ -40,9 +49,10 @@ export const Header = () => {
         void getUserData();
     }, []);
 
+    // ★修正: BFF APIでログアウト
     const handleLogoutClick = async () => {
         try {
-            await signOut();
+            await bffAuth.logout();
             clearUser();
             navigate('/login');
         } catch (error) {
@@ -66,19 +76,9 @@ export const Header = () => {
             top={0}
             zIndex="sticky"
         >
-            {/* relativeを指定することで、中のabsolute要素(タイトル)が
-               このFlexコンテナを基準に配置されます
-            */}
             <Flex justify="space-between" align="center" position="relative" h="32px">
 
-                {/* --- 左側：メニューアイコンなど --- */}
-                <Box
-                    // as="button" // ボタンとして振る舞う場合
-                    // cursor="pointer"
-                    // color="gray.600"
-                    // _hover={{ color: "gray.900" }}
-                    // onClick={() => console.log("Menu clicked")} // メニュー処理など
-                >
+                <Box>
                     {/*<LuMenu size={24} />*/}
                 </Box>
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signOut } from 'aws-amplify/auth';
+import { bffAuth } from '@/lib/bffAuth'; // ★変更
 
 // 無操作許容時間（ミリ秒）: 15分
 const TIMEOUT_MS = 15 * 60 * 1000;
@@ -12,7 +12,7 @@ export const useAutoLogout = () => {
     // ログアウト処理
     const handleLogout = useCallback(async () => {
         try {
-            await signOut();
+            await bffAuth.logout(); // ★変更
             if (timerRef.current) clearTimeout(timerRef.current);
 
             navigate('/login');
