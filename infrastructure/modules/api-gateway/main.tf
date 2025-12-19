@@ -15,6 +15,7 @@ resource "aws_apigatewayv2_api" "this" {
       "X-Amz-Date",
       "X-Api-Key",
       "X-Amz-Security-Token",
+      "X-Requested-With",
       "tenant-id"
     ]
 
