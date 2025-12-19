@@ -33,25 +33,33 @@ def generate_session_id() -> str:
 
 
 def lambda_handler(event, context):
-    """メインハンドラー (API Gateway v2対応)"""
+    """メインハンドラー (API Gateway v2対応 / セキュリティ強化版)"""
 
-    # ★HTTP API v2のイベント形式に対応
+    # 1. コンテキスト取得
     method = event.get('requestContext', {}).get('http', {}).get('method', '')
     path = event.get('rawPath', '')
-
-    # フォールバック: REST API形式もサポート
-    if not method:
-        method = event.get('httpMethod', '')
-    if not path:
-        path = event.get('path', '')
+    if not method: method = event.get('httpMethod', '')
+    if not path: path = event.get('path', '')
 
     log_info('Request', method=method, path=path)
 
-    # CORS対応
+    # 2. CORSヘッダー取得
     origin = event.get('headers', {}).get('origin', '')
     cors_headers = get_cors_headers(origin)
 
-    # ルーティング
+    # 3. CSRF対策: カスタムヘッダーの検証 (実運用での必須級設定)
+    # ブラウザの自動送信Cookieだけでは防げないCSRF攻撃を、JSからのカスタムヘッダーチェックで防ぎます
+    headers = event.get('headers', {})
+    # API Gateway/Lambdaではヘッダー名は小文字で渡されることが多いため .lower() で比較
+    if headers.get('x-requested-with') != 'XMLHttpRequest':
+        log_warn('CSRF check failed - missing or invalid X-Requested-With header')
+        return {
+            'statusCode': 403,
+            'headers': cors_headers,
+            'body': json.dumps({'error': 'Forbidden: Invalid request source'})
+        }
+
+    # 4. ルーティング
     if path == '/bff/auth/login' and method == 'POST':
         return handle_login(event, cors_headers)
     elif path == '/bff/auth/logout' and method == 'POST':
@@ -66,6 +74,7 @@ def lambda_handler(event, context):
             'headers': cors_headers,
             'body': json.dumps({'error': 'Not found'})
         }
+
 
 def handle_login(event: Dict, cors_headers: Dict) -> Dict:
     """ログイン処理"""
