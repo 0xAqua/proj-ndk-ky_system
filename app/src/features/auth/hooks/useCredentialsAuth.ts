@@ -7,8 +7,7 @@ export const useCredentialsAuth = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleLogin = async () => {
 
         if (!username || !password) {
             setError("メールアドレスとパスワードを入力してください。");

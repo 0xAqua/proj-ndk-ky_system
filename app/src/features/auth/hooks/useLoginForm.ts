@@ -1,5 +1,5 @@
 // src/hooks/useLoginForm.ts
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -47,9 +47,12 @@ export const useLoginForm = () => {
         void checkAuth();
     }, [navigate]);
 
-    const handleLogin = async () => {
+    // ★修正: e.preventDefault() を追加
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();  // デフォルトの送信を阻止
+
         const result = await credentialsAuth.handleLogin();
-        if (result.success) {
+        if (result?.success) {
             handleSuccess();
         }
     };
