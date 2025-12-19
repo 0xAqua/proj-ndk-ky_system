@@ -310,12 +310,12 @@ def update_session_tokens(session_id: str, tokens: Dict) -> None:
 # ユーティリティ関数
 # ─────────────────────────────
 def create_cookie(session_id: str, max_age: int = 3600) -> str:
-    """HttpOnly Cookieを生成"""
+    """実運用（ドメイン統一後）のセキュアなCookie設定"""
     cookie_parts = [
         f'sessionId={session_id}',
-        'HttpOnly',
-        'Secure',
-        'SameSite=Strict',
+        'HttpOnly',      # JSからのアクセスを禁止し、XSSによるセッション奪取を防止
+        'Secure',        # HTTPS通信のみに限定
+        'SameSite=Lax',   # ★ 実運用での推奨設定（ドメイン統一が前提）
         'Path=/',
         f'Max-Age={max_age}'
     ]
