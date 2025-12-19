@@ -1,3 +1,4 @@
+// src/hooks/useCredentialsAuth.ts
 import { useState } from "react";
 import { bffAuth } from "@/lib/bffAuth";
 
@@ -7,50 +8,33 @@ export const useCredentialsAuth = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!username || !password) {
-            setError("メールアドレスとパスワードを入力してください。");
-            return;
-        }
-
+    const handleLogin = async () => {
         setIsLoading(true);
         setError(null);
 
         try {
-            // BFF API経由でログイン
             await bffAuth.login(username, password);
 
-            // ログイン成功 (HttpOnly Cookieが自動設定される)
-            console.log("Login successful.");
-
-            // 成功を返す (useLoginFormで画面遷移を処理)
+            // ログイン成功
+            console.log("Login successful");
             return { success: true };
-
         } catch (err: any) {
-            console.error("Login failed:", err);
-
-            // バックエンドからのエラーメッセージを取得
             const message = err.response?.data?.error || 'ログインに失敗しました';
             setError(message);
-
+            console.error("Login failed:", message);
             return { success: false };
         } finally {
             setIsLoading(false);
         }
     };
 
-    const clearError = () => setError(null);
-
     return {
         username,
         setUsername,
         password,
         setPassword,
+        handleLogin,
         isLoading,
         error,
-        handleLogin,
-        clearError
     };
 };

@@ -1,6 +1,5 @@
-
+// src/lib/api.ts
 import axios from 'axios';
-import { fetchAuthSession } from 'aws-amplify/auth';
 
 // 共通のAxiosインスタンス作成
 export const api = axios.create({
@@ -8,32 +7,24 @@ export const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    withCredentials: true, // ★HttpOnly Cookie送受信を有効化
 });
 
-// リクエストインターセプター: 通信の直前に割り込んでトークンをセットする
+// ─────────────────────────────
+// リクエストインターセプター
+// BFF: トークンヘッダー不要
+// ─────────────────────────────
 api.interceptors.request.use(
     async (config) => {
-        try {
-            // Amplifyから最新のセッションを取得
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
-
-                // (任意) 将来のテナント分離のためにヘッダーにも入れておく
-                // const tenantId = session.tokens?.idToken?.payload['custom:tenant_id'];
-                // if (tenantId) config.headers['X-Tenant-ID'] = tenantId;
-            }
-        } catch (error) {
-            console.error('Failed to get auth token', error);
-        }
+        // HttpOnly Cookieがブラウザによって自動送信される
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-// レスポンスインターセプター: エラー時の共通処理
+// ─────────────────────────────
+// レスポンスインターセプター
+// ─────────────────────────────
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -41,13 +32,18 @@ api.interceptors.response.use(
         if (error.response?.status === 401) {
             console.warn("Session expired. Logging out...");
 
-            // 1. Cognitoからサインアウト
-            const { signOut } = await import('aws-amplify/auth');
-            await signOut();
+            try {
+                // BFFのログアウトエンドポイントを呼ぶ
+                await axios.post(
+                    `${import.meta.env.VITE_API_BASE_URL}/bff/auth/logout`,
+                    {},
+                    { withCredentials: true }
+                );
+            } catch (logoutError) {
+                console.error('Logout failed', logoutError);
+            }
 
-            // 2. Storeをクリア (循環参照を避けるため、直接importせずにwindow.location等でリロードさせるのが一番確実ですが、今回はStoreを呼ぶ)
-            // ※ ここでStoreを呼ぶと依存関係が複雑になるので、
-            //    一番簡単なのは「強制リロード」してログイン画面に戻すことです。
+            // ログイン画面にリダイレクト
             window.location.href = '/login';
         }
         return Promise.reject(error);

@@ -13,7 +13,7 @@ import {
 import { LuLogOut, LuChevronDown } from "react-icons/lu";
 import { Tooltip } from "@/components/ui/tooltip.tsx";
 import { Avatar } from "@/components/ui/avatar.tsx";
-import {fetchUserAttributes, signOut} from 'aws-amplify/auth';
+import { bffAuth } from '@/lib/bffAuth';
 
 // Phosphor Icons (pi)
 import {
@@ -118,8 +118,7 @@ export const AdminSidebar = () => {
 
     const handleLogoutClick = async () => {
         try {
-            await signOut();
-            // 必要に応じてリダイレクト処理
+            await bffAuth.logout();
             window.location.href = "/login";
         } catch (error) {
             console.error("ログアウトに失敗しました", error);
@@ -130,23 +129,30 @@ export const AdminSidebar = () => {
     const [userEmail, setUserEmail] = useState("");
     const [userName, setUserName] = useState("読込中...");
 
-    // 画面表示時にユーザー情報を取得する
+    // ★修正: BFF APIからユーザー情報を取得
     useEffect(() => {
         const getUserData = async () => {
             try {
-                const attributes = await fetchUserAttributes();
-                if (attributes.email) {
-                    setUserEmail(attributes.email);
+                const session = await bffAuth.checkSession();
+
+                if (!session.authenticated || !session.user) {
+                    setUserName("ゲスト");
+                    return;
+                }
+
+                const user = session.user;
+
+                if (user.email) {
+                    setUserEmail(user.email);
                 }
 
                 // 姓名を結合してフルネームを作成
-                let displayName = attributes.name; // まずnameを試す
-                if (!displayName && (attributes.family_name || attributes.given_name)) {
-                    // family_name と given_name から作成
-                    displayName = `${attributes.family_name || ''} ${attributes.given_name || ''}`.trim();
+                let displayName = user.name;
+                if (!displayName && (user.family_name || user.given_name)) {
+                    displayName = `${user.family_name || ''} ${user.given_name || ''}`.trim();
                 }
                 if (!displayName) {
-                    displayName = attributes.email || "ユーザー";
+                    displayName = user.email || "ユーザー";
                 }
 
                 setUserName(displayName);
