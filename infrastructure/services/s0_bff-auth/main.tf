@@ -170,47 +170,44 @@ resource "aws_cloudwatch_log_group" "bff_auth" {
 }
 
 # ─────────────────────────────
-# API Gateway統合
+# API Gateway v2 (HTTP API) 統合
 # ─────────────────────────────
-resource "aws_api_gateway_resource" "auth" {
-  rest_api_id = var.api_gateway_id
-  parent_id   = aws_api_gateway_resource.root.id
-  path_part   = "auth"
-}
-
-resource "aws_api_gateway_resource" "root" {
-  rest_api_id = var.api_gateway_id
-  parent_id   = data.aws_api_gateway_rest_api.api.root_resource_id
-  path_part   = "bff"
-}
-
-data "aws_api_gateway_rest_api" "api" {
-  rest_api_id = var.api_gateway_id
-}
-
-# プロキシリソース ({proxy+})
-resource "aws_api_gateway_resource" "proxy" {
-  rest_api_id = var.api_gateway_id
-  parent_id   = aws_api_gateway_resource.auth.id
-  path_part   = "{proxy+}"
-}
-
-# ANYメソッド
-resource "aws_api_gateway_method" "proxy" {
-  rest_api_id   = var.api_gateway_id
-  resource_id   = aws_api_gateway_resource.proxy.id
-  http_method   = "ANY"
-  authorization = "NONE"  # 認証前のエンドポイントなので認証不要
-}
 
 # Lambda統合
-resource "aws_api_gateway_integration" "lambda" {
-  rest_api_id             = var.api_gateway_id
-  resource_id             = aws_api_gateway_resource.proxy.id
-  http_method             = aws_api_gateway_method.proxy.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.bff_auth.invoke_arn
+resource "aws_apigatewayv2_integration" "bff_auth" {
+  api_id           = var.api_gateway_id
+  integration_type = "AWS_PROXY"
+
+  connection_type      = "INTERNET"
+  description          = "BFF Auth Lambda integration"
+  integration_method   = "POST"
+  integration_uri      = aws_lambda_function.bff_auth.invoke_arn
+  payload_format_version = "2.0"
+}
+
+# ルート定義
+resource "aws_apigatewayv2_route" "login" {
+  api_id    = var.api_gateway_id
+  route_key = "POST /bff/auth/login"
+  target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"
+}
+
+resource "aws_apigatewayv2_route" "logout" {
+  api_id    = var.api_gateway_id
+  route_key = "POST /bff/auth/logout"
+  target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"
+}
+
+resource "aws_apigatewayv2_route" "session" {
+  api_id    = var.api_gateway_id
+  route_key = "GET /bff/auth/session"
+  target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"
+}
+
+resource "aws_apigatewayv2_route" "refresh" {
+  api_id    = var.api_gateway_id
+  route_key = "POST /bff/auth/refresh"
+  target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"
 }
 
 # Lambda呼び出し権限
