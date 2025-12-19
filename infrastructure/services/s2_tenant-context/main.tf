@@ -57,32 +57,6 @@ resource "aws_iam_role_policy" "dynamodb_read" {
 }
 
 # ─────────────────────────────
-# Lambda 依存ライブラリのインストール（ローカルで pip 実行）
-# ─────────────────────────────
-resource "null_resource" "lambda_deps" {
-  # requirements.txt が変わったら再実行
-  triggers = {
-    requirements = filesha256("${local.lambda_src_dir}/requirements.txt")
-  }
-
-  provisioner "local-exec" {
-    working_dir = local.lambda_src_dir
-
-    command = <<-EOT
-      echo "[s2_tenant-context] install deps with pip"
-
-      # 念のため過去の依存を掃除
-      rm -rf aws_lambda_powertools* boto3* __pycache__
-
-      # 依存ライブラリを lambda/ 直下にインストール
-      pip install -r requirements.txt -t .
-
-      echo "[s2_tenant-context] deps installed"
-    EOT
-  }
-}
-
-# ─────────────────────────────
 # Lambda ソースコードのZIP化
 # ─────────────────────────────
 data "archive_file" "lambda_zip" {
@@ -91,8 +65,6 @@ data "archive_file" "lambda_zip" {
   output_path = "${path.module}/lambda_payload.zip"
   excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
 
-  # 先に pip 実行してから ZIP させる
-  depends_on = [null_resource.lambda_deps]
 }
 
 resource "aws_lambda_function" "this" {
@@ -106,17 +78,19 @@ resource "aws_lambda_function" "this" {
 
   kms_key_arn = var.lambda_kms_key_arn
 
+  layers = [
+    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+  ]
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   environment {
     variables = {
-      # Pythonコード内の os.environ.get("...") と合わせる
       CONSTRUCTION_MASTER_TABLE_NAME = var.construction_master_table_name
       POWERTOOLS_SERVICE_NAME        = "TenantContext"
       LOG_LEVEL                      = "INFO"
-      SESSION_TABLE_NAME            = var.session_table_name
+      SESSION_TABLE            = var.session_table_name
     }
   }
 
@@ -177,3 +151,22 @@ resource "aws_iam_role_policy" "kms_decrypt" {
   role   = aws_iam_role.this.id
   policy = data.aws_iam_policy_document.kms_decrypt.json
 }
+
+resource "aws_iam_role_policy" "session_table_access" {
+  name = "${var.name_prefix}-session-access"
+  role = aws_iam_role.this.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "dynamodb:GetItem"
+        ]
+        Effect   = "Allow"
+        Resource = var.session_table_arn
+      }
+    ]
+  })
+}
+

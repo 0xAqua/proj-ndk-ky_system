@@ -9,6 +9,26 @@ data "aws_cloudfront_origin_request_policy" "all_viewer" {
   name = "Managed-AllViewerExceptHostHeader"
 }
 
+resource "aws_cloudfront_origin_request_policy" "api_policy" {
+  name    = "${var.name_prefix}-api-origin-policy"
+
+  cookies_config {
+    cookie_behavior = "all"
+  }
+
+  headers_config {
+    header_behavior = "whitelist"
+    headers {
+      # ★ X-Requested-With を明示的に追加して Lambda まで届けます
+      items = ["Origin", "Access-Control-Request-Headers", "Access-Control-Request-Method", "X-Requested-With"]
+    }
+  }
+
+  query_strings_config {
+    query_string_behavior = "all"
+  }
+}
+
 # ─────────────────────────────
 # 2. セキュリティヘッダーポリシーの作成
 # ─────────────────────────────
@@ -78,7 +98,7 @@ resource "aws_cloudfront_distribution" "this" {
     viewer_protocol_policy = "redirect-to-https"
 
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.api_policy.id
 
     # ★ここに追加します！ (default_cache_behavior の中)
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id

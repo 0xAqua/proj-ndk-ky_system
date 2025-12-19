@@ -19,11 +19,11 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
+
 # ─────────────────────────────
-# Lambda 依存ライブラリのインストール
+# ソースコードのZIP化
 # ─────────────────────────────
 
-# producer 用
 resource "null_resource" "producer_deps" {
   triggers = {
     requirements = filesha256("${local.producer_src_dir}/requirements.txt")
@@ -32,15 +32,14 @@ resource "null_resource" "producer_deps" {
   provisioner "local-exec" {
     working_dir = local.producer_src_dir
     command = <<-EOT
-      echo "[s3_vq_workflow/producer] install deps with pip"
-      rm -rf aws_lambda_powertools* boto3* __pycache__
-      pip install -r requirements.txt -t .
-      echo "[s3_vq_workflow/producer] deps installed"
+      echo "[s3_vq_workflow/producer] install requests"
+      # Powertools は Layer で提供されるのでインストール不要
+      # requests とその依存関係だけをローカルにインストール
+      pip install requests -t .
     EOT
   }
 }
 
-# worker 用
 resource "null_resource" "worker_deps" {
   triggers = {
     requirements = filesha256("${local.worker_src_dir}/requirements.txt")
@@ -49,17 +48,14 @@ resource "null_resource" "worker_deps" {
   provisioner "local-exec" {
     working_dir = local.worker_src_dir
     command = <<-EOT
-      echo "[s3_vq_workflow/worker] install deps with pip"
-      rm -rf aws_lambda_powertools* boto3* __pycache__
-      pip install -r requirements.txt -t .
-      echo "[s3_vq_workflow/worker] deps installed"
+      echo "[s3_vq_workflow/producer] install requests"
+      # Powertools は Layer で提供されるのでインストール不要
+      # requests とその依存関係だけをローカルにインストール
+      pip install requests -t .
     EOT
   }
 }
 
-# ─────────────────────────────
-# ソースコードのZIP化
-# ─────────────────────────────
 
 data "archive_file" "producer_zip" {
   type        = "zip"
@@ -74,7 +70,7 @@ data "archive_file" "worker_zip" {
   source_dir  = local.worker_src_dir
   output_path = "${path.module}/worker_payload.zip"
   excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
-  depends_on  = [null_resource.worker_deps]
+  depends_on  = [null_resource.producer_deps]
 }
 
 # ─────────────────────────────
@@ -99,7 +95,7 @@ data "aws_iam_policy_document" "producer_policy" {
   statement { # DynamoDB Put/Get
     effect    = "Allow"
     actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"]
-    resources = [var.job_table_arn]
+    resources = [var.job_table_arn, var.session_table_arn]
   }
   statement { # SQS Send
     effect    = "Allow"
@@ -142,7 +138,7 @@ data "aws_iam_policy_document" "worker_policy" {
   statement { # DynamoDB Read/Update
     effect    = "Allow"
     actions   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
-    resources = [var.job_table_arn]
+    resources = [var.job_table_arn, var.session_table_arn]
   }
   statement { # SQS Receive/Delete/Send (★Sendは再試行ロジックで必要)
     effect    = "Allow"
@@ -182,6 +178,10 @@ resource "aws_lambda_function" "producer" {
   source_code_hash = data.archive_file.producer_zip.output_base64sha256
   kms_key_arn = var.lambda_kms_key_arn
 
+  layers = [
+    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+  ]
+
   environment {
     variables = {
       JOB_TABLE_NAME   = var.job_table_name
@@ -191,7 +191,7 @@ resource "aws_lambda_function" "producer" {
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
       MESSAGE_API_URL  = "${var.external_api_base_url}/public-api/v1/message"
       CALLBACK_URL     = "${var.api_endpoint}/webhook"
-      SESSION_TABLE_NAME            = var.session_table_name
+      SESSION_TABLE    = var.session_table_name
     }
   }
 
@@ -216,6 +216,10 @@ resource "aws_lambda_function" "worker" {
 
   reserved_concurrent_executions = 10
 
+  layers = [
+    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+  ]
+
   environment {
     variables = {
       JOB_TABLE_NAME   = var.job_table_name
@@ -230,7 +234,7 @@ resource "aws_lambda_function" "worker" {
       # ★追加: ポーリング間隔をここで管理する
       POLLING_INTERVAL = "10"
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
-      SESSION_TABLE_NAME            = var.session_table_name
+      SESSION_TABLE    = var.session_table_name
     }
   }
 

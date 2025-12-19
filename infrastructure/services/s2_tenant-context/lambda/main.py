@@ -12,7 +12,7 @@ tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
 TABLE_NAME = os.environ.get("CONSTRUCTION_MASTER_TABLE_NAME")
-SESSION_TABLE = os.environ.get("SESSION_TABLE_NAME") # ★追加: セッション管理テーブル
+SESSION_TABLE = os.environ.get("SESSION_TABLE") # ★追加: セッション管理テーブル
 
 def create_response(status_code: int, body: dict, cors_headers: dict = None) -> dict:
     headers = {"Content-Type": "application/json"}
@@ -24,26 +24,38 @@ def create_response(status_code: int, body: dict, cors_headers: dict = None) -> 
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
 
-def get_session(event: APIGatewayProxyEventV2):
-    """Cookie からセッション情報を取得"""
-    cookies = event.cookies or []
-    session_id = None
-    for c in cookies:
-        if c.startswith("sessionId="):
-            session_id = c.split("=")[1]
-            break
+def parse_cookies(cookie_header_list: list) -> dict:
+    cookies = {}
+    for cookie_str in cookie_header_list:
+        # スペースやセミコロンを考慮して分割
+        parts = cookie_str.split(';')
+        for p in parts:
+            if '=' in p:
+                k, v = p.strip().split('=', 1)
+                cookies[k] = v
+    return cookies
+
+def get_session(event):
+    raw_cookies = event.get('cookies', [])
+    # 定義済みの parse_cookies を使って辞書形式にする
+    cookies = parse_cookies(raw_cookies)
+
+    # 辞書から sessionId を取得 (大文字小文字の揺れに注意が必要なら適宜調整)
+    session_id = cookies.get('sessionId')
 
     if not session_id:
         return None
 
     try:
-        # セッションテーブルから情報を取得
-        table = dynamodb.Table(SESSION_TABLE)
-        res = table.get_item(Key={"sessionId": session_id})
-        return res.get("Item")
+        table_name = os.environ.get('SESSION_TABLE')
+        table = dynamodb.Table(table_name)
+        # DynamoDB のキー名 "session_id" で取得
+        response = table.get_item(Key={'session_id': session_id})
+        return response.get('Item')
     except Exception as e:
-        logger.error(f"Session check failed: {e}")
+        logger.error(f"Session check failed: {str(e)}")
         return None
+
 
 def build_tree(flat_items: list) -> list:
     # ... (既存の build_tree ロジックはそのまま使用) ...
@@ -100,7 +112,7 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
     if not session:
         return create_response(401, {"message": "Unauthorized"}, cors_headers)
 
-    tenant_id = session.get("tenant_id")
+    tenant_id = str(session.get("tenant_id"))
     logger.append_keys(tenant_id=tenant_id)
 
     # 3. マスタ取得処理

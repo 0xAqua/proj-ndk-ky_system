@@ -1,5 +1,7 @@
 import os
 import json
+import time
+import base64
 import boto3
 from botocore.exceptions import ClientError
 
@@ -14,14 +16,72 @@ tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
 TABLE_NAME = os.environ.get("TENANT_USER_MASTER_TABLE_NAME")
+SESSION_TABLE = os.environ.get("SESSION_TABLE")  # ★追加: セッションテーブル
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",")  # ★追加: CORS用
 
 
-def create_response(status_code: int, body: dict) -> dict:
+def create_response(status_code: int, body: dict, cors_headers: dict = None) -> dict:
+    """レスポンス生成"""
+    headers = {"Content-Type": "application/json"}
+    if cors_headers:
+        headers.update(cors_headers)
     return {
         "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
+        "headers": headers,
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
+
+
+def get_cors_headers(origin: str) -> dict:
+    """CORS用ヘッダー"""
+    if origin in ALLOWED_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Content-Type": "application/json"
+        }
+    return {"Content-Type": "application/json"}
+
+
+def get_session_from_cookie(event: APIGatewayProxyEventV2) -> str | None:
+    """CookieからセッションIDを取得"""
+    raw_cookies = event.raw_event.get("cookies", [])
+    for c in raw_cookies:
+        if c.startswith("sessionId="):
+            return c.split("=")[1]
+    return None
+
+
+def get_session(session_id: str) -> dict | None:
+    """DynamoDBからセッション情報を取得"""
+    if not SESSION_TABLE:
+        logger.error("SESSION_TABLE環境変数が未設定です")
+        return None
+
+    try:
+        session_table = dynamodb.Table(SESSION_TABLE)
+        response = session_table.get_item(Key={"session_id": session_id})
+        item = response.get("Item")
+
+        # 期限チェック
+        if item and item.get("expires_at", 0) > int(time.time()):
+            return item
+        return None
+    except ClientError as e:
+        logger.exception("セッション取得エラー", error=str(e))
+        return None
+
+
+def decode_id_token(id_token: str) -> dict:
+    """IDトークンからユーザー情報を取得"""
+    try:
+        payload = id_token.split(".")[1]
+        payload += "=" * (4 - len(payload) % 4)
+        decoded = base64.b64decode(payload)
+        return json.loads(decoded)
+    except Exception as e:
+        logger.error("トークンデコードエラー", error=str(e))
+        return {}
 
 
 @tracer.capture_lambda_handler
@@ -29,37 +89,46 @@ def create_response(status_code: int, body: dict) -> dict:
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
 
-    # 2. 環境変数のチェック
+    # ★ CORS用ヘッダー取得
+    headers = {k.lower(): v for k, v in event.raw_event.get("headers", {}).items()}
+    origin = headers.get("origin", "")
+    cors_headers = get_cors_headers(origin)
+
+    # 1. 環境変数のチェック
     if not TABLE_NAME:
-        logger.error("環境変数 'TENANT_USER_MASTER_TABLE_NAME' が設定されていません", action_category="ERROR")
-        return create_response(500, {"message": "Server configuration error"})
+        logger.error("環境変数 'TENANT_USER_MASTER_TABLE_NAME' が設定されていません")
+        return create_response(500, {"message": "Server configuration error"}, cors_headers)
 
-    # 3. トークン(JWT)から情報の取り出し
-    # ★修正ポイント:
-    # Powertoolsのオブジェクトアクセス(event.request_context...)がエラーになる場合があるため、
-    # 'raw_event' (生の辞書データ) から安全に取得する方法に変更しました。
-    raw_claims = (
-        event.raw_event.get("requestContext", {})
-        .get("authorizer", {})
-        .get("jwt", {})
-        .get("claims", {})
-    )
+    if not SESSION_TABLE:
+        logger.error("環境変数 'SESSION_TABLE' が設定されていません")
+        return create_response(500, {"message": "Server configuration error"}, cors_headers)
 
-    tenant_id = raw_claims.get("custom:tenant_id") or raw_claims.get("tenant_id")
-    user_id = raw_claims.get("sub")
+    # 2. ★修正: CookieからセッションIDを取得
+    session_id = get_session_from_cookie(event)
+    if not session_id:
+        logger.warning("セッションIDがありません")
+        return create_response(401, {"message": "認証が必要です"}, cors_headers)
+
+    # 3. ★修正: DynamoDBからセッション情報を取得
+    session = get_session(session_id)
+    if not session:
+        logger.warning("セッションが無効または期限切れです", session_id=session_id[:8])
+        return create_response(401, {"message": "セッションが無効です"}, cors_headers)
+
+    # 4. ★修正: セッションからユーザー情報を取得
+    tenant_id = session.get("tenant_id")
+    user_id = session.get("user_id")
 
     # ログにテナントID等を付与
     logger.append_keys(tenant_id=tenant_id, user_id=user_id)
 
     if not tenant_id or not user_id:
-        logger.warning("トークンにtenant_idまたはuser_idがありません", action_category="ERROR")
-        # デバッグ用に claims の中身をログに出す（本番ログで見るとき用）
-        logger.debug("受信したclaims", action_category="EXECUTE", claims=raw_claims)
-        return create_response(400, {"message": "Invalid token claims"})
+        logger.warning("セッションにtenant_idまたはuser_idがありません")
+        return create_response(400, {"message": "Invalid session data"}, cors_headers)
 
     logger.info("テナントユーザー情報を取得します", action_category="EXECUTE")
 
-    # 4. DynamoDBアクセス
+    # 5. DynamoDBからテナントユーザー情報を取得
     try:
         table = dynamodb.Table(TABLE_NAME)
         response = table.get_item(
@@ -69,21 +138,40 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
             }
         )
     except ClientError:
-        logger.exception("DynamoDBアクセスに失敗しました", action_category="ERROR")
-        return create_response(500, {"message": "Database access error"})
+        logger.exception("DynamoDBアクセスに失敗しました")
+        return create_response(500, {"message": "Database access error"}, cors_headers)
     except Exception:
-        logger.exception("予期しないエラーが発生しました", action_category="ERROR")
-        return create_response(500, {"message": "Internal server error"})
+        logger.exception("予期しないエラーが発生しました")
+        return create_response(500, {"message": "Internal server error"}, cors_headers)
 
-    # 5. レスポンス返却
-    user_item = response.get("Item")
+    # 6. レスポンス返却
+    user_item = response.get("Item") or {}
+
+    # 1. IDトークン（Cognito）から情報を取得
+    id_token = session.get("id_token", "")
+    token_info = decode_id_token(id_token) if id_token else {}
+
+    # 2. 名前の構築 (Cognitoの苗字と名前を結合)
+    # Cognitoの 'name' 属性が空でも、family_name と given_name から生成します
+    full_name = token_info.get("name")
+    if not full_name:
+        f_name = token_info.get("family_name", "")
+        g_name = token_info.get("given_name", "")
+        full_name = f"{f_name}{g_name}".strip() or None
 
     logger.info("テナントユーザー情報を取得しました", action_category="EXECUTE")
 
+    # 3. レスポンスボディの構築（必要なものだけに絞り込む）
     response_body = {
         "tenantId": tenant_id,
         "userId": user_id,
-        "tenantUser": user_item
+        "email": token_info.get("email"),  # CognitoのEmailを使用
+        "name": full_name,                # 結合した名前
+        "tenantUser": {
+            "departments": user_item.get("departments", {}), # 必須データ
+            "role": user_item.get("role"),
+            "status": user_item.get("status")
+        }
     }
 
-    return create_response(200, response_body)
+    return create_response(200, response_body, cors_headers)

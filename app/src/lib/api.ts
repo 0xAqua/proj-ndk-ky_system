@@ -15,13 +15,10 @@ export const api = axios.create({
 // リクエストインターセプター
 // BFF: トークンヘッダー不要
 // ─────────────────────────────
-api.interceptors.request.use(
-    async (config) => {
-        // HttpOnly Cookieがブラウザによって自動送信される
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
+api.interceptors.request.use((config) => {
+    config.headers['X-Requested-With'] = 'XMLHttpRequest'; // ★ これが必須
+    return config;
+});
 
 // ─────────────────────────────
 // レスポンスインターセプター

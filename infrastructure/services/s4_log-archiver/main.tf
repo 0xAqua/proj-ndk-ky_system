@@ -6,40 +6,53 @@ locals {
 }
 
 # ─────────────────────────────
-# IAM Role (Log Archiver)
+# 1. IAM Role & Lambda Function
 # ─────────────────────────────
-resource "aws_iam_role" "archiver_role" {
-  name = "${var.name_prefix}-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
-  })
+
+data "aws_iam_policy_document" "assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+  }
 }
 
+resource "aws_iam_role" "this" {
+  name               = "${var.name_prefix}-role"
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
+
+# 基本ポリシー (CloudWatch Logs)
 resource "aws_iam_role_policy_attachment" "basic" {
-  role       = aws_iam_role.archiver_role.name
+  role       = aws_iam_role.this.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# 独自の強力なポリシー (Logs Query & DynamoDB Write)
-data "aws_iam_policy_document" "archiver_policy" {
-  # 1. CloudWatch Logs Insights を実行する権限
+# ログ収集に必要な権限 (CloudWatch Logs からの読み取り)
+data "aws_iam_policy_document" "log_access" {
   statement {
     effect = "Allow"
     actions = [
-      "logs:StartQuery",
-      "logs:GetQueryResults",
-      "logs:StopQuery",
-      "logs:DescribeLogGroups"
+      "logs:DescribeLogGroups",
+      "logs:DescribeLogStreams",
+      "logs:GetLogEvents",
+      "logs:FilterLogEvents"
     ]
-    resources = ["*"] # Insights APIはワイルドカード指定が一般的
+    resources = ["*"] # 特定のロググループに絞る場合は var.target_log_group_arns を使用
   }
+}
 
-  # 2. 保存先 DynamoDB への書き込み
+resource "aws_iam_role_policy" "log_access" {
+  name   = "cloudwatch-logs-access"
+  role   = aws_iam_role.this.id
+  policy = data.aws_iam_policy_document.log_access.json
+}
+
+# DynamoDB への書き込み（アーカイブ）およびセッション確認権限
+data "aws_iam_policy_document" "dynamodb_access" {
+  # アーカイブ先テーブルへの権限
   statement {
     effect = "Allow"
     actions = [
@@ -48,101 +61,89 @@ data "aws_iam_policy_document" "archiver_policy" {
     ]
     resources = [var.log_archive_table_arn]
   }
+
+  # ★ 追加: セッション管理テーブルへの読み取り権限
+  # プログラム内で get_session() 等を呼ぶ場合に必須です
+  statement {
+    effect = "Allow"
+    actions = [
+      "dynamodb:GetItem"
+    ]
+    resources = [var.session_table_arn]
+  }
 }
 
-resource "aws_iam_role_policy" "archiver_policy" {
-  role   = aws_iam_role.archiver_role.id
-  policy = data.aws_iam_policy_document.archiver_policy.json
+resource "aws_iam_role_policy" "dynamodb_access" {
+  name   = "dynamodb-archive-access"
+  role   = aws_iam_role.this.id
+  policy = data.aws_iam_policy_document.dynamodb_access.json
 }
 
 # ─────────────────────────────
-# Lambda 依存ライブラリのインストール（ローカル pip）
+# Lambda のビルド・デプロイ設定
 # ─────────────────────────────
+
 resource "null_resource" "lambda_deps" {
-  # requirements.txt が変わったら再実行
   triggers = {
     requirements = filesha256("${local.lambda_src_dir}/requirements.txt")
   }
 
   provisioner "local-exec" {
     working_dir = local.lambda_src_dir
-
     command = <<-EOT
       echo "[s4_log-archiver] install deps with pip"
-
-      # 念のため過去の依存を掃除
       rm -rf aws_lambda_powertools* boto3* __pycache__
-
-      # 依存ライブラリを lambda/ 直下にインストール
       pip install -r requirements.txt -t .
-
       echo "[s4_log-archiver] deps installed"
     EOT
   }
 }
 
-# ─────────────────────────────
-# Lambda Function
-# ─────────────────────────────
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = local.lambda_src_dir
   output_path = "${path.module}/lambda_payload.zip"
-
-  excludes = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
-
-  # 先に pip を実行させる
-  depends_on = [null_resource.lambda_deps]
+  excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+  depends_on  = [null_resource.lambda_deps]
 }
 
 resource "aws_lambda_function" "this" {
   function_name = var.name_prefix
-  role          = aws_iam_role.archiver_role.arn
+  role          = aws_iam_role.this.arn
   handler       = "main.lambda_handler"
   runtime       = "python3.12"
-  timeout       = 300 # ログ集計は時間がかかるので長めに (5分)
-  memory_size   = 512 # メモリを増やして処理速度UP
+  architectures = ["arm64"]
+  timeout       = 60
+  memory_size   = 256
+
+  kms_key_arn = var.lambda_kms_key_arn
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
-  kms_key_arn = var.lambda_kms_key_arn
   environment {
     variables = {
-      LOG_ARCHIVE_TABLE = var.log_archive_table_name
-      TARGET_LOG_GROUPS = join(",", var.target_log_group_names)
-      POWERTOOLS_SERVICE_NAME = "log-archiver"
+      LOG_ARCHIVE_TABLE_NAME = var.log_archive_table_name
+      TARGET_LOG_GROUPS      = jsonencode(var.target_log_group_names)
+      POWERTOOLS_SERVICE_NAME = "LogArchiver"
       LOG_LEVEL               = "INFO"
-      SESSION_TABLE_NAME            = var.session_table_name
+      # ★ 追加: セッション検証用
+      SESSION_TABLE_NAME     = var.session_table_name
     }
   }
 }
 
 # ─────────────────────────────
-# EventBridge Scheduler (Cron)
+# 2. CloudWatch Log Group
 # ─────────────────────────────
-# 毎日深夜 1:00 (JST) -> UTC 16:00 に実行
-resource "aws_cloudwatch_event_rule" "daily_schedule" {
-  name                = "${var.name_prefix}-daily-trigger"
-  description         = "Trigger log archiver daily"
-  schedule_expression = "cron(0 16 * * ? *)" # UTC 16:00 = JST 01:00
+resource "aws_cloudwatch_log_group" "this" {
+  name              = "/aws/lambda/${var.name_prefix}"
+  retention_in_days = 30
 }
 
-resource "aws_cloudwatch_event_target" "lambda_target" {
-  rule      = aws_cloudwatch_event_rule.daily_schedule.name
-  target_id = "LogArchiverLambda"
-  arn       = aws_lambda_function.this.arn
-}
-
-resource "aws_lambda_permission" "allow_eventbridge" {
-  statement_id  = "AllowExecutionFromEventBridge"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.this.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.daily_schedule.arn
-}
-
-# KMS 復号権限
+# ─────────────────────────────
+# 3. KMS Decrypt Policy
+# ─────────────────────────────
 data "aws_iam_policy_document" "kms_decrypt" {
   statement {
     effect    = "Allow"
@@ -153,6 +154,6 @@ data "aws_iam_policy_document" "kms_decrypt" {
 
 resource "aws_iam_role_policy" "kms_decrypt" {
   name   = "kms-decrypt-access"
-  role   = aws_iam_role.archiver_role.id
+  role   = aws_iam_role.this.id
   policy = data.aws_iam_policy_document.kms_decrypt.json
 }

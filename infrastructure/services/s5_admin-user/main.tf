@@ -65,6 +65,9 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
 }
 
 # DynamoDB Policy
+# ─────────────────────────────
+# IAM Role 関連 (DynamoDB Policy の修正)
+# ─────────────────────────────
 resource "aws_iam_role_policy" "dynamodb_policy" {
   name = "${var.name_prefix}-dynamodb"
   role = aws_iam_role.lambda_role.id
@@ -85,13 +88,14 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
         Resource = [
           var.tenant_master_table_arn,
           var.tenant_user_master_table_arn,
-          "${var.tenant_user_master_table_arn}/index/*"
+          "${var.tenant_user_master_table_arn}/index/*",
+          # ★ 追加: セッション管理テーブルへのアクセス権限
+          var.session_table_arn
         ]
       }
     ]
   })
 }
-
 # Cognito Admin Policy
 resource "aws_iam_role_policy" "cognito_admin_policy" {
   name = "${var.name_prefix}-cognito-admin"

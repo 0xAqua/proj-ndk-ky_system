@@ -53,47 +53,17 @@ resource "aws_iam_role_policy" "dynamodb_read" {
 }
 
 # ─────────────────────────────
-# Lambda 依存ライブラリのインストール（ローカルで pip 実行）
+# Lambda Function 本体
 # ─────────────────────────────
-resource "null_resource" "lambda_deps" {
-  # requirements.txt が変わったら再実行
-  triggers = {
-    requirements = filesha256("${local.lambda_src_dir}/requirements.txt")
-  }
 
-  provisioner "local-exec" {
-    working_dir = local.lambda_src_dir
-
-    command = <<-EOT
-      echo "[s1_auth-user] install deps with pip"
-
-      # 念のため過去の依存を掃除
-      rm -rf aws_lambda_powertools* boto3* __pycache__
-
-      # 依存ライブラリを lambda/ 直下にインストール
-      pip install -r requirements.txt -t .
-
-      echo "[s1_auth-user] deps installed"
-    EOT
-  }
-}
-
-# ─────────────────────────────
-# Lambda ソースコードのZIP化
-# ─────────────────────────────
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = local.lambda_src_dir
   output_path = "${path.module}/lambda_payload.zip"
   excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
 
-  # 先に pip 実行してから ZIP させる
-  depends_on = [null_resource.lambda_deps]
 }
 
-# ─────────────────────────────
-# Lambda Function 本体
-# ─────────────────────────────
 resource "aws_lambda_function" "this" {
   function_name = var.name_prefix
   role          = aws_iam_role.this.arn
@@ -102,19 +72,23 @@ resource "aws_lambda_function" "this" {
   architectures = ["arm64"]
   timeout       = 10
   memory_size   = 256
-  reserved_concurrent_executions = 100  # 最大同時実行数を制限
+  reserved_concurrent_executions = 10
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   kms_key_arn = var.lambda_kms_key_arn
 
+  layers = [
+    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
+  ]
+
   environment {
     variables = {
       TENANT_USER_MASTER_TABLE_NAME = var.tenant_user_master_table_name
       POWERTOOLS_SERVICE_NAME       = "AuthUserContext"
       LOG_LEVEL                     = "INFO"
-      SESSION_TABLE_NAME            = var.session_table_name
+      SESSION_TABLE            = var.session_table_name
     }
   }
 
@@ -143,8 +117,8 @@ resource "aws_apigatewayv2_route" "get_me" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 
   # 共通Authorizerを使用
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+  authorization_type = "NONE"
+
 }
 
 # ─────────────────────────────
@@ -179,4 +153,22 @@ resource "aws_iam_role_policy" "kms_decrypt" {
   name   = "kms-decrypt-access"
   role   = aws_iam_role.this.id
   policy = data.aws_iam_policy_document.kms_decrypt.json
+}
+
+resource "aws_iam_role_policy" "session_table_access" {
+  name = "${var.name_prefix}-session-access"
+  role = aws_iam_role.this.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "dynamodb:GetItem"
+        ]
+        Effect   = "Allow"
+        Resource = var.session_table_arn
+      }
+    ]
+  })
 }

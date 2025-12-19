@@ -13,7 +13,7 @@ logger = Logger()
 tracer = Tracer()
 
 dynamodb = boto3.resource('dynamodb')
-SESSION_TABLE_NAME = os.environ.get('SESSION_TABLE_NAME') # ★追加
+SESSION_TABLE = os.environ.get('SESSION_TABLE') # ★追加
 
 def create_response(status_code: int, body: dict, origin: str) -> dict:
     """CORS・Cookie対応の共通レスポンス生成"""
@@ -27,20 +27,45 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
 
-def get_session_info(event: APIGatewayProxyEventV2):
-    """Cookieからセッション情報を取得 (BFF方式)"""
-    cookies = event.cookies or []
-    session_id = next((c.split("=")[1] for c in cookies if c.startswith("sessionId=")), None)
+def get_session(event):
+    """
+    Cookie から sessionId を抽出し、DynamoDB からセッション情報を取得します。
+    """
+    # API Gateway v2 形式では event['cookies'] にリストで入っています
+    cookies = event.get('cookies', [])
+    session_id = None
 
+    # Cookie リストから sessionId を探す
+    for cookie_str in cookies:
+        if cookie_str.startswith("sessionId="):
+            # "sessionId=abc123xxx" -> "abc123xxx"
+            session_id = cookie_str.split("=")[1]
+            break
+
+    # セッションIDが見つからない場合は未認証として返す
     if not session_id:
         return None
 
     try:
-        table = dynamodb.Table(SESSION_TABLE_NAME)
-        res = table.get_item(Key={"sessionId": session_id})
-        return res.get("Item")
+        # 環境変数 SESSION_TABLE からテーブルを取得
+        # ※ SESSION_TABLE は各 main.tf で設定済み
+        table_name = os.environ.get('SESSION_TABLE')
+        table = dynamodb.Table(table_name)
+
+        # ★ 修正ポイント:
+        # DynamoDB のキー定義に合わせて "session_id" (スネークケース) を使用
+        response = table.get_item(
+            Key={
+                'session_id': session_id
+            }
+        )
+
+        # 取得できた Item (セッション情報) を返す
+        return response.get('Item')
+
     except Exception as e:
-        logger.error(f"Session lookup failed: {e}")
+        # 権限不足やキー名の間違いがあるとここでログが出る
+        print(f"Session check failed: {str(e)}")
         return None
 
 @tracer.capture_lambda_handler
@@ -59,8 +84,8 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
     if not session:
         return create_response(401, {"message": "Unauthorized"}, origin)
 
-    tenant_id = session.get("tenant_id")
-    caller_user_id = session.get("user_id")
+    tenant_id = str(session.get("tenant_id"))
+    caller_user_id = str(session.get("user_id"))
 
     # 管理者権限のチェック (実運用上のガードレール)
     if session.get("role") != "admin":

@@ -23,17 +23,18 @@ export const useUserStore = create<UserState>((set) => ({
     isLoading: false,
 
     setUserData: (data) => {
-        const nestedDepts = data.tenantUser?.departments;
+        // オプショナルチェイニングで安全に取得
+        const nestedDepts = data?.tenantUser?.departments;
 
-        // データの取得（優先順位: 直下 > tenantUser配下 > 空）
-        const formattedDepts: Department[] = Object.entries(nestedDepts).map(([key, value]) => ({
+        // nestedDepts が null/undefined の場合は {} を使用する
+        const formattedDepts: Department[] = Object.entries(nestedDepts ?? {}).map(([key, value]) => ({
             id: key,
             name: String(value)
         }));
 
         set({
-            tenantId: data.tenantId,
-            userId: data.userId,
+            tenantId: data?.tenantId,
+            userId: data?.userId,
             departments: formattedDepts,
         });
     },

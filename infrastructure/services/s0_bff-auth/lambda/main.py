@@ -33,49 +33,41 @@ def generate_session_id() -> str:
 
 
 def lambda_handler(event, context):
-    """メインハンドラー (API Gateway v2対応 / セキュリティ強化版)"""
-
+    """メインハンドラー (Forbidden解消版)"""
     # 1. コンテキスト取得
     method = event.get('requestContext', {}).get('http', {}).get('method', '')
     path = event.get('rawPath', '')
-    if not method: method = event.get('httpMethod', '')
-    if not path: path = event.get('path', '')
 
-    log_info('Request', method=method, path=path)
+    # 2. ヘッダーを小文字で統一して取得
+    headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
 
-    # 2. CORSヘッダー取得
-    origin = event.get('headers', {}).get('origin', '')
+    # Origin の取得 (CORS用)
+    origin = headers.get('origin', '')
     cors_headers = get_cors_headers(origin)
 
-    # 3. CSRF対策: カスタムヘッダーの検証
-    # 大文字小文字の揺れを許容するために .get() を重ねてチェックします
-    headers = event.get('headers', {})
-    x_requested_with = headers.get('x-requested-with') or headers.get('X-Requested-With')
+    # 3. CSRF対策 ★ここを修正
+    # 値自体も .lower() してから比較することで、大文字小文字の差を無視します
+    x_requested_with = str(headers.get('x-requested-with', '')).lower()
 
-    if x_requested_with != 'XMLHttpRequest':
-        # デバッグのために、実際に届いているヘッダー値をログに出力します
-        log_warn(f'CSRF check failed - Header found: {x_requested_with}')
+    if x_requested_with != 'xmlhttprequest':
+        # デバッグ用: 実際に届いている値をログに出して原因を特定しやすくします
+        log_warn(f'CSRF check failed: {x_requested_with}')
         return {
             'statusCode': 403,
             'headers': cors_headers,
-            'body': json.dumps({'error': 'Forbidden: Invalid request source'})
+            'body': json.dumps({'error': 'Forbidden'})
         }
 
-    # 4. ルーティング (以降は変更なし)
+    # 4. ルーティング (以降はそのまま)
     if path == '/bff/auth/login' and method == 'POST':
         return handle_login(event, cors_headers)
-    elif path == '/bff/auth/logout' and method == 'POST':
-        return handle_logout(event, cors_headers)
     elif path == '/bff/auth/session' and method == 'GET':
         return handle_session_check(event, cors_headers)
-    elif path == '/bff/auth/refresh' and method == 'POST':
-        return handle_refresh(event, cors_headers)
-    else:
-        return {
-            'statusCode': 404,
-            'headers': cors_headers,
-            'body': json.dumps({'error': 'Not found'})
-        }
+    elif path == '/bff/auth/logout' and method == 'POST':
+        return handle_logout(event, cors_headers)
+
+    return {'statusCode': 404, 'headers': cors_headers, 'body': json.dumps({'error': 'Not found'})}
+
 
 def handle_login(event: Dict, cors_headers: Dict) -> Dict:
     """ログイン処理"""
@@ -105,11 +97,18 @@ def handle_login(event: Dict, cors_headers: Dict) -> Dict:
 
         tokens = response['AuthenticationResult']
 
+        # IDトークンをデコードしてユーザー情報を取得
+        user_info = decode_id_token(tokens['IdToken'])
+
+        # ★ ここが重要：メールアドレスではなく、UUID (sub) を取得する
+        user_uuid = user_info.get('sub') # Cognitoのユーザー一意識別子
+        tenant_id = user_info.get('custom:tenant_id', 'UNKNOWN')
+
         # セッションID生成
         session_id = generate_session_id()
 
-        # DynamoDBに保存
-        save_session(session_id, tokens, username)
+        # ★ 修正：username ではなく user_uuid を保存する
+        save_session(session_id, tokens, user_uuid, tenant_id)
 
         log_info('Login successful', username=username)
 
@@ -163,51 +162,43 @@ def handle_logout(event: Dict, cors_headers: Dict) -> Dict:
         return error_response(500, 'ログアウトに失敗しました', cors_headers)
 
 
-# infrastructure/services/s0_bff-auth/lambda/handler.py
-# handle_session_check 関数を修正
-
 def handle_session_check(event: Dict, cors_headers: Dict) -> Dict:
-    """セッション確認 + ユーザー情報取得"""
+    """セッション確認 (無限ループ・クラッシュ完全回避)"""
     try:
-        cookies = parse_cookies(event.get('headers', {}).get('Cookie', ''))
-        session_id = cookies.get('sessionId')
+        # API Gateway v2 専用の cookies リストから取得
+        raw_cookies = event.get('cookies', [])
+        session_id = None
+        for c in raw_cookies:
+            if c.startswith("sessionId="):
+                session_id = c.split("=")[1]
+                break
 
         if not session_id:
-            return {
-                'statusCode': 200,
-                'headers': cors_headers,
-                'body': json.dumps({'authenticated': False})
-            }
+            return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'authenticated': False})}
 
         session = get_session(session_id)
-
         if not session:
-            return {
-                'statusCode': 200,
-                'headers': cors_headers,
-                'body': json.dumps({'authenticated': False})
-            }
+            # ★修正: logger ではなく log_info を使用
+            log_info(f"Session not found: {session_id[:8]}...")
+            return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'authenticated': False})}
 
-        # ★追加: IDトークンからユーザー情報を取得
         user_info = decode_id_token(session.get('id_token'))
-
         return {
             'statusCode': 200,
             'headers': cors_headers,
             'body': json.dumps({
                 'authenticated': True,
                 'user': {
-                    'id': session.get('user_id'),
+                    'id': str(session.get('user_id')),
+                    'tenant_id': str(session.get('tenant_id', '')),
                     'email': user_info.get('email'),
                     'name': user_info.get('name'),
-                    'family_name': user_info.get('family_name'),
-                    'given_name': user_info.get('given_name'),
                 }
             })
         }
     except Exception as e:
         log_error('Session check error', str(e))
-        return error_response(500, 'セッション確認に失敗しました', cors_headers)
+        return error_response(500, 'Internal Server Error', cors_headers)
 
 def decode_id_token(id_token: str) -> Dict:
     """IDトークンからユーザー情報を取得"""
@@ -263,12 +254,13 @@ def handle_refresh(event: Dict, cors_headers: Dict) -> Dict:
 # ─────────────────────────────
 # セッション管理関数
 # ─────────────────────────────
-def save_session(session_id: str, tokens: Dict, user_id: str) -> None:
+def save_session(session_id: str, tokens: Dict, user_id: str, tenant_id: str) -> None:
     """セッションをDynamoDBに保存"""
     session_table.put_item(
         Item={
             'session_id': session_id,
             'user_id': user_id,
+            'tenant_id': tenant_id, # ★これが無いと他のSサービスが動きません
             'access_token': tokens['AccessToken'],
             'id_token': tokens['IdToken'],
             'refresh_token': tokens['RefreshToken'],
@@ -276,7 +268,6 @@ def save_session(session_id: str, tokens: Dict, user_id: str) -> None:
             'created_at': int(time.time())
         }
     )
-
 
 def get_session(session_id: str) -> Optional[Dict]:
     """セッションをDynamoDBから取得"""
@@ -320,14 +311,15 @@ def update_session_tokens(session_id: str, tokens: Dict) -> None:
 # ユーティリティ関数
 # ─────────────────────────────
 def create_cookie(session_id: str, max_age: int = 3600) -> str:
-    """実運用（ドメイン統一後）のセキュアなCookie設定"""
+    """ブラウザに拒否されないCookie属性の設定"""
     cookie_parts = [
         f'sessionId={session_id}',
-        'HttpOnly',      # JSからのアクセスを禁止し、XSSによるセッション奪取を防止
-        'Secure',        # HTTPS通信のみに限定
-        'SameSite=Lax',   # ★ 実運用での推奨設定（ドメイン統一が前提）
+        'HttpOnly',
+        'Secure',
+        'SameSite=None',
         'Path=/',
-        f'Max-Age={max_age}'
+        f'Max-Age={max_age}',
+        'Partitioned'  # ★ 2025年のブラウザ（Chrome等）のサードパーティCookie規制対策
     ]
     return '; '.join(cookie_parts)
 

@@ -86,7 +86,9 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
           var.tenant_user_master_table_arn,
           "${var.tenant_user_master_table_arn}/index/*",
           var.tenant_log_archive_table_arn,
-          "${var.tenant_log_archive_table_arn}/index/*"
+          "${var.tenant_log_archive_table_arn}/index/*",
+          # ★ ここを追加します
+          var.session_table_arn
         ]
       }
     ]

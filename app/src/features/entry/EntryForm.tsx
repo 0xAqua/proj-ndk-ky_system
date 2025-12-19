@@ -49,6 +49,9 @@ export const EntryForm = () => {
             setLoading(true);
             try {
                 const userRes = await api.get('/me');
+
+                // ★ ここでレスポンスの中身をチェック
+                console.log("API Response Data:", userRes.data);
                 if (userRes.data) {
                     setUserData(userRes.data);
                 }

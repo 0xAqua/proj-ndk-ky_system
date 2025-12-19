@@ -174,7 +174,7 @@ def lambda_handler(event, context):
                     continue
 
                 # CloudWatch Logs Insightsで抽出できた tenant_id を使用
-                tenant_id = item.get("tenant_id", "UNKNOWN")
+                tenant_id = str(item.get("tenant_id", "UNKNOWN"))
 
                 # 【修正】キーの重複回避ロジック
                 # まったく同じ tenant_id と timestamp (ミリ秒) が存在する場合、
@@ -205,7 +205,7 @@ def lambda_handler(event, context):
                     "message": message,
 
                     # コンテキスト
-                    "user_id": item.get("user_id", msg_data.get("user_id", "SYSTEM")),
+                    "user_id": str(item.get("user_id", msg_data.get("user_id", "SYSTEM"))),
                     "function_name": function_name,
                     "action_category": action_category,
 

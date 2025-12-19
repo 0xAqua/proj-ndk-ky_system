@@ -89,18 +89,17 @@ module "s1_auth_user" {
   # AGW情報
   api_gateway_id            = module.api_gateway.api_id
   api_gateway_execution_arn = module.api_gateway.api_execution_arn
-  authorizer_id             = module.api_gateway.authorizer_id
-  user_pool_client_id       = module.auth.user_pool_client_id
-  user_pool_id              = module.auth.user_pool_id
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
 
+  # セッション
   session_table_name = module.dynamodb.auth_sessions_table_name
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
 
+  # ★追加
+  allowed_origins = local.allowed_origins_string
 }
-
 # ─────────────────────────────
 # 6-2. バックエンドサービス (S2 Tenant Context)
 # ─────────────────────────────

@@ -3,16 +3,6 @@ variable "name_prefix" {
   type        = string
 }
 
-variable "user_pool_id" {
-  description = "Cognito User Pool ID"
-  type        = string
-}
-
-variable "user_pool_client_id" {
-  description = "Cognito User Pool Client ID"
-  type        = string
-}
-
 variable "tenant_user_master_table_name" {
   description = "DynamoDB Table Name"
   type        = string
@@ -29,7 +19,7 @@ variable "api_gateway_id" {
 
 }
 variable "api_gateway_execution_arn" { type = string }
-variable "authorizer_id" { type = string }
+
 
 variable "lambda_kms_key_arn" {
   description = "KMS key ARN for Lambda environment encryption"
@@ -45,3 +35,10 @@ variable "session_table_arn" {
   description = "ARN of the DynamoDB table for sessions"
   type        = string
 }
+
+variable "allowed_origins" {
+  description = "CORS許可オリジン（カンマ区切り）"
+  type        = string
+  default     = ""
+}
+
