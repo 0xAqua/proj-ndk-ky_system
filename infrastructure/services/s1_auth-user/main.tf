@@ -114,6 +114,7 @@ resource "aws_lambda_function" "this" {
       TENANT_USER_MASTER_TABLE_NAME = var.tenant_user_master_table_name
       POWERTOOLS_SERVICE_NAME       = "AuthUserContext"
       LOG_LEVEL                     = "INFO"
+      SESSION_TABLE_NAME            = var.session_table_name
     }
   }
 

@@ -25,6 +25,7 @@ resource "aws_lambda_function" "vq_jobs" {
     variables = {
       TENANT_VQ_MANAGER_TABLE = var.tenant_vq_manager_table_name
       LOG_LEVEL               = "INFO"
+      SESSION_TABLE_NAME      = var.session_table_name
     }
   }
 
@@ -71,13 +72,11 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
     Statement = [
       {
         Effect = "Allow"
-        Action = [
-          "dynamodb:Query",
-          "dynamodb:GetItem"
-        ]
+        Action = ["dynamodb:Query", "dynamodb:GetItem"]
         Resource = [
           var.tenant_vq_manager_table_arn,
-          "${var.tenant_vq_manager_table_arn}/index/*"
+          "${var.tenant_vq_manager_table_arn}/index/*",
+          var.session_table_arn
         ]
       }
     ]
@@ -113,8 +112,7 @@ resource "aws_apigatewayv2_route" "list_jobs" {
   api_id             = var.api_gateway_id
   route_key          = "GET /vq-jobs"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+  authorization_type = "NONE"
 }
 
 # Lambda Integration

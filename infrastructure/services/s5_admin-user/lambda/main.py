@@ -2,69 +2,90 @@ import os
 import json
 import boto3
 from botocore.exceptions import ClientError
-
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.data_classes import event_source, APIGatewayProxyEventV2
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
+# 各アクションのハンドラをインポート
 from modules import list_users, create_user, get_user, update_user, delete_user
 
-# サービスの初期化
 logger = Logger()
 tracer = Tracer()
 
+dynamodb = boto3.resource('dynamodb')
+SESSION_TABLE_NAME = os.environ.get('SESSION_TABLE_NAME') # ★追加
 
-def create_response(status_code: int, body: dict) -> dict:
+def create_response(status_code: int, body: dict, origin: str) -> dict:
+    """CORS・Cookie対応の共通レスポンス生成"""
     return {
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true" # ★重要
         },
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
 
+def get_session_info(event: APIGatewayProxyEventV2):
+    """Cookieからセッション情報を取得 (BFF方式)"""
+    cookies = event.cookies or []
+    session_id = next((c.split("=")[1] for c in cookies if c.startswith("sessionId=")), None)
+
+    if not session_id:
+        return None
+
+    try:
+        table = dynamodb.Table(SESSION_TABLE_NAME)
+        res = table.get_item(Key={"sessionId": session_id})
+        return res.get("Item")
+    except Exception as e:
+        logger.error(f"Session lookup failed: {e}")
+        return None
 
 @tracer.capture_lambda_handler
 @event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
+    origin = event.headers.get('origin', '')
 
-    # JWTからテナント情報を取得
-    raw_claims = (
-        event.raw_event.get("requestContext", {})
-        .get("authorizer", {})
-        .get("jwt", {})
-        .get("claims", {})
-    )
+    # 1. CSRF対策のチェック (JSからのカスタムヘッダーを必須化)
+    x_req = (event.headers.get('x-requested-with') or event.headers.get('X-Requested-With') or '').lower()
+    if x_req != 'xmlhttprequest':
+        return create_response(403, {"message": "Forbidden"}, origin)
 
-    tenant_id = raw_claims.get("custom:tenant_id") or raw_claims.get("tenant_id")
-    caller_user_id = raw_claims.get("sub")
+    # 2. セッション認証 (JWT claims ではなく Cookie 方式へ変更)
+    session = get_session_info(event)
+    if not session:
+        return create_response(401, {"message": "Unauthorized"}, origin)
 
-    # ログにテナントID等を付与
+    tenant_id = session.get("tenant_id")
+    caller_user_id = session.get("user_id")
+
+    # 管理者権限のチェック (実運用上のガードレール)
+    if session.get("role") != "admin":
+        logger.warning(f"一般ユーザーによる管理操作を拒否しました: {caller_user_id}")
+        return create_response(403, {"message": "Access Denied"}, origin)
+
     logger.append_keys(tenant_id=tenant_id, user_id=caller_user_id)
-
-    if not tenant_id or not caller_user_id:
-        logger.warning("トークンにtenant_idまたはuser_idがありません", action_category="ERROR")
-        logger.debug("受信したclaims", action_category="EXECUTE", claims=raw_claims)
-        return create_response(400, {"message": "Invalid token claims"})
 
     # ルーティング情報取得
     http_method = event.request_context.http.method
     path = event.raw_path
     path_params = event.path_parameters or {}
 
-    # コンテキスト情報を作成
+    # ハンドラに渡すコンテキスト (claimsの代わりにsession情報を使用)
     ctx = {
         "tenant_id": tenant_id,
         "caller_user_id": caller_user_id,
-        "claims": raw_claims
+        "session": session,
+        "origin": origin # create_response用
     }
 
-    logger.info(f"リクエスト受信: {http_method} {path}", action_category="EXECUTE")
+    logger.info(f"Admin Request: {http_method} {path}", action_category="EXECUTE")
 
     try:
-        # ルーティング
+        # ルーティング (既存のロジックを流用)
         if path == "/admin/users":
             if http_method == "GET":
                 return list_users.handle(event, ctx)
@@ -72,17 +93,16 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
                 return create_user.handle(event, ctx)
 
         elif path.startswith("/admin/users/") and path_params.get("user_id"):
-            user_id = path_params["user_id"]
+            u_id = path_params["user_id"]
             if http_method == "GET":
-                return get_user.handle(event, ctx, user_id)
+                return get_user.handle(event, ctx, u_id)
             elif http_method == "PATCH":
-                return update_user.handle(event, ctx, user_id)
+                return update_user.handle(event, ctx, u_id)
             elif http_method == "DELETE":
-                return delete_user.handle(event, ctx, user_id)
+                return delete_user.handle(event, ctx, u_id)
 
-        logger.warning(f"ルートが見つかりません: {http_method} {path}", action_category="ERROR")
-        return create_response(404, {"message": "Not Found"})
+        return create_response(404, {"message": "Not Found"}, origin)
 
     except Exception:
-        logger.exception("予期しないエラーが発生しました", action_category="ERROR")
-        return create_response(500, {"message": "Internal server error"})
+        logger.exception("Internal error in Admin User module")
+        return create_response(500, {"message": "Internal server error"}, origin)

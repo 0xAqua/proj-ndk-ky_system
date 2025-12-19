@@ -20,40 +20,27 @@ vq_manager_table = dynamodb.Table(os.environ['TENANT_VQ_MANAGER_TABLE'])
 user_master_table = dynamodb.Table(os.environ['TENANT_USER_MASTER_TABLE'])
 
 
-def get_logs(event: dict, context: LambdaContext) -> dict:
-    """
-    実行履歴を取得
-    """
+def get_logs(event: dict, context: LambdaContext, tenant_id: str, origin: str) -> dict:
     try:
-        # クエリパラメータ取得
         params = event.get('queryStringParameters') or {}
 
-        tenant_id = params.get('tenantId')
-        if not tenant_id:
-            return create_error_response(400, 'tenantId is required')
-
-        # ページネーションパラメータ
+        # ページネーション等のパラメータ取得ロジックはそのまま維持
         try:
             limit = int(params.get('limit', 30))
-            if limit not in [30, 50, 100]:
-                limit = 30
-        except ValueError:
-            limit = 30
+            if limit not in [30, 50, 100]: limit = 30
+        except ValueError: limit = 30
 
         try:
             page = int(params.get('page', 1))
-            if page < 1:
-                page = 1
-        except ValueError:
-            page = 1
+            if page < 1: page = 1
+        except ValueError: page = 1
 
-        # 日付範囲フィルタ
         start_date = params.get('startDate')
         end_date = params.get('endDate')
 
         logger.info(f"Fetching execution logs: tenant_id={tenant_id}, limit={limit}, page={page}")
 
-        # 実行履歴を取得
+        # 1. 実行履歴を取得 (引数には認証済みの tenant_id を使用)
         items = fetch_execution_logs(
             tenant_id=tenant_id,
             limit=limit,
@@ -62,26 +49,39 @@ def get_logs(event: dict, context: LambdaContext) -> dict:
             end_date=end_date
         )
 
-        # ユーザー名を解決
+        # 2. ユーザー名を解決 & 整形
         items_with_users = resolve_user_names(tenant_id, items)
-
-        # レスポンス整形
         formatted_items = [format_log_item(item) for item in items_with_users]
-
-        # 全件数を取得(簡易版: 取得した件数から推定)
-        # 本番では別途CountクエリやCache機構が必要
         total_items = estimate_total_items(tenant_id, limit, len(formatted_items))
 
-        return create_paginated_response(
+        # 3. 成功レスポンスの生成
+        response = create_paginated_response(
             items=formatted_items,
             current_page=page,
             items_per_page=limit,
             total_items=total_items
         )
 
+        # ★ 重要: BFF(Cookie認証)用のCORSヘッダーを追加
+        if "headers" not in response: response["headers"] = {}
+        response["headers"].update({
+            "Access-Control-Allow-Origin": origin,         # ★ 動的にOriginを返す
+            "Access-Control-Allow-Credentials": "true",    # ★ Cookie使用時は必須
+            "Content-Type": "application/json"
+        })
+
+        return response
+
     except Exception as e:
         logger.exception("Error in get_logs")
-        return create_error_response(500, f"Internal server error: {str(e)}")
+        # エラー時も CORS ヘッダーがないとブラウザで詳細が見られないため同様に処理
+        err_res = create_error_response(500, f"Internal server error")
+        if "headers" not in err_res: err_res["headers"] = {}
+        err_res["headers"].update({
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true"
+        })
+        return err_res
 
 
 def fetch_execution_logs(

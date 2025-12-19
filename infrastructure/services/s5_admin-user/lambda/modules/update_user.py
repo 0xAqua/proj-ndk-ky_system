@@ -7,47 +7,47 @@ from .cognito_client import cognito, USER_POOL_ID, tenant_user_master_table
 logger = Logger()
 tracer = Tracer()
 
-
-def create_response(status_code: int, body: dict) -> dict:
+# ★ 修正: CORS対応
+def create_response(status_code: int, body: dict, origin: str) -> dict:
     return {
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true"
         },
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
-
 
 @tracer.capture_method
 def handle(event, ctx, user_id):
     """ユーザー更新"""
     tenant_id = ctx["tenant_id"]
+    origin = ctx.get("origin", "*") # ★ main.py から渡される origin
 
-    # リクエストボディ取得
+    #
     try:
         body = json.loads(event.body) if event.body else {}
     except json.JSONDecodeError:
         logger.warning("JSONパースに失敗しました", action_category="ERROR")
-        return create_response(400, {"message": "Invalid JSON"})
+        return create_response(400, {"message": "Invalid JSON"}, origin)
 
     if not body:
         logger.warning("更新フィールドがありません", action_category="ERROR")
-        return create_response(400, {"message": "No update fields provided"})
+        return create_response(400, {"message": "No update fields provided"}, origin)
 
     now = datetime.utcnow().isoformat() + "Z"
-
     logger.info(f"ユーザーを更新します: {user_id}", action_category="EXECUTE")
 
     try:
-        # 既存ユーザー取得
+        #
         existing = tenant_user_master_table.get_item(
             Key={"tenant_id": tenant_id, "user_id": user_id}
         ).get("Item")
 
         if not existing:
             logger.warning(f"ユーザーが見つかりません: {user_id}", action_category="ERROR")
-            return create_response(404, {"message": "User not found"})
+            return create_response(404, {"message": "User not found"}, origin)
 
         email = existing.get("email")
 
@@ -60,9 +60,7 @@ def handle(event, ctx, user_id):
 
         if cognito_attrs:
             cognito.admin_update_user_attributes(
-                UserPoolId=USER_POOL_ID,
-                Username=email,
-                UserAttributes=cognito_attrs
+                UserPoolId=USER_POOL_ID, Username=email, UserAttributes=cognito_attrs
             )
             logger.info("Cognito属性更新完了", action_category="EXECUTE")
 
@@ -85,23 +83,17 @@ def handle(event, ctx, user_id):
             ExpressionAttributeValues=expr_values
         )
 
-        # ステータス変更の場合、Cognito も更新
+        # ステータス変更の場合のCognito更新ロジック
         if "status" in body:
             new_status = body["status"]
-            if new_status == "INACTIVE":
+            if new_status in ["INACTIVE", "LOCKED"]:
                 cognito.admin_disable_user(UserPoolId=USER_POOL_ID, Username=email)
-                logger.info("Cognitoユーザー無効化完了", action_category="EXECUTE")
-            elif new_status == "LOCKED":
-                cognito.admin_disable_user(UserPoolId=USER_POOL_ID, Username=email)
-                logger.info("Cognitoユーザーロック完了", action_category="EXECUTE")
             elif new_status == "ACTIVE":
                 cognito.admin_enable_user(UserPoolId=USER_POOL_ID, Username=email)
-                logger.info("Cognitoユーザー有効化完了", action_category="EXECUTE")
 
         logger.info(f"ユーザー更新完了: {user_id}", action_category="EXECUTE")
-
-        return create_response(200, {"message": "User updated successfully"})
+        return create_response(200, {"message": "User updated successfully"}, origin)
 
     except ClientError:
         logger.exception("ユーザー更新に失敗しました", action_category="ERROR")
-        return create_response(500, {"message": "Failed to update user"})
+        return create_response(500, {"message": "Failed to update user"}, origin)

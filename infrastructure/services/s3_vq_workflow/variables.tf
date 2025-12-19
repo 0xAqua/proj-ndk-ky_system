@@ -66,3 +66,13 @@ variable "env" {
   description = "Environment (dev, stg, prod)"
   type        = string
 }
+
+variable "session_table_name" {
+  description = "Name of the DynamoDB table for sessions"
+  type        = string
+}
+
+variable "session_table_arn" {
+  description = "ARN of the DynamoDB table for sessions"
+  type        = string
+}

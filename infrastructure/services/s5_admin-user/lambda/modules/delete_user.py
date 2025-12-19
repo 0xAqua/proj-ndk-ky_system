@@ -6,22 +6,23 @@ from .cognito_client import cognito, USER_POOL_ID, tenant_user_master_table
 logger = Logger()
 tracer = Tracer()
 
-
-def create_response(status_code: int, body: dict) -> dict:
+# ★ 修正: CORS対応（OriginとCredentials）を組み込んだレスポンス生成
+def create_response(status_code: int, body: dict, origin: str) -> dict:
     return {
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
+            "Access-Control-Allow-Origin": origin,         # ★ 特定のOriginを返す
+            "Access-Control-Allow-Credentials": "true"      # ★ Cookie使用時は必須
         },
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
-
 
 @tracer.capture_method
 def handle(event, ctx, user_id):
     """ユーザー削除"""
     tenant_id = ctx["tenant_id"]
+    origin = ctx.get("origin", "*") # ★ main.py から渡される origin を取得
 
     logger.info(f"ユーザーを削除します: {user_id}", action_category="EXECUTE")
 
@@ -33,7 +34,7 @@ def handle(event, ctx, user_id):
 
         if not existing:
             logger.warning(f"ユーザーが見つかりません: {user_id}", action_category="ERROR")
-            return create_response(404, {"message": "User not found"})
+            return create_response(404, {"message": "User not found"}, origin)
 
         email = existing.get("email")
 
@@ -54,8 +55,8 @@ def handle(event, ctx, user_id):
 
         logger.info(f"ユーザー削除完了: {email} ({user_id})", action_category="EXECUTE")
 
-        return create_response(200, {"message": "User deleted successfully"})
+        return create_response(200, {"message": "User deleted successfully"}, origin)
 
     except ClientError:
         logger.exception("ユーザー削除に失敗しました", action_category="ERROR")
-        return create_response(500, {"message": "Failed to delete user"})
+        return create_response(500, {"message": "Failed to delete user"}, origin)

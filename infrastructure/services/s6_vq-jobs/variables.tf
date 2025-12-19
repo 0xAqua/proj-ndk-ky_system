@@ -42,3 +42,14 @@ variable "lambda_kms_key_arn" {
   type        = string
   description = "Lambda用KMSキーARN"
 }
+
+
+variable "session_table_name" {
+  description = "Name of the DynamoDB table for sessions"
+  type        = string
+}
+
+variable "session_table_arn" {
+  description = "ARN of the DynamoDB table for sessions"
+  type        = string
+}

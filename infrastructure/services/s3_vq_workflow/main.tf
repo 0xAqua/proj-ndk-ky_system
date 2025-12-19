@@ -187,11 +187,11 @@ resource "aws_lambda_function" "producer" {
       JOB_TABLE_NAME   = var.job_table_name
       SQS_QUEUE_URL    = aws_sqs_queue.main.url
       VQ_SECRET_ARN    = var.vq_secret_arn
-
-      # Pythonコードで使用するAPI URL類 (★追加)
+      POLLING_INTERVAL = "10"
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
       MESSAGE_API_URL  = "${var.external_api_base_url}/public-api/v1/message"
       CALLBACK_URL     = "${var.api_endpoint}/webhook"
+      SESSION_TABLE_NAME            = var.session_table_name
     }
   }
 
@@ -230,6 +230,7 @@ resource "aws_lambda_function" "worker" {
       # ★追加: ポーリング間隔をここで管理する
       POLLING_INTERVAL = "10"
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
+      SESSION_TABLE_NAME            = var.session_table_name
     }
   }
 
@@ -264,8 +265,8 @@ resource "aws_apigatewayv2_route" "post_job" {
   api_id             = var.api_gateway_id
   route_key          = "POST /jobs"
   target             = "integrations/${aws_apigatewayv2_integration.producer.id}"
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+
+  authorization_type = "NONE"
 }
 
 # Route: GET /jobs/{jobId}
@@ -273,8 +274,8 @@ resource "aws_apigatewayv2_route" "get_job" {
   api_id             = var.api_gateway_id
   route_key          = "GET /jobs/{jobId}"
   target             = "integrations/${aws_apigatewayv2_integration.producer.id}"
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+
+  authorization_type = "NONE"
 }
 
 # AGWからProducer起動権限

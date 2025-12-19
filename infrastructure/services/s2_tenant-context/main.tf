@@ -116,6 +116,7 @@ resource "aws_lambda_function" "this" {
       CONSTRUCTION_MASTER_TABLE_NAME = var.construction_master_table_name
       POWERTOOLS_SERVICE_NAME        = "TenantContext"
       LOG_LEVEL                      = "INFO"
+      SESSION_TABLE_NAME            = var.session_table_name
     }
   }
 
@@ -139,14 +140,10 @@ resource "aws_apigatewayv2_integration" "lambda" {
 
 resource "aws_apigatewayv2_route" "get_master" {
   api_id    = var.api_gateway_id
-  route_key = "GET /construction-master" # フロントエンドから呼ぶパス
+  route_key = "GET /construction-master"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-
-  # 共通Authorizer (JWT) を使用
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+  authorization_type = "NONE"
 }
-
 # ─────────────────────────────
 # 3. 権限設定 (AGWからLambda起動許可)
 # ─────────────────────────────

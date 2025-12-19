@@ -27,6 +27,7 @@ resource "aws_lambda_function" "logs" {
       TENANT_USER_MASTER_TABLE  = var.tenant_user_master_table_name
       TENANT_LOG_ARCHIVE_TABLE  = var.tenant_log_archive_table_name
       LOG_LEVEL                 = "INFO"
+      SESSION_TABLE_NAME            = var.session_table_name
     }
   }
 
@@ -121,8 +122,7 @@ resource "aws_apigatewayv2_route" "execution_logs" {
   api_id             = var.api_gateway_id
   route_key          = "GET /logs/execution"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+  authorization_type = "NONE"
 }
 
 # GET /logs/operation リソース (後で有効化)
@@ -130,8 +130,7 @@ resource "aws_apigatewayv2_route" "execution_logs" {
 #   api_id             = var.api_gateway_id
 #   route_key          = "GET /logs/operation"
 #   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-#   authorization_type = "JWT"
-#   authorizer_id      = var.authorizer_id
+#   authorization_type = "NONE"
 # }
 
 # GET /logs/access リソース (後で有効化)
@@ -139,8 +138,8 @@ resource "aws_apigatewayv2_route" "execution_logs" {
 #   api_id             = var.api_gateway_id
 #   route_key          = "GET /logs/access"
 #   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-#   authorization_type = "JWT"
-#   authorizer_id      = var.authorizer_id
+#   authorization_type = "NONE"
+
 # }
 
 # Lambda Integration

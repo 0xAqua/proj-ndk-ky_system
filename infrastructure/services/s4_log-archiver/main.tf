@@ -113,6 +113,7 @@ resource "aws_lambda_function" "this" {
       TARGET_LOG_GROUPS = join(",", var.target_log_group_names)
       POWERTOOLS_SERVICE_NAME = "log-archiver"
       LOG_LEVEL               = "INFO"
+      SESSION_TABLE_NAME            = var.session_table_name
     }
   }
 }

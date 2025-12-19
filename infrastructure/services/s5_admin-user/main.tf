@@ -26,6 +26,7 @@ resource "aws_lambda_function" "admin_user" {
       USER_POOL_ID              = var.user_pool_id
       TENANT_MASTER_TABLE       = var.tenant_master_table_name
       TENANT_USER_MASTER_TABLE  = var.tenant_user_master_table_name
+      SESSION_TABLE_NAME        = var.session_table_name
       LOG_LEVEL                 = "INFO"
     }
   }
@@ -146,16 +147,14 @@ resource "aws_apigatewayv2_route" "list_users" {
   api_id             = var.api_gateway_id
   route_key          = "GET /admin/users"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+  authorization_type = "NONE" # ★ JWT から変更
 }
 
 resource "aws_apigatewayv2_route" "create_user" {
   api_id             = var.api_gateway_id
   route_key          = "POST /admin/users"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+  authorization_type = "NONE" # ★ JWT から変更
 }
 
 # /admin/users/{user_id} リソース
@@ -163,24 +162,21 @@ resource "aws_apigatewayv2_route" "get_user" {
   api_id             = var.api_gateway_id
   route_key          = "GET /admin/users/{user_id}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+  authorization_type = "NONE" # ★ JWT から変更
 }
 
 resource "aws_apigatewayv2_route" "update_user" {
   api_id             = var.api_gateway_id
   route_key          = "PATCH /admin/users/{user_id}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+  authorization_type = "NONE" # ★ JWT から変更
 }
 
 resource "aws_apigatewayv2_route" "delete_user" {
   api_id             = var.api_gateway_id
   route_key          = "DELETE /admin/users/{user_id}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "JWT"
-  authorizer_id      = var.authorizer_id
+  authorization_type = "NONE" # ★ JWT から変更
 }
 
 # Lambda Integration

@@ -96,6 +96,9 @@ module "s1_auth_user" {
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
 
+  session_table_name = module.dynamodb.auth_sessions_table_name
+  session_table_arn  = module.dynamodb.auth_sessions_table_arn
+
 }
 
 # ─────────────────────────────
@@ -117,6 +120,9 @@ module "s2_tenant_context" {
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
+
+  session_table_name = module.dynamodb.auth_sessions_table_name
+  session_table_arn  = module.dynamodb.auth_sessions_table_arn
 }
 
 # ─────────────────────────────
@@ -144,6 +150,9 @@ module "s5_admin_user" {
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
+
+  session_table_name = module.dynamodb.auth_sessions_table_name
+  session_table_arn  = module.dynamodb.auth_sessions_table_arn
 }
 
 
@@ -168,6 +177,9 @@ module "s6_vq_jobs" {
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
+
+  session_table_name = module.dynamodb.auth_sessions_table_name
+  session_table_arn  = module.dynamodb.auth_sessions_table_arn
 }
 
 # ─────────────────────────────
@@ -193,6 +205,9 @@ module "s7_logs" {
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
+
+  session_table_name = module.dynamodb.auth_sessions_table_name
+  session_table_arn  = module.dynamodb.auth_sessions_table_arn
 }
 
 
@@ -332,6 +347,9 @@ module "s3_vq_workflow" {
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
+
+  session_table_name = module.dynamodb.auth_sessions_table_name
+  session_table_arn  = module.dynamodb.auth_sessions_table_arn
 }
 
 # ─────────────────────────────
@@ -363,6 +381,9 @@ module "s4_log_archiver" {
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
+
+  session_table_name = module.dynamodb.auth_sessions_table_name
+  session_table_arn  = module.dynamodb.auth_sessions_table_arn
 
 }
 

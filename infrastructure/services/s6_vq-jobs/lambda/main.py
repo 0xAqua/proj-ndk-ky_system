@@ -1,10 +1,3 @@
-"""
-VQジョブ履歴取得 Lambda（最適化版）
-DynamoDBから tenant_vq_manager テーブルのデータを取得してフロントに返す
-- エラーのあるjobを除外
-- インシデント0件のjobを除外
-- 必要な情報のみ返す（job_id, created_at, incidents の一部フィールド）
-"""
 import os
 import json
 import base64
@@ -12,258 +5,121 @@ from decimal import Decimal
 import boto3
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools.utilities.data_classes import event_source, APIGatewayProxyEventV2
+from aws_lambda_powertools.utilities.typing import LambdaContext
 
 logger = Logger()
 tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
-
 TABLE_NAME = os.environ["TENANT_VQ_MANAGER_TABLE"]
-
+SESSION_TABLE_NAME = os.environ.get("SESSION_TABLE_NAME") # ★追加
 
 class DecimalEncoder(json.JSONEncoder):
-    """DynamoDB の Decimal 型を JSON シリアライズ可能にする"""
     def default(self, obj):
         if isinstance(obj, Decimal):
             return int(obj) if obj % 1 == 0 else float(obj)
         return super(DecimalEncoder, self).default(obj)
 
+def create_response(status_code: int, body: dict, origin: str) -> dict:
+    """共通レスポンス生成（CORS/Cookie対応）"""
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true" # ★ブラウザのCookie受取に必須
+        },
+        "body": json.dumps(body, cls=DecimalEncoder, ensure_ascii=False)
+    }
 
-def get_tenant_id_from_event(event: dict) -> str:
-    """
-    API Gateway Lambda Proxy Integration (v2.0) からテナントIDを取得
-    JWT の custom:tenant_id を使用
-    """
+def get_session_info(event: APIGatewayProxyEventV2):
+    """Cookieからセッション情報を取得 (BFF方式)"""
+    cookies = event.cookies or []
+    sid = next((c.split("=")[1] for c in cookies if c.startswith("sessionId=")), None)
+    if not sid: return None
     try:
-        claims = event["requestContext"]["authorizer"]["jwt"]["claims"]
-        tenant_id = claims.get("custom:tenant_id")
-
-        if not tenant_id:
-            logger.warning("JWT に custom:tenant_id が含まれていません", action_category="AUTH")
-            raise ValueError("tenant_id not found in JWT")
-
-        return tenant_id
-    except (KeyError, TypeError) as e:
-        logger.error("JWT クレームの解析に失敗しました", action_category="ERROR", error=str(e))
-        raise ValueError("Invalid JWT structure") from e
-
+        table = dynamodb.Table(SESSION_TABLE_NAME)
+        return table.get_item(Key={"sessionId": sid}).get("Item")
+    except Exception as e:
+        logger.error(f"Session lookup failed: {e}")
+        return None
 
 def filter_and_transform_job(item: dict) -> dict | None:
-    """
-    ジョブデータをフィルタリング・変換する
-
-    除外条件:
-    - error_msg が存在する
-    - incidents が0件
-
-    Returns:
-        変換後のジョブデータ、または除外する場合は None
-    """
-    # error_msg がある場合は除外
-    if "error_msg" in item and item["error_msg"]:
-        logger.debug("エラーのあるジョブを除外", job_id=item.get("job_id"))
-        return None
-
-    # replyの解析
+    # ... (既存のフィルタリングロジックはそのまま維持) ...
+    if "error_msg" in item and item["error_msg"]: return None
     reply = item.get("reply")
     if isinstance(reply, str):
-        try:
-            reply = json.loads(reply)
-        except json.JSONDecodeError:
-            logger.warning("reply のパースに失敗", job_id=item.get("job_id"))
-            return None
+        try: reply = json.loads(reply)
+        except json.JSONDecodeError: return None
+    incidents = (reply or {}).get("incidents", [])
+    if not incidents: return None
 
-    # incidents の取得
-    incidents = []
-    if reply and isinstance(reply, dict):
-        incidents = reply.get("incidents", [])
+    filtered_incidents = [{
+        "id": i.get("id"), "title": i.get("title"),
+        "summary": i.get("summary"), "classification": i.get("classification")
+    } for i in incidents]
 
-    # incidents が0件の場合は除外
-    if not incidents or len(incidents) == 0:
-        logger.debug("インシデント0件のジョブを除外", job_id=item.get("job_id"))
-        return None
-
-    # 必要な情報だけ抽出
-    filtered_incidents = []
-    for incident in incidents:
-        filtered_incident = {
-            "id": incident.get("id"),
-            "title": incident.get("title"),
-            "summary": incident.get("summary"),
-            "classification": incident.get("classification")
-        }
-        filtered_incidents.append(filtered_incident)
-
-    # 最終的なジョブデータ
-    job = {
+    return {
         "job_id": item.get("job_id"),
         "created_at": item.get("created_at"),
         "incidents": filtered_incidents
     }
 
-    return job
-
-
 @tracer.capture_lambda_handler
+@event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context(log_event=False)
-def lambda_handler(event, context):
-    """
-    VQジョブ履歴を取得する（最適化版）
+def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
+    origin = event.headers.get('origin', '')
 
-    Query Parameters:
-    - limit: 取得件数（デフォルト: 20、最大: 100）
-    - last_evaluated_key: ページネーション用（Base64エンコードされたJSON）
+    # 1. CSRF対策チェック
+    x_req = (event.headers.get('x-requested-with') or event.headers.get('X-Requested-With') or '').lower()
+    if x_req != 'xmlhttprequest':
+        return create_response(403, {"message": "Forbidden"}, origin)
 
-    Response:
-    {
-      "jobs": [
-        {
-          "job_id": "...",
-          "created_at": 1234567890,
-          "incidents": [
-            {
-              "id": 1,
-              "title": "...",
-              "summary": "...",
-              "classification": "..."
-            }
-          ]
-        }
-      ],
-      "last_evaluated_key": "..." // 次のページがある場合のみ
-    }
-    """
+    # 2. セッション認証 (JWTからCookie方式へ)
+    session = get_session_info(event)
+    if not session:
+        return create_response(401, {"message": "Unauthorized"}, origin)
+
+    tenant_id = session.get("tenant_id")
+    logger.append_keys(tenant_id=tenant_id)
 
     try:
-        # 1. テナントIDを取得
-        tenant_id = get_tenant_id_from_event(event)
+        # 3. クエリパラメータとページネーションの処理 (既存通り)
+        query_params = event.query_string_parameters or {}
+        limit = min(max(int(query_params.get("limit", 20)), 1), 100)
 
-        logger.info(
-            "VQジョブ履歴取得を開始します",
-            action_category="EXECUTE",
-            tenant_id=tenant_id
-        )
-
-        # 2. クエリパラメータの取得
-        query_params = event.get("queryStringParameters") or {}
-        limit = int(query_params.get("limit", 20))
-
-        # limitの範囲制限
-        if limit < 1:
-            limit = 20
-        elif limit > 100:
-            limit = 100
-
-        # 3. ページネーション用のキー取得
-        last_evaluated_key_str = query_params.get("last_evaluated_key")
         exclusive_start_key = None
-
-        if last_evaluated_key_str:
+        last_key_str = query_params.get("last_evaluated_key")
+        if last_key_str:
             try:
-                # Base64デコード → JSON解析
-                decoded = base64.b64decode(last_evaluated_key_str).decode("utf-8")
-                exclusive_start_key = json.loads(decoded)
-                logger.info("ページネーションキーを使用します", action_category="EXECUTE")
-            except (ValueError, json.JSONDecodeError) as e:
-                logger.warning(
-                    "last_evaluated_key のデコードに失敗しました",
-                    action_category="EXECUTE",
-                    error=str(e)
-                )
-                # 無効なキーは無視して最初から取得
-                exclusive_start_key = None
+                exclusive_start_key = json.loads(base64.b64decode(last_key_str).decode("utf-8"))
+            except Exception: pass
 
-        # 4. DynamoDB Query (GSI TenantDateIndex を使用)
+        # 4. DynamoDB Query
         table = dynamodb.Table(TABLE_NAME)
-
-        query_params_dynamodb = {
+        query_args = {
             "IndexName": "TenantDateIndex",
-            "KeyConditionExpression": "tenant_id = :tenant_id",
-            "ExpressionAttributeValues": {
-                ":tenant_id": tenant_id
-            },
-            "ScanIndexForward": False,  # created_at の降順（新しい順）
+            "KeyConditionExpression": boto3.dynamodb.conditions.Key("tenant_id").eq(tenant_id),
+            "ScanIndexForward": False,
             "Limit": limit
         }
+        if exclusive_start_key: query_args["ExclusiveStartKey"] = exclusive_start_key
 
-        # ページネーションキーがあれば追加
-        if exclusive_start_key:
-            query_params_dynamodb["ExclusiveStartKey"] = exclusive_start_key
-
-        response = table.query(**query_params_dynamodb)
-
+        response = table.query(**query_args)
         items = response.get("Items", [])
 
-        # 5. フィルタリングと変換
-        jobs = []
-        for item in items:
-            filtered_job = filter_and_transform_job(item)
-            if filtered_job:
-                jobs.append(filtered_job)
+        # 5. フィルタリング
+        jobs = [f for f in (filter_and_transform_job(i) for i in items) if f]
 
-        logger.info(
-            "VQジョブ履歴を取得しました",
-            action_category="EXECUTE",
-            tenant_id=tenant_id,
-            total_items=len(items),
-            filtered_jobs=len(jobs)
-        )
+        result = {"jobs": jobs}
+        lek = response.get("LastEvaluatedKey")
+        if lek:
+            result["last_evaluated_key"] = base64.b64encode(json.dumps(lek, cls=DecimalEncoder).encode("utf-8")).decode("utf-8")
 
-        # 6. 次のページのキーを生成
-        result = {
-            "jobs": jobs
-        }
+        return create_response(200, result, origin)
 
-        last_evaluated_key = response.get("LastEvaluatedKey")
-        if last_evaluated_key:
-            # JSON → Base64エンコード
-            key_json = json.dumps(last_evaluated_key, cls=DecimalEncoder)
-            encoded_key = base64.b64encode(key_json.encode("utf-8")).decode("utf-8")
-            result["last_evaluated_key"] = encoded_key
-
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            "body": json.dumps(result, cls=DecimalEncoder, ensure_ascii=False)
-        }
-
-    except ValueError as e:
-        logger.error("バリデーションエラー", action_category="ERROR", error=str(e))
-        return {
-            "statusCode": 400,
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            "body": json.dumps({
-                "error": "Bad Request",
-                "message": str(e)
-            }, ensure_ascii=False)
-        }
-
-    except ClientError as e:
-        logger.exception("DynamoDBエラーが発生しました", action_category="ERROR")
-        return {
-            "statusCode": 500,
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            "body": json.dumps({
-                "error": "Internal Server Error",
-                "message": "データの取得に失敗しました"
-            }, ensure_ascii=False)
-        }
-
-    except Exception as e:
-        logger.exception("予期しないエラーが発生しました", action_category="ERROR")
-        return {
-            "statusCode": 500,
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            "body": json.dumps({
-                "error": "Internal Server Error",
-                "message": "サーバーエラーが発生しました"
-            }, ensure_ascii=False)
-        }
+    except Exception:
+        logger.exception("Internal error")
+        return create_response(500, {"message": "Internal error"}, origin)
