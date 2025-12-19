@@ -132,7 +132,7 @@ data "archive_file" "lambda_zip" {
 resource "aws_lambda_function" "bff_auth" {
   function_name = var.name_prefix
   role          = aws_iam_role.bff_auth.arn
-  handler       = "handler.lambda_handler"
+  handler       = "handler.main"
   runtime       = "python3.12"
   architectures = ["x86_64"]  # ★layerに合わせてarm64からx86_64に変更
   timeout       = 30
