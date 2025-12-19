@@ -32,34 +32,40 @@ def generate_session_id() -> str:
     return secrets.token_urlsafe(32)
 
 
-def lambda_handler(event: Dict, context) -> Dict:
-    """メインハンドラー"""
-    path = event.get('path', '')
-    method = event.get('httpMethod', '')
+def lambda_handler(event, context):
+    """メインハンドラー (API Gateway v2対応)"""
+
+    # ★HTTP API v2のイベント形式に対応
+    method = event.get('requestContext', {}).get('http', {}).get('method', '')
+    path = event.get('rawPath', '')
+
+    # フォールバック: REST API形式もサポート
+    if not method:
+        method = event.get('httpMethod', '')
+    if not path:
+        path = event.get('path', '')
+
+    log_info('Request', method=method, path=path)
 
     # CORS対応
     origin = event.get('headers', {}).get('origin', '')
     cors_headers = get_cors_headers(origin)
 
-    log_request(method, path)
-
-    try:
-        # ルーティング
-        if path == '/bff/auth/login' and method == 'POST':
-            return handle_login(event, cors_headers)
-        elif path == '/bff/auth/logout' and method == 'POST':
-            return handle_logout(event, cors_headers)
-        elif path == '/bff/auth/session' and method == 'GET':
-            return handle_session_check(event, cors_headers)
-        elif path == '/bff/auth/refresh' and method == 'POST':
-            return handle_refresh(event, cors_headers)
-        else:
-            return error_response(404, 'Not Found', cors_headers)
-
-    except Exception as e:
-        log_error('Unhandled exception', str(e))
-        return error_response(500, 'Internal Server Error', cors_headers)
-
+    # ルーティング
+    if path == '/bff/auth/login' and method == 'POST':
+        return handle_login(event, cors_headers)
+    elif path == '/bff/auth/logout' and method == 'POST':
+        return handle_logout(event, cors_headers)
+    elif path == '/bff/auth/session' and method == 'GET':
+        return handle_session_check(event, cors_headers)
+    elif path == '/bff/auth/refresh' and method == 'POST':
+        return handle_refresh(event, cors_headers)
+    else:
+        return {
+            'statusCode': 404,
+            'headers': cors_headers,
+            'body': json.dumps({'error': 'Not found'})
+        }
 
 def handle_login(event: Dict, cors_headers: Dict) -> Dict:
     """ログイン処理"""
