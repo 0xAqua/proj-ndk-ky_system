@@ -1,4 +1,4 @@
-import { VStack, Text, Image, Link, Center, Spinner } from "@chakra-ui/react";
+import { VStack, Text, Image, Center, Spinner } from "@chakra-ui/react";
 import logo from '@/assets/logo.jpg';
 import { useLoginForm } from "./hooks/useLoginForm.ts";
 import { CredentialsForm } from "./components/CredentialsForm.tsx";
@@ -86,11 +86,11 @@ export const LoginForm = () => {
 
 
                 {/* パスワード忘れリンク */}
-                <Text textAlign="left" mt={2} fontSize="sm">
-                    <Link color="blue.500" href="#">
-                        パスワードをお忘れですか？
-                    </Link>
-                </Text>
+                {/*<Text textAlign="left" mt={2} fontSize="sm">*/}
+                {/*    <Link color="blue.500" href="#">*/}
+                {/*        パスワードをお忘れですか？*/}
+                {/*    </Link>*/}
+                {/*</Text>*/}
             </VStack>
         </>
     );
