@@ -57,4 +57,13 @@ output "tenant_master_table_arn" {
   value = aws_dynamodb_table.tenant_master.arn
 }
 
+# Auth Sessions (末尾に追加)
+output "auth_sessions_table_name" {
+  description = "Auth sessions table name"
+  value       = aws_dynamodb_table.auth_sessions.name
+}
 
+output "auth_sessions_table_arn" {
+  description = "Auth sessions table ARN"
+  value       = aws_dynamodb_table.auth_sessions.arn
+}

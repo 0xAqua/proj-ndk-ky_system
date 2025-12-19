@@ -446,3 +446,32 @@ module "guard-duty" {
 }
 
 
+# ─────────────────────────────
+# 16. BFF認証API (HttpOnly Cookie管理)
+# ─────────────────────────────
+module "bff_auth" {
+  source = "../../services/s0_bff-auth"
+
+  name_prefix = "${local.project}-${local.environment}-bff-auth"
+
+  # Cognito
+  user_pool_id        = module.auth.user_pool_id
+  user_pool_client_id = module.auth.user_pool_client_id
+
+  # DynamoDB (セッション管理)
+  auth_sessions_table_name = module.dynamodb.auth_sessions_table_name
+  auth_sessions_table_arn  = module.dynamodb.auth_sessions_table_arn
+
+  # API Gateway
+  api_gateway_id            = module.api_gateway.api_id
+  api_gateway_execution_arn = module.api_gateway.api_execution_arn
+
+  # KMS
+  lambda_kms_key_arn = module.kms.lambda_key_arn
+
+  # CORS設定
+  allowed_origins = [
+    "http://localhost:3000",
+    "https://${module.frontend.cloudfront_domain}"
+  ]
+}
