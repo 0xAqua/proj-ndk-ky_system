@@ -171,6 +171,32 @@ module "s6_vq_jobs" {
 }
 
 # ─────────────────────────────
+# 6-7. バックエンドサービス (S7 Logs)
+# ─────────────────────────────
+module "s7_logs" {
+  source = "../../services/s7_logs"
+
+  name_prefix = "${local.project}-${local.environment}-s7-logs"
+
+  # DynamoDB
+  tenant_vq_manager_table_name   = module.dynamodb.tenant_vq_manager_table_name
+  tenant_vq_manager_table_arn    = module.dynamodb.tenant_vq_manager_table_arn
+  tenant_user_master_table_name  = module.dynamodb.tenant_user_master_table_name
+  tenant_user_master_table_arn   = module.dynamodb.tenant_user_master_table_arn
+  tenant_log_archive_table_name  = module.dynamodb.tenant_log_archive_table_name
+  tenant_log_archive_table_arn   = module.dynamodb.tenant_log_archive_table_arn
+
+  # API Gateway
+  api_gateway_id            = module.api_gateway.api_id
+  api_gateway_execution_arn = module.api_gateway.api_execution_arn
+  authorizer_id             = module.api_gateway.authorizer_id
+
+  # KMS
+  lambda_kms_key_arn = module.kms.lambda_key_arn
+}
+
+
+# ─────────────────────────────
 # 7. セキュリティ (WAF)
 # ─────────────────────────────
 module "waf" {
