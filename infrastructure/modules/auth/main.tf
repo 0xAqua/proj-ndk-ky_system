@@ -145,7 +145,7 @@ resource "aws_cognito_user_pool_client" "web" {
 
   access_token_validity  = 15   # 15分
   id_token_validity      = 15   # 15分
-  refresh_token_validity = 1    # 1日
+  refresh_token_validity = 1    # 1日（ローカルストレージに置いてる）
 
   token_validity_units {
     access_token  = "minutes"
