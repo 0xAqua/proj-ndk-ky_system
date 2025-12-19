@@ -10,6 +10,7 @@ import secrets
 import time
 from typing import Dict, Optional
 from botocore.exceptions import ClientError
+import base64
 
 # AWS クライアント
 cognito = boto3.client('cognito-idp')
@@ -146,8 +147,11 @@ def handle_logout(event: Dict, cors_headers: Dict) -> Dict:
         return error_response(500, 'ログアウトに失敗しました', cors_headers)
 
 
+# infrastructure/services/s0_bff-auth/lambda/handler.py
+# handle_session_check 関数を修正
+
 def handle_session_check(event: Dict, cors_headers: Dict) -> Dict:
-    """セッション確認"""
+    """セッション確認 + ユーザー情報取得"""
     try:
         cookies = parse_cookies(event.get('headers', {}).get('Cookie', ''))
         session_id = cookies.get('sessionId')
@@ -168,18 +172,39 @@ def handle_session_check(event: Dict, cors_headers: Dict) -> Dict:
                 'body': json.dumps({'authenticated': False})
             }
 
+        # ★追加: IDトークンからユーザー情報を取得
+        user_info = decode_id_token(session.get('id_token'))
+
         return {
             'statusCode': 200,
             'headers': cors_headers,
             'body': json.dumps({
                 'authenticated': True,
-                'user': session.get('user_id')
+                'user': {
+                    'id': session.get('user_id'),
+                    'email': user_info.get('email'),
+                    'name': user_info.get('name'),
+                    'family_name': user_info.get('family_name'),
+                    'given_name': user_info.get('given_name'),
+                }
             })
         }
     except Exception as e:
         log_error('Session check error', str(e))
         return error_response(500, 'セッション確認に失敗しました', cors_headers)
 
+def decode_id_token(id_token: str) -> Dict:
+    """IDトークンからユーザー情報を取得"""
+    try:
+        # JWTの payload 部分 (2番目) を取得
+        payload = id_token.split('.')[1]
+        # Base64デコード (パディング調整)
+        payload += '=' * (4 - len(payload) % 4)
+        decoded = base64.b64decode(payload)
+        return json.loads(decoded)
+    except Exception as e:
+        log_error('Token decode error', str(e))
+        return {}
 
 def handle_refresh(event: Dict, cors_headers: Dict) -> Dict:
     """トークンリフレッシュ"""
