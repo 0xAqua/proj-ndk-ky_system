@@ -12,6 +12,7 @@ resource "aws_lambda_function" "vq_jobs" {
   function_name    = var.name_prefix
   role             = aws_iam_role.lambda_role.arn
   handler          = "main.lambda_handler"
+  architectures = ["x86_64"]
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   runtime          = "python3.12"
   timeout          = 30
@@ -25,7 +26,7 @@ resource "aws_lambda_function" "vq_jobs" {
     variables = {
       TENANT_VQ_MANAGER_TABLE = var.tenant_vq_manager_table_name
       LOG_LEVEL               = "INFO"
-      SESSION_TABLE_NAME      = var.session_table_name
+      SESSION_TABLE      = var.session_table_name
     }
   }
 
@@ -76,7 +77,7 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
         Resource = [
           var.tenant_vq_manager_table_arn,
           "${var.tenant_vq_manager_table_arn}/index/*",
-          var.session_table_arn
+          var.session_table_arn # セッションテーブルへの参照
         ]
       }
     ]

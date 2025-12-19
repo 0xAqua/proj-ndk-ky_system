@@ -11,7 +11,8 @@ resource "aws_lambda_function" "logs" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = var.name_prefix
   role             = aws_iam_role.lambda_role.arn
-  handler          = "index.handler"
+  handler          = "main.lambda_handler"
+  architectures = ["x86_64"]
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   runtime          = "python3.12"
   timeout          = 30
@@ -27,10 +28,10 @@ resource "aws_lambda_function" "logs" {
       TENANT_USER_MASTER_TABLE  = var.tenant_user_master_table_name
       TENANT_LOG_ARCHIVE_TABLE  = var.tenant_log_archive_table_name
       LOG_LEVEL                 = "INFO"
-      SESSION_TABLE_NAME            = var.session_table_name
+      SESSION_TABLE             = var.session_table_name
+      POWERTOOLS_SERVICE_NAME   = "LogsService"
     }
   }
-
   kms_key_arn = var.lambda_kms_key_arn
 
   tags = {

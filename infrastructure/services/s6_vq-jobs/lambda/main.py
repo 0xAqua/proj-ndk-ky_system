@@ -107,7 +107,7 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
         return create_response(403, {"message": "Forbidden"}, origin)
 
     # 2. セッション認証 (JWTからCookie方式へ)
-    session = get_session_info(event)
+    session = get_session(event)
     if not session:
         return create_response(401, {"message": "Unauthorized"}, origin)
 

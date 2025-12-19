@@ -10,7 +10,7 @@ from modules import execution_logs
 
 logger = Logger()
 dynamodb = boto3.resource('dynamodb')
-SESSION_TABLE = os.environ.get('SESSION_TABLE_NAME')
+SESSION_TABLE = os.environ.get('SESSION_TABLE')
 
 def create_response(status_code: int, body: dict, origin: str) -> dict:
     """CORS/Cookie対応のレスポンス生成"""
@@ -44,10 +44,11 @@ def get_session(event):
         return None
 
     try:
-        # 環境変数 SESSION_TABLE_NAME からテーブルを取得
-        # ※ SESSION_TABLE_NAME は各 main.tf で設定済み
-        table_name = os.environ.get('SESSION_TABLE_NAME')
-        table = dynamodb.Table(table_name)
+        if not SESSION_TABLE:
+            logger.error("SESSION_TABLE environment variable is not set")
+            return None
+
+        table = dynamodb.Table(SESSION_TABLE)
 
         # ★ 修正ポイント:
         # DynamoDB のキー定義に合わせて "session_id" (スネークケース) を使用
