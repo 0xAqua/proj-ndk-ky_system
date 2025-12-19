@@ -31,6 +31,16 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
       frame_option = "DENY"
       override     = true
     }
+
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+    content_security_policy {
+      content_security_policy = "default-src 'none'; frame-ancestors 'none'"
+      override                = true
+    }
+
   }
 }
 
@@ -76,7 +86,8 @@ resource "aws_cloudfront_distribution" "this" {
 
   restrictions {
     geo_restriction {
-      restriction_type = "none"
+      restriction_type = "whitelist"
+      locations        = ["JP"]
     }
   }
 
@@ -98,4 +109,6 @@ resource "aws_cloudfront_distribution" "this" {
   #     record = dvo.resource_record_value
   #     type   = dvo.resource_record_type
   #   }
+
+
 }

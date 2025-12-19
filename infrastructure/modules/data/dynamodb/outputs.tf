@@ -37,3 +37,33 @@ output "tenant_log_archive_table_name" {
 output "tenant_log_archive_table_arn" {
   value = aws_dynamodb_table.tenant_log_archive.arn
 }
+
+# OTP
+output "otp_codes_table_name" {
+  description = "OTP codes table name"
+  value       = aws_dynamodb_table.otp_codes.name
+}
+
+output "otp_codes_table_arn" {
+  description = "OTP codes table ARN"
+  value       = aws_dynamodb_table.otp_codes.arn
+}
+
+output "tenant_master_table_name" {
+  value = aws_dynamodb_table.tenant_master.name
+}
+
+output "tenant_master_table_arn" {
+  value = aws_dynamodb_table.tenant_master.arn
+}
+
+# Auth Sessions (末尾に追加)
+output "auth_sessions_table_name" {
+  description = "Auth sessions table name"
+  value       = aws_dynamodb_table.auth_sessions.name
+}
+
+output "auth_sessions_table_arn" {
+  description = "Auth sessions table ARN"
+  value       = aws_dynamodb_table.auth_sessions.arn
+}

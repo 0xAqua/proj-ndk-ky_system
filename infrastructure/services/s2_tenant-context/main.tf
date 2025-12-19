@@ -1,6 +1,15 @@
 # ─────────────────────────────
+# 0. ローカル変数
+# ─────────────────────────────
+locals {
+  # Lambda のソースコードディレクトリ
+  lambda_src_dir = "${path.module}/lambda"
+}
+
+# ─────────────────────────────
 # 1. IAM Role & Lambda Function
 # ─────────────────────────────
+
 data "aws_iam_policy_document" "assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -34,7 +43,7 @@ data "aws_iam_policy_document" "dynamodb_read" {
     effect = "Allow"
     actions = [
       "dynamodb:GetItem",
-      "dynamodb:Query", # ★今回の検索ロジック(begins_with)に必須！
+      "dynamodb:Query", # begins_with などの検索に必須
       # "dynamodb:BatchGetItem" # 将来必要なら追加
     ]
     resources = [var.construction_master_table_arn]
@@ -47,22 +56,56 @@ resource "aws_iam_role_policy" "dynamodb_read" {
   policy = data.aws_iam_policy_document.dynamodb_read.json
 }
 
+# ─────────────────────────────
+# Lambda 依存ライブラリのインストール（ローカルで pip 実行）
+# ─────────────────────────────
+resource "null_resource" "lambda_deps" {
+  # requirements.txt が変わったら再実行
+  triggers = {
+    requirements = filesha256("${local.lambda_src_dir}/requirements.txt")
+  }
+
+  provisioner "local-exec" {
+    working_dir = local.lambda_src_dir
+
+    command = <<-EOT
+      echo "[s2_tenant-context] install deps with pip"
+
+      # 念のため過去の依存を掃除
+      rm -rf aws_lambda_powertools* boto3* __pycache__
+
+      # 依存ライブラリを lambda/ 直下にインストール
+      pip install -r requirements.txt -t .
+
+      echo "[s2_tenant-context] deps installed"
+    EOT
+  }
+}
+
+# ─────────────────────────────
 # Lambda ソースコードのZIP化
+# ─────────────────────────────
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda"
+  source_dir  = local.lambda_src_dir
   output_path = "${path.module}/lambda_payload.zip"
   excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+
+  # 先に pip 実行してから ZIP させる
+  depends_on = [null_resource.lambda_deps]
 }
 
 resource "aws_lambda_function" "this" {
-  function_name    = var.name_prefix
-  role             = aws_iam_role.this.arn
-  handler          = "main.lambda_handler"
-  runtime          = "python3.12"
-  architectures    = ["arm64"]
-  timeout          = 10
-  memory_size      = 256
+  function_name = var.name_prefix
+  role          = aws_iam_role.this.arn
+  handler       = "main.lambda_handler"
+  runtime       = "python3.12"
+  architectures = ["arm64"]
+  timeout       = 10
+  memory_size   = 256
+
+  kms_key_arn = var.lambda_kms_key_arn
+
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
@@ -121,4 +164,19 @@ resource "aws_lambda_permission" "apigw" {
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/aws/lambda/${var.name_prefix}"
   retention_in_days = 30
+}
+
+# KMS 復号権限
+data "aws_iam_policy_document" "kms_decrypt" {
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = [var.lambda_kms_key_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "kms_decrypt" {
+  name   = "kms-decrypt-access"
+  role   = aws_iam_role.this.id
+  policy = data.aws_iam_policy_document.kms_decrypt.json
 }

@@ -23,10 +23,6 @@ variable "callback_urls" {
   type = list(string)
 
   default = [
-    # 例: テナントごとに callback を増やすやり方（やらない方針）
-    # "https://tenant-a.example.com/auth/callback",
-    # "https://tenant-b.example.com/auth/callback",
-
     # 採用する方針: 認証専用ドメイン 1つに集約
     "https://auth.example.com/callback",
     "http://localhost:3000/api/auth/callback"
@@ -50,3 +46,37 @@ variable "logout_urls" {
     "http://localhost:3000"
   ]
 }
+
+# ─────────────────────────────
+# Email OTP カスタム認証 Lambda ARNs
+# ─────────────────────────────
+variable "define_auth_lambda_arn" {
+  description = "Define Auth Challenge Lambda ARN"
+  type        = string
+  default     = null
+}
+
+variable "create_auth_lambda_arn" {
+  description = "Create Auth Challenge Lambda ARN"
+  type        = string
+  default     = null
+}
+
+variable "verify_auth_lambda_arn" {
+  description = "Verify Auth Challenge Lambda ARN"
+  type        = string
+  default     = null
+}
+
+
+variable "webauthn_relying_party_id" {
+  description = "WebAuthn Relying Party ID (frontend domain)"
+  type        = string
+}
+
+variable "is_mfa_enabled" {
+  description = "MFA設定を有効にするかどうか (true=OPTIONAL, false=OFF)"
+  type        = bool
+  default     = false
+}
+

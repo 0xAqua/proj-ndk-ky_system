@@ -12,8 +12,11 @@ resource "aws_sqs_queue" "dlq" {
 resource "aws_sqs_queue" "main" {
   name                      = "${var.name_prefix}-vq-job-queue"
 
-  # Worker Lambdaのタイムアウトより長く設定 (Workerのタイムアウトは60秒を想定)
-  visibility_timeout_seconds = 65
+  # Producerがメッセージを入れても、Workerには20秒間見えなくなります
+  delay_seconds = 20
+
+  # Worker Lambdaのタイムアウト
+  visibility_timeout_seconds = 70
 
   # リトライ設定: 3回失敗したらDLQへ送る
   redrive_policy = jsonencode({

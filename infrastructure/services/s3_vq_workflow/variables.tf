@@ -46,3 +46,23 @@ variable "authorizer_id" {
   description = "ID of the Cognito JWT Authorizer"
   type        = string
 }
+
+variable "lambda_kms_key_arn" {
+  description = "KMS key ARN for Lambda environment encryption"
+  type        = string
+}
+
+variable "external_api_base_url" {
+  description = "Base URL for the external VQ API (e.g. https://ndis.questella.biz)"
+  type        = string
+}
+
+variable "api_endpoint" {
+  description = "The base URL of the API Gateway"
+  type        = string
+}
+
+variable "env" {
+  description = "Environment (dev, stg, prod)"
+  type        = string
+}

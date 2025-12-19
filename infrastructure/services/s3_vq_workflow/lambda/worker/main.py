@@ -1,87 +1,283 @@
 import os
 import json
-import boto3
 import time
-from botocore.exceptions import ClientError
+import boto3
+import requests
 from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.utilities.data_classes import event_source, SQSEvent
 
 logger = Logger()
 tracer = Tracer()
 
-dynamodb = boto3.resource("dynamodb")
-secrets = boto3.client("secretsmanager")
-TABLE_NAME = os.environ["JOB_TABLE_NAME"]
+# 環境変数
+JOB_TABLE_NAME = os.environ.get('JOB_TABLE_NAME')
+SQS_QUEUE_URL = os.environ.get('SQS_QUEUE_URL')
+AUTH_API_URL = os.environ.get('AUTH_API_URL')
+MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
+CALLBACK_URL = os.environ.get('CALLBACK_URL')
+VQ_SECRET_ARN = os.environ.get('VQ_SECRET_ARN')
+POLLING_INTERVAL = int(os.environ.get('POLLING_INTERVAL'))
 
-def get_vq_api_key(tenant_id):
-    """Secrets ManagerからテナントごとのAPIキーを取得"""
-    # 設計に合わせてパスを調整してください
-    secret_name = f"ndk-ky/dev/{tenant_id}/vq-key"
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table(JOB_TABLE_NAME)
+sqs = boto3.client('sqs')
+secrets = boto3.client('secretsmanager')
+
+
+def get_vq_credentials(target_tenant_id):
+    """Producerと同じ認証情報取得ロジック"""
     try:
-        resp = secrets.get_secret_value(SecretId=secret_name)
-        return json.loads(resp["SecretString"])["api_key"]
-    except ClientError:
-        logger.exception("Secret retrieval failed")
-        raise # システムエラーなのでリトライさせる
+        resp = secrets.get_secret_value(SecretId=VQ_SECRET_ARN)
+        secret_json = json.loads(resp.get('SecretString'))
+        if isinstance(secret_json, list):
+            target_config = next(
+                (item for item in secret_json if item.get("tenant_id") == target_tenant_id), None)
+            if not target_config:
+                raise Exception(f"Tenant config not found for id: {target_tenant_id}")
+            return target_config['secret_data']
+        else:
+            return secret_json.get('secret_data', secret_json)
+    except Exception as e:
+        logger.exception("シークレット取得に失敗しました", action_category="ERROR")
+        raise e
 
-def call_vq_api(api_key, eat_value):
-    """VQシステムへの連携 (擬似コード)"""
-    # ここで requests.post(...) などを行う
-    # タイムアウトや500エラーの場合は Exception を raise すること！
-    time.sleep(2) # 処理時間のシミュレーション
-    return f"VQ Result for {eat_value}"
 
-@tracer.capture_lambda_handler
-@event_source(data_class=SQSEvent)
-@logger.inject_lambda_context
-def lambda_handler(event: SQSEvent, context):
-    for record in event.records:
-        body = json.loads(record.body)
-        tenant_id = body.get("tenant_id")
-        job_id = body.get("job_id")
-        eat = body.get("input_eat")
+def get_auth_token(api_key, login_id):
+    resp = requests.post(AUTH_API_URL, json={"api_key": api_key, "login_id": login_id})
+    resp.raise_for_status()
+    return resp.json().get('token')
 
-        logger.append_keys(job_id=job_id, tenant_id=tenant_id)
 
-        try:
-            # 1. バリデーション (リトライさせないパターン)
-            if not eat or not tenant_id:
-                # これは「アプリ仕様のエラー」なので、リトライしても直らない。
-                # Exceptionを上げずに、ステータスをFAILEDにして正常終了(return)し、
-                # SQSからメッセージを消す。
-                logger.error("Invalid input format. Stopping retry.")
-                update_status(tenant_id, job_id, "FAILED", "Invalid input")
-                return
+def strip_markdown_code_block(content):
+    """Markdownコードブロック（```json ... ```）を除去"""
+    if not content:
+        return content
+    cleaned = content.strip()
+    if cleaned.startswith('```'):
+        lines = cleaned.split('\n')
+        # 最初の行（```json）を除去
+        if lines[0].startswith('```'):
+            lines = lines[1:]
+        # 最後の行（```）を除去
+        if lines and lines[-1].strip() == '```':
+            lines = lines[:-1]
+        cleaned = '\n'.join(lines)
+    return cleaned.strip()
 
-                # 2. VQ連携 (時間がかかる処理)
-            api_key = get_vq_api_key(tenant_id)
-            result = call_vq_api(api_key, eat) # 失敗したらここでExceptionが出る想定
 
-            # 3. 成功時更新
-            update_status(tenant_id, job_id, "COMPLETED", result)
-            logger.info("Job completed successfully")
+def is_valid_content(content):
+    """VQ API形式のJSON検証"""
+    if not content:
+        logger.warning("検証: contentが空です", action_category="ERROR")
+        return False
 
-        except Exception as e:
-            logger.exception("System error occurred. SQS will retry this message.")
-            # ★ここで例外を再度発生させると、Lambdaは「失敗」とみなされ、
-            # SQSの VisibilityTimeout 後に再試行(リトライ)される。
-            # 3回失敗するとDLQへ行く。
-            raise e
+    try:
+        cleaned = strip_markdown_code_block(content)
+        parsed = json.loads(cleaned)
 
-def update_status(tenant_id, job_id, status, result=None):
-    table = dynamodb.Table(TABLE_NAME)
-    update_expr = "SET #st = :st, updated_at = :ts"
-    expr_attrs = {":st": status, ":ts": int(time.time())}
-    expr_names = {"#st": "status"} # statusは予約語の可能性があるため
+        # VQ API形式: { "incidents": [...] }
+        if isinstance(parsed, dict) and 'incidents' in parsed:
+            incidents = parsed['incidents']
+        elif isinstance(parsed, list):
+            incidents = parsed
+        else:
+            logger.warning("検証: ルート構造が不正です", action_category="ERROR")
+            return False
 
-    if result:
-        update_expr += ", #res = :res"
-        expr_attrs[":res"] = result
-        expr_names["#res"] = "result"
+        if len(incidents) == 0:
+            logger.warning("検証: incidentsリストが空です", action_category="ERROR")
+            return False
+
+        required_keys = {'id', 'title', 'classification', 'summary', 'cause', 'countermeasures'}
+        required_cm_keys = {'no', 'title', 'description', 'responsible'}
+
+        for idx, incident in enumerate(incidents):
+            missing = required_keys - set(incident.keys())
+            if missing:
+                logger.warning("検証: 必須キーが不足しています", action_category="ERROR", index=idx, missing_keys=list(missing))
+                return False
+
+            for cm_idx, cm in enumerate(incident.get('countermeasures', [])):
+                missing_cm = required_cm_keys - set(cm.keys())
+                if missing_cm:
+                    logger.warning(
+                        "検証: countermeasuresの必須キーが不足しています",
+                        action_category="ERROR",
+                        incident_index=idx,
+                        cm_index=cm_idx,
+                        missing_keys=list(missing_cm)
+                    )
+                    return False
+
+        logger.info("検証: OK", action_category="EXECUTE")
+        return True
+
+    except json.JSONDecodeError as e:
+        logger.warning("検証: JSONパースエラー", action_category="ERROR", error=str(e))
+        return False
+
+
+def recreate_job(creds, old_job_item, tenant_id, error_reason=None):
+    """JSONが不正だった場合にジョブを作り直す"""
+    logger.info("ジョブを再作成します", action_category="EXECUTE", old_tid=old_job_item['tid'])
+
+    token = get_auth_token(creds['api_key'], creds['login_id'])
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "message": old_job_item.get('input_message'),
+        "model_id": creds['model_id'],
+        "callback_url": CALLBACK_URL
+    }
+
+    vq_resp = requests.post(MESSAGE_API_URL, json=payload, headers=headers)
+    vq_resp.raise_for_status()
+    vq_data = vq_resp.json()
+
+    new_tid = vq_data.get('tid')
+    new_mid = vq_data.get('mid')
+
+    logger.info("新しいIDを取得しました", action_category="EXECUTE", new_tid=new_tid)
+
+    # DynamoDB更新
+    # error_reasonがある場合は error_msg カラムも更新する
+    update_expression = "set tid=:t, mid=:m, #st=:s, updated_at=:u, retry_count=if_not_exists(retry_count, :zero) + :inc"
+    expression_values = {
+        ':t': new_tid,
+        ':m': new_mid,
+        ':s': 'PENDING',
+        ':u': int(time.time()),
+        ':zero': 0,
+        ':inc': 1
+    }
+
+    if error_reason:
+        update_expression += ", error_msg=:e"
+        expression_values[':e'] = error_reason
 
     table.update_item(
-        Key={"tenant_id": tenant_id, "job_id": job_id},
-        UpdateExpression=update_expr,
-        ExpressionAttributeNames=expr_names,
-        ExpressionAttributeValues=expr_attrs
+        Key={'job_id': old_job_item['job_id']},
+        UpdateExpression=update_expression,
+        ExpressionAttributeNames={'#st': 'status'},
+        ExpressionAttributeValues=expression_values
     )
+
+    # 新しいSQSメッセージを送信 (Worker自身へ再送)
+    sqs.send_message(
+        QueueUrl=SQS_QUEUE_URL,
+        MessageBody=json.dumps({
+            'job_id': old_job_item['job_id'],
+            'tid': new_tid,
+            'mid': new_mid,
+            'tenant_id': tenant_id
+        })
+    )
+
+    logger.info("ジョブ再作成を完了しました", action_category="EXECUTE", job_id=old_job_item['job_id'])
+
+
+@tracer.capture_lambda_handler
+@logger.inject_lambda_context(log_event=False)
+def lambda_handler(event, context):
+    for record in event['Records']:
+        try:
+            body = json.loads(record['body'])
+            job_id = body.get('job_id')
+            tid = body.get('tid')
+            mid = body.get('mid')
+            tenant_id = body.get('tenant_id')
+
+            logger.append_keys(job_id=job_id, tid=tid, tenant_id=tenant_id)
+            logger.info("ジョブをチェックします", action_category="BATCH")
+
+            # tenant_id がSQSにない場合の復旧ロジック
+            if not tenant_id:
+                item_resp = table.get_item(Key={'job_id': job_id})
+                if 'Item' in item_resp:
+                    tenant_id = item_resp['Item'].get('tenant_id')
+
+            if not tenant_id:
+                logger.error("tenant_idがありません", action_category="ERROR")
+                return  # 処理不能
+
+            # 1. 認証情報取得
+            creds = get_vq_credentials(tenant_id)
+            token = get_auth_token(creds['api_key'], creds['login_id'])
+
+            # 2. ポーリング (GET)
+            url = f"{MESSAGE_API_URL}/{tid}/{mid}"
+            headers = {"Authorization": f"Bearer {token}"}
+
+            resp = requests.get(url, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+
+            logger.debug("VQ APIレスポンス", action_category="BATCH", response=data)
+
+            # ステータス確認 (processing / done)
+            status = data.get('status')
+
+            if status != 'done':
+                logger.info("ジョブは処理中です。再確認します。", action_category="BATCH", status=status)
+
+                sqs.send_message(
+                    QueueUrl=SQS_QUEUE_URL,
+                    MessageBody=record['body'],
+                    DelaySeconds=POLLING_INTERVAL
+                )
+                return
+
+            # 3. 完了時の検証
+            result_reply = data.get('reply', '')
+
+            if is_valid_content(result_reply):
+                # 成功: DB更新（Markdownコードブロックを除去して保存）
+                logger.info("検証成功 - DynamoDBに保存します", action_category="BATCH")
+                cleaned_reply = strip_markdown_code_block(result_reply)
+                table.update_item(
+                    Key={'job_id': job_id},
+                    UpdateExpression="set #r=:r, #st=:s, updated_at=:u",
+                    ExpressionAttributeNames={'#r': 'reply', '#st': 'status'},
+                    ExpressionAttributeValues={
+                        ':r': cleaned_reply,
+                        ':s': 'COMPLETED',
+                        ':u': int(time.time())
+                    }
+                )
+                logger.info("ジョブ完了", action_category="BATCH", job_id=job_id)
+            else:
+                # 失敗: やり直し (Re-create)
+                logger.warning("検証失敗 - リトライします", action_category="ERROR")
+
+                # 無限ループ防止のための回数チェック
+                resp = table.get_item(Key={'job_id': job_id})
+                if 'Item' in resp:
+                    current_item = resp['Item']
+                    current_retry = int(current_item.get('retry_count', 0))
+
+                    # 例: 3回以上リトライしていたら、あきらめてFAILEDにする
+                    if current_retry >= 3:
+                        logger.error("リトライ上限に達しました - FAILEDに設定", action_category="ERROR", retry_count=current_retry)
+                        table.update_item(
+                            Key={'job_id': job_id},
+                            UpdateExpression="set #st=:s, updated_at=:u, error_msg=:e",
+                            ExpressionAttributeNames={'#st': 'status'},
+                            ExpressionAttributeValues={
+                                ':s': 'FAILED',
+                                ':u': int(time.time()),
+                                ':e': 'Validation failed multiple times. Invalid JSON format.'
+                            }
+                        )
+                        return  # ここで終了（再送しない）
+
+                    # まだ上限に達していなければ再作成
+                    logger.info("リトライ中", action_category="BATCH", retry_count=current_retry + 1)
+                    recreate_job(creds, current_item, tenant_id, error_reason="Validation failed: Invalid JSON format.")
+
+        except Exception as e:
+            # 待機用の例外チェックは不要になったので削除し、予期せぬエラーのみを扱う
+            logger.exception("ワーカーエラーが発生しました", action_category="ERROR")
+            raise e  # 本当のエラーはDLQ行きにするため raise

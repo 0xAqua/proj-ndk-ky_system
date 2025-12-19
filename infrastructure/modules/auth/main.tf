@@ -13,40 +13,50 @@ resource "aws_cognito_user_pool" "this" {
     case_sensitive = false
   }
 
-  # ★重要: 誤削除防止（開発初期で頻繁に作り直す場合は "INACTIVE" にしてください）
+  # ★重要: 誤削除防止
   deletion_protection = "ACTIVE"
 
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
+  user_pool_tier = "PLUS"
+
+  user_pool_add_ons {
+    advanced_security_mode = "ENFORCED"
+  }
+
   # ─────────────────────────────
-  # MFA (多要素認証) 設定
-  # 将来: Passkey (FIDO2) と OTP を使用予定
-  # 現状: 開発効率のため OFF
+  # MFA設定
   # ─────────────────────────────
-  mfa_configuration = "OFF" # 本番化に向け "OPTIONAL" または "ON" に変更
+  mfa_configuration = var.is_mfa_enabled ? "OPTIONAL" : "OFF"
 
-  # 将来MFAを有効化する際の OTP 設定（今はOFFなので影響しません）
-  # software_token_mfa_configuration {
-  #   enabled = true
-  # }
+  dynamic "software_token_mfa_configuration" {
+    for_each = var.is_mfa_enabled ? [1] : []
+    content {
+      enabled = true
+    }
+  }
 
-  # 将来MFAを有効化する際の Passkey (WebAuthn) 設定
-  # ※ Terraform Provider AWS v5.x以降で使用可能
-  # user_pool_add_ons {
-  #   advanced_security_mode = "AUDIT" # Passkey利用にはENFORCEDかAUDITが必要な場合あり
-  # }
-  # web_authn_configuration {
-  #   relying_party_id = "auth.example.com" # 実際の認証ドメインに合わせて設定
-  #   user_verification = "preferred"
-  # }
+  # ─────────────────────────────
+  # Passkey (WebAuthn) 設定
+  # ドメイン取得後に有効化
+  # ─────────────────────────────
+  sign_in_policy {
+    allowed_first_auth_factors = ["PASSWORD", "WEB_AUTHN", "EMAIL_OTP"]
+  }
 
+  web_authn_configuration {
+    relying_party_id  = var.webauthn_relying_party_id
+    user_verification = "preferred"
+  }
+
+  # パスワードポリシー（強化済み）
   password_policy {
-    minimum_length    = 8
+    minimum_length    = 10
     require_lowercase = true
     require_numbers   = true
-    require_symbols   = false
-    require_uppercase = false
+    require_symbols   = true
+    require_uppercase = true
   }
 
   # tenant_id カスタム属性
@@ -61,7 +71,19 @@ resource "aws_cognito_user_pool" "this" {
     }
   }
 
-  # ユーザーのデバイス追跡（MFAのリスクベース認証などで将来役立つ）
+  # パスキー登録済みかどうかを管理するフラグ (0:未登録, 1:登録済)
+  schema {
+    name                = "has_passkey"
+    attribute_data_type = "Number"
+    mutable             = true
+    required            = false
+    number_attribute_constraints {
+      min_value = 0
+      max_value = 1
+    }
+  }
+
+  # ユーザーのデバイス追跡
   device_configuration {
     challenge_required_on_new_device      = true
     device_only_remembered_on_user_prompt = true
@@ -74,6 +96,18 @@ resource "aws_cognito_user_pool" "this" {
       priority = 1
     }
   }
+
+  # ─────────────────────────────
+  # Email OTP カスタム認証トリガー
+  # ─────────────────────────────
+  dynamic "lambda_config" {
+    for_each = var.define_auth_lambda_arn != null ? [1] : []
+    content {
+      define_auth_challenge          = var.define_auth_lambda_arn
+      create_auth_challenge          = var.create_auth_lambda_arn
+      verify_auth_challenge_response = var.verify_auth_lambda_arn
+    }
+  }
 }
 
 # ─────────────────────────────
@@ -83,13 +117,13 @@ resource "aws_cognito_user_pool_client" "web" {
   name         = "${local.name_prefix}-web-client"
   user_pool_id = aws_cognito_user_pool.this.id
 
-  # MFA有効化時もこのフロー設定で対応可能
+  # パスワード認証(SRP)と、カスタム認証(OTP)の両方を許可します
   explicit_auth_flows = [
-    "ALLOW_USER_PASSWORD_AUTH",
-    "ALLOW_REFRESH_TOKEN_AUTH",
-    # Passkey/MFAを利用する場合は以下が必要になる可能性があります
     "ALLOW_USER_SRP_AUTH",
-    "ALLOW_CUSTOM_AUTH"
+    "ALLOW_USER_PASSWORD_AUTH",
+    "ALLOW_CUSTOM_AUTH",
+    "ALLOW_REFRESH_TOKEN_AUTH",
+    "ALLOW_USER_AUTH"
   ]
 
   supported_identity_providers         = ["COGNITO"]
@@ -105,24 +139,38 @@ resource "aws_cognito_user_pool_client" "web" {
   # ユーザー存在エラーの隠蔽（セキュリティ対策）
   prevent_user_existence_errors = "ENABLED"
 
+  # トークン有効期限
+  # access_token_validity  = 60   # 分
+  # id_token_validity      = 60   # 分
+  # refresh_token_validity = 30   # 日
+
+  access_token_validity  = 15   # 15分
+  id_token_validity      = 15   # 15分
+  refresh_token_validity = 1    # 1日（ローカルストレージに置いてる）
+
+  token_validity_units {
+    access_token  = "minutes"
+    id_token      = "minutes"
+    refresh_token = "days"
+  }
+
   # ★重要: テナントID書き換え防止設定
-  # ユーザー（ブラウザ）からは書き込み不可にする
-  # "custom:tenant_id" は絶対に含めない
   write_attributes = [
     "email",
     "name",
     "family_name",
     "given_name",
+    "custom:has_passkey"
   ]
 
-  # 読み取りはOK（アプリ内でテナント判定に使用）
   read_attributes = [
     "email",
     "email_verified",
     "name",
     "family_name",
     "given_name",
-    "custom:tenant_id"
+    "custom:tenant_id",
+    "custom:has_passkey"
   ]
 }
 
@@ -133,3 +181,5 @@ resource "aws_cognito_user_pool_domain" "this" {
   domain       = "${local.name_prefix}-auth"
   user_pool_id = aws_cognito_user_pool.this.id
 }
+
+

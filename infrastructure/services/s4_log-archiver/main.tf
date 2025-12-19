@@ -1,4 +1,11 @@
 # ─────────────────────────────
+# 0. ローカル変数
+# ─────────────────────────────
+locals {
+  lambda_src_dir = "${path.module}/lambda"
+}
+
+# ─────────────────────────────
 # IAM Role (Log Archiver)
 # ─────────────────────────────
 resource "aws_iam_role" "archiver_role" {
@@ -49,12 +56,43 @@ resource "aws_iam_role_policy" "archiver_policy" {
 }
 
 # ─────────────────────────────
+# Lambda 依存ライブラリのインストール（ローカル pip）
+# ─────────────────────────────
+resource "null_resource" "lambda_deps" {
+  # requirements.txt が変わったら再実行
+  triggers = {
+    requirements = filesha256("${local.lambda_src_dir}/requirements.txt")
+  }
+
+  provisioner "local-exec" {
+    working_dir = local.lambda_src_dir
+
+    command = <<-EOT
+      echo "[s4_log-archiver] install deps with pip"
+
+      # 念のため過去の依存を掃除
+      rm -rf aws_lambda_powertools* boto3* __pycache__
+
+      # 依存ライブラリを lambda/ 直下にインストール
+      pip install -r requirements.txt -t .
+
+      echo "[s4_log-archiver] deps installed"
+    EOT
+  }
+}
+
+# ─────────────────────────────
 # Lambda Function
 # ─────────────────────────────
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda"
+  source_dir  = local.lambda_src_dir
   output_path = "${path.module}/lambda_payload.zip"
+
+  excludes = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+
+  # 先に pip を実行させる
+  depends_on = [null_resource.lambda_deps]
 }
 
 resource "aws_lambda_function" "this" {
@@ -68,11 +106,13 @@ resource "aws_lambda_function" "this" {
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
+  kms_key_arn = var.lambda_kms_key_arn
   environment {
     variables = {
       LOG_ARCHIVE_TABLE = var.log_archive_table_name
-      # 収集対象のロググループ名をカンマ区切りで渡す
       TARGET_LOG_GROUPS = join(",", var.target_log_group_names)
+      POWERTOOLS_SERVICE_NAME = "log-archiver"
+      LOG_LEVEL               = "INFO"
     }
   }
 }
@@ -99,4 +139,19 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   function_name = aws_lambda_function.this.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.daily_schedule.arn
+}
+
+# KMS 復号権限
+data "aws_iam_policy_document" "kms_decrypt" {
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = [var.lambda_kms_key_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "kms_decrypt" {
+  name   = "kms-decrypt-access"
+  role   = aws_iam_role.archiver_role.id
+  policy = data.aws_iam_policy_document.kms_decrypt.json
 }

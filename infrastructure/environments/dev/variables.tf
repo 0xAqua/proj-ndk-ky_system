@@ -8,7 +8,13 @@ variable "root_domain" {
 }
 
 locals {
-  project     = "ndk-ky"
+  project     = "ndk-ky-system"
   environment = "dev"
   region      = "ap-northeast-1"
+}
+
+variable "enable_advanced_auth" {
+  description = "MFA/Passkeyなどの高度な認証機能を有効にするか"
+  type        = bool
+  default     = false
 }

@@ -1,0 +1,260 @@
+{
+  "tenant_id": "tenant-a",
+  "data": [
+    {
+      "id": "DEPT#1",
+      "title": "共通",
+      "children": [
+        {
+          "id": "DEPT#1#TYPE#1",
+          "title": "電柱・支線",
+          "children": [
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#1",
+              "title": "電柱新設",
+              "tasks": [
+                { "id": "DEPT#1#TYPE#1#PROJ#1#TASK#1", "title": "保安施設の設置・撤去" },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#TASK#2", "title": "重機類の設置" },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#TASK#3", "title": "建柱（掘削、建入れ、埋戻し）" },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#TASK#4", "title": "昇柱" },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#TASK#5", "title": "電力設備防護" }
+              ],
+              "equipments": [],
+              "safety_equipments": [
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#1", "title": "絶縁用保護具", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#2", "title": "穴掘建柱車", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#3", "title": "高所作業車", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#4", "title": "輪止め・ジャッキベース", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#5", "title": "梯子", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#6", "title": "玉掛け用ワイヤ", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#7", "title": "削岩機", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#8", "title": "ディスクグラインダー", "is_high_risk": true }
+              ]
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#2",
+              "title": "電柱撤去",
+              "tasks": [
+                { "id": "DEPT#1#TYPE#1#PROJ#2#TASK#1", "title": "保安施設の設置・撤去" },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#TASK#2", "title": "重機類の設置" },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#TASK#3", "title": "昇柱" },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#TASK#4", "title": "撤去（掘削、抜柱、埋戻し）" },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#TASK#5", "title": "電力設備防護" }
+              ],
+              "equipments": [],
+              "safety_equipments": [
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#1", "title": "絶縁用保護具", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#2", "title": "穴掘建柱車", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#3", "title": "高所作業車", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#4", "title": "輪止め・ジャッキベース", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#5", "title": "抜柱機", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#6", "title": "梯子", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#7", "title": "玉掛け用ワイヤ", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#8", "title": "削岩機", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#9", "title": "ディスクグラインダー", "is_high_risk": true }
+              ]
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#3",
+              "title": "上部支線新設",
+              "tasks": [
+                { "id": "DEPT#1#TYPE#1#PROJ#3#TASK#1", "title": "保安施設の設置・撤去" },
+                { "id": "DEPT#1#TYPE#1#PROJ#3#TASK#2", "title": "昇柱" }
+              ],
+              "equipments": [],
+              "safety_equipments": [
+                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#1", "title": "絶縁用保護具", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#2", "title": "高所作業車", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#3", "title": "車輪止め・ジャッキベース", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#4", "title": "梯子", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#5", "title": "張線器（シメラー）", "is_high_risk": true }
+              ]
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#4",
+              "title": "上部支線撤去",
+              "tasks": [
+                { "id": "DEPT#1#TYPE#1#PROJ#4#TASK#1", "title": "保安施設用器具類の設置" },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#TASK#2", "title": "準備" },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#TASK#3", "title": "支線ガードの取外し" },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#TASK#4", "title": "支線の取外し" },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#TASK#5", "title": "整理" },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#TASK#6", "title": "保安施設用器具類の撤去" },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#TASK#7", "title": "写真撮影" }
+              ],
+              "equipments": [],
+              "safety_equipments": [
+                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#1", "title": "絶縁用保護具", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#2", "title": "高所作業車", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#3", "title": "輪止め・ジャッキベース", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#4", "title": "梯子", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#5", "title": "張線器（シメラー）", "is_high_risk": true }
+              ]
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#5",
+              "title": "下部支線新設",
+              "tasks": [
+                { "id": "DEPT#1#TYPE#1#PROJ#5#TASK#1", "title": "保安施設の設置・撤去" },
+                { "id": "DEPT#1#TYPE#1#PROJ#5#TASK#2", "title": "掘削" },
+                { "id": "DEPT#1#TYPE#1#PROJ#5#TASK#3", "title": "下部支線設置" }
+              ],
+              "equipments": [],
+              "safety_equipments": [
+                { "id": "DEPT#1#TYPE#1#PROJ#5#SEQ#1", "title": "削岩機", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#5#SEQ#2", "title": "ディスクグラインダー", "is_high_risk": true }
+              ]
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#6",
+              "title": "下部支線撤去",
+              "tasks": [
+                { "id": "DEPT#1#TYPE#1#PROJ#6#TASK#1", "title": "保安施設の設置・撤去" },
+                { "id": "DEPT#1#TYPE#1#PROJ#6#TASK#2", "title": "掘削" },
+                { "id": "DEPT#1#TYPE#1#PROJ#6#TASK#3", "title": "撤去" }
+              ],
+              "equipments": [],
+              "safety_equipments": [
+                { "id": "DEPT#1#TYPE#1#PROJ#6#SEQ#1", "title": "削岩機", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#6#SEQ#2", "title": "ディスクグラインダー", "is_high_risk": true }
+              ]
+            },
+            {
+              "id": "DEPT#1#TYPE#1#PROJ#7",
+              "title": "舗装破砕復旧",
+              "tasks": [
+                { "id": "DEPT#1#TYPE#1#PROJ#7#TASK#1", "title": "舗装破砕､復旧" },
+                { "id": "DEPT#1#TYPE#1#PROJ#7#TASK#2", "title": "転圧工" }
+              ],
+              "equipments": [],
+              "safety_equipments": [
+                { "id": "DEPT#1#TYPE#1#PROJ#7#SEQ#1", "title": "ディスクグラインダー", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#7#SEQ#2", "title": "ランマー", "is_high_risk": false }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ENV#1",
+      "title": "交通がある場所での工事",
+      "children": [
+        {
+          "id": "ENV#1#TYPE#1",
+          "title": "車両の通行がある",
+          "children": [
+            { "id": "ENV#1#TYPE#1#ITEM#1", "title": "公道での運転を要する" },
+            { "id": "ENV#1#TYPE#1#ITEM#2", "title": "交通整理あり" }
+          ]
+        },
+        {
+          "id": "ENV#1#TYPE#2",
+          "title": "歩行者の通行がある",
+          "children": [
+            { "id": "ENV#1#TYPE#2#ITEM#1", "title": "交通整理あり" }
+          ]
+        },
+        {
+          "id": "ENV#1#TYPE#3",
+          "title": "道路の状況に注意が必要",
+          "children": [
+            { "id": "ENV#1#TYPE#3#ITEM#1", "title": "道路横断中の作業" },
+            { "id": "ENV#1#TYPE#3#ITEM#2", "title": "道路が狭い" },
+            { "id": "ENV#1#TYPE#3#ITEM#3", "title": "道路横断箇所での作業" },
+            { "id": "ENV#1#TYPE#3#ITEM#4", "title": "交差点内での作業" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ENV#2",
+      "title": "作業場所に注意が必要",
+      "children": [
+        {
+          "id": "ENV#2#TYPE#1",
+          "title": "電力設備の近くでの作業",
+          "children": [
+            { "id": "ENV#2#TYPE#1#ITEM#1", "title": "架空電力線の近くでの作業" },
+            { "id": "ENV#2#TYPE#1#ITEM#2", "title": "電力設備との距離が十分にとれない" },
+            { "id": "ENV#2#TYPE#1#ITEM#3", "title": "特別高圧電力線（送電線）の接近箇所における作業" },
+            { "id": "ENV#2#TYPE#1#ITEM#4", "title": "電力線接近・接触箇所での作業" },
+            { "id": "ENV#2#TYPE#1#ITEM#5", "title": "変圧器接近・接触箇所での作業" },
+            { "id": "ENV#2#TYPE#1#ITEM#6", "title": "電力共架柱(電灯線添柱含む)における作業" }
+          ]
+        },
+        {
+          "id": "ENV#2#TYPE#2",
+          "title": "作業環境が狭い・特殊",
+          "children": [
+            { "id": "ENV#2#TYPE#2#ITEM#1", "title": "作業スペースが十分に取れない可能性がある" },
+            { "id": "ENV#2#TYPE#2#ITEM#2", "title": "室内でドアのある出入り口の移動" },
+            { "id": "ENV#2#TYPE#2#ITEM#3", "title": "室内での作業" },
+            { "id": "ENV#2#TYPE#2#ITEM#4", "title": "MH内の作業" },
+            { "id": "ENV#2#TYPE#2#ITEM#5", "title": "掘削穴へ入っての作業" },
+            { "id": "ENV#2#TYPE#2#ITEM#6", "title": "掘削箇所に入っての作業" },
+            { "id": "ENV#2#TYPE#2#ITEM#7", "title": "掘削付近の路面段差" },
+            { "id": "ENV#2#TYPE#2#ITEM#8", "title": "とう道内の出入り・作業" },
+            { "id": "ENV#2#TYPE#2#ITEM#9", "title": "樹木を利用しての作業" },
+            { "id": "ENV#2#TYPE#2#ITEM#10", "title": "軌道越しでの作業" }
+          ]
+        },
+        {
+          "id": "ENV#2#TYPE#3",
+          "title": "安全対策が必要",
+          "children": [
+            { "id": "ENV#2#TYPE#3#ITEM#1", "title": "落下危険がある場所に柵がない" },
+            { "id": "ENV#2#TYPE#3#ITEM#2", "title": "不安定な場所での作業" },
+            { "id": "ENV#2#TYPE#3#ITEM#3", "title": "地山崩壊の恐れがある" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ENV#3",
+      "title": "作業環境・作業条件に注意が必要",
+      "children": [
+        {
+          "id": "ENV#3#TYPE#1",
+          "title": "地面や天候の影響がある",
+          "children": [
+            { "id": "ENV#3#TYPE#1#ITEM#1", "title": "地面が凍結している部分がある" },
+            { "id": "ENV#3#TYPE#1#ITEM#2", "title": "地面が濡れている部分がある" },
+            { "id": "ENV#3#TYPE#1#ITEM#3", "title": "傾斜地での移動、作業がある" },
+            { "id": "ENV#3#TYPE#1#ITEM#4", "title": "滑りやすい材質上での作業" },
+            { "id": "ENV#3#TYPE#1#ITEM#5", "title": "雨天時" },
+            { "id": "ENV#3#TYPE#1#ITEM#6", "title": "寒冷時" },
+            { "id": "ENV#3#TYPE#1#ITEM#7", "title": "夜間時" },
+            { "id": "ENV#3#TYPE#1#ITEM#8", "title": "炎天下での作業" }
+          ]
+        },
+        {
+          "id": "ENV#3#TYPE#2",
+          "title": "高所や特殊な作業がある",
+          "children": [
+            { "id": "ENV#3#TYPE#2#ITEM#1", "title": "高所作業" },
+            { "id": "ENV#3#TYPE#2#ITEM#2", "title": "高所作業車を使用できない" },
+            { "id": "ENV#3#TYPE#2#ITEM#3", "title": "屋根上での作業" },
+            { "id": "ENV#3#TYPE#2#ITEM#4", "title": "二重床（フリーアクセス）での作業" },
+            { "id": "ENV#3#TYPE#2#ITEM#5", "title": "支持線・ケーブル引留箇所での作業" },
+            { "id": "ENV#3#TYPE#2#ITEM#6", "title": "吊り線引留箇所での作業" }
+          ]
+        },
+        {
+          "id": "ENV#3#TYPE#3",
+          "title": "その他の特別な作業がある",
+          "children": [
+            { "id": "ENV#3#TYPE#3#ITEM#1", "title": "給油作業" },
+            { "id": "ENV#3#TYPE#3#ITEM#2", "title": "人力運搬" },
+            { "id": "ENV#3#TYPE#3#ITEM#3", "title": "鋼より線先端処理" },
+            { "id": "ENV#3#TYPE#3#ITEM#4", "title": "支持線先端処理及びケーブル端末処理" },
+            { "id": "ENV#3#TYPE#3#ITEM#5", "title": "事前確認した図面と異なる部分がある" },
+            { "id": "ENV#3#TYPE#3#ITEM#6", "title": "装柱作業" },
+            { "id": "ENV#3#TYPE#3#ITEM#7", "title": "パッケージ搭載作業" },
+            { "id": "ENV#3#TYPE#3#ITEM#8", "title": "柱間分岐箇所での作業" }
+          ]
+        }
+      ]
+    }
+  ]
+}
