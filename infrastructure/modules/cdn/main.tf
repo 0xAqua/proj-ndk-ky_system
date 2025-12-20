@@ -29,32 +29,50 @@ resource "aws_cloudfront_origin_access_control" "this" {
   signing_protocol                  = "sigv4"
 }
 
-# パス書き換え (Viteのproxy再現)
+# API用: パス書き換え
 resource "aws_cloudfront_function" "api_rewrite" {
   name    = "${var.name_prefix}-api-rewrite"
-  runtime = "cloudfront-js-1.0"
+  runtime = "cloudfront-js-2.0"
   publish = true
   code    = <<EOF
 function handler(event) {
     var request = event.request;
-    if (request.uri.startsWith('/api/v1/')) {
-        request.uri = request.uri.replace('/api/v1/', '/');
-    }
+    // /api/v1/xxx → /xxx に書き換え
+    request.uri = request.uri.replace('/api/v1/', '/');
     return request;
 }
 EOF
 }
 
-# CloudFront本体
-resource "aws_cloudfront_distribution" "this" {
-  enabled = true
+# SPA用: 拡張子なしパスはindex.htmlへ
+resource "aws_cloudfront_function" "spa_routing" {
+  name    = "${var.name_prefix}-spa-routing"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  code    = <<EOF
+function handler(event) {
+    var request = event.request;
+    var uri = request.uri;
 
-  # ★ WAFの紐付け（作成した aws_wafv2_web_acl の ARN を指定）
-  web_acl_id = var.web_acl_arn
+    // 拡張子がない && ルート以外 → index.html
+    if (uri !== '/' && !uri.includes('.')) {
+        request.uri = '/index.html';
+    }
+
+    return request;
+}
+EOF
+}
+
+# --- CloudFront Distribution ---
+resource "aws_cloudfront_distribution" "this" {
+  enabled             = true
+  default_root_object = "index.html"
+  web_acl_id          = var.web_acl_arn
 
   # API Gateway オリジン
   origin {
-    domain_name = var.api_gateway_domain # rootから渡される
+    domain_name = var.api_gateway_domain
     origin_id   = "APIGateway"
     custom_origin_config {
       http_port              = 80
@@ -64,8 +82,6 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-
-
   # S3 オリジン
   origin {
     domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
@@ -73,7 +89,7 @@ resource "aws_cloudfront_distribution" "this" {
     origin_access_control_id = aws_cloudfront_origin_access_control.this.id
   }
 
-  # API用設定 (/api/v1/*)
+  # API用 (/api/v1/*)
   ordered_cache_behavior {
     path_pattern     = "/api/v1/*"
     target_origin_id = "APIGateway"
@@ -83,7 +99,6 @@ resource "aws_cloudfront_distribution" "this" {
 
     viewer_protocol_policy = "redirect-to-https"
 
-    # ★ AWS マネージドポリシー ID を直接指定（ベストプラクティス）
     cache_policy_id            = data.aws_cloudfront_cache_policy.caching_disabled.id
     origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer.id
     response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security_headers.id
@@ -94,22 +109,22 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-  # デフォルト (S3)
+  # デフォルト (S3 + SPA)
   default_cache_behavior {
     target_origin_id       = "S3Origin"
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
     viewer_protocol_policy = "redirect-to-https"
-    cache_policy_id  = data.aws_cloudfront_cache_policy.caching_optimized.id
+    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
     response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security_headers.id
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_routing.arn
+    }
   }
 
-  # SPA対応 (404をindex.htmlへ)
-  custom_error_response {
-    error_code = 404
-    response_code = 200
-    response_page_path = "/index.html"
-  }
+  # ★ custom_error_response は削除（コメントアウト or 削除）
 
   restrictions {
     geo_restriction {
@@ -117,5 +132,41 @@ resource "aws_cloudfront_distribution" "this" {
       locations        = []
     }
   }
-  viewer_certificate { cloudfront_default_certificate = true }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+  # viewer_certificate {
+  #   acm_certificate_arn      = aws_acm_certificate.your_cert.arn
+  #   ssl_support_method       = "sni-only"
+  #   minimum_protocol_version = "TLSv1.2_2021"
+  # }
+  #
+  # aliases = ["your-domain.com"]
+
 }
+
+resource "aws_s3_bucket_policy" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AllowCloudFrontOAC"
+        Effect    = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.frontend.arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.this.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
