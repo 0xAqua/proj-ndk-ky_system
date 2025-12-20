@@ -2,21 +2,29 @@
   {
     "tenant_id": "tenant-a",
     "user_id": "27b4ea38-5051-70a3-82ee-dc2fd8ce2b10",
+    "email": "suzuki.kousuke@ndisol.com",
+    "family_name": "鈴木",
+    "given_name": "宏輔",
     "departments": {
       "COMMON": "共通",
       "ACCESS": "アクセス"
     },
     "role": "admin",
     "status": "ACTIVE",
+    "version": 1,
+    "last_login_at": "2025-12-20T10:00:00Z",
+    "last_login_ip": "153.123.45.67",
+    "status_changed_at": "2025-12-03T00:00:00Z",
+    "status_changed_by": "SYSTEM_INIT",
     "created_at": "2025-12-03T00:00:00Z",
-    "updated_at": "2025-12-03T00:00:00Z",
-    "email": "suzuki.kousuke@ndisol.com",
-    "family_name": "鈴木",
-    "given_name": "宏輔"
+    "updated_at": "2025-12-20T10:00:00Z"
   },
   {
     "tenant_id": "tenant-a",
     "user_id": "b7e49a28-6001-70e8-bd34-e34f847eed4b",
+    "email": "ogura.ayaka@ndisol.com",
+    "family_name": "小倉",
+    "given_name": "彩香",
     "departments": {
       "COMMON": "共通",
       "NETWORK": "ネットワーク",
@@ -24,40 +32,52 @@
     },
     "role": "user",
     "status": "ACTIVE",
+    "version": 1,
+    "last_login_at": "2025-12-19T15:30:00Z",
+    "last_login_ip": "153.123.45.68",
+    "status_changed_at": "2025-12-03T00:00:00Z",
+    "status_changed_by": "SYSTEM_INIT",
     "created_at": "2025-12-03T00:00:00Z",
-    "updated_at": "2025-12-03T00:00:00Z",
-    "email": "ogura.ayaka@ndisol.com",
-    "family_name": "小倉",
-    "given_name": "彩香"
+    "updated_at": "2025-12-19T15:30:00Z"
   },
   {
     "tenant_id": "tenant-a",
     "user_id": "c7e48a98-5081-704e-d0ce-933c4bcfb6db",
+    "email": "tsuji.kodai@ndisol.com",
+    "family_name": "辻",
+    "given_name": "航大",
     "departments": {
       "COMMON": "共通",
       "CIVIL": "土木"
     },
     "role": "admin",
     "status": "ACTIVE",
+    "version": 1,
+    "last_login_at": "2025-12-20T09:15:00Z",
+    "last_login_ip": "153.123.45.69",
+    "status_changed_at": "2025-12-03T00:00:00Z",
+    "status_changed_by": "SYSTEM_INIT",
     "created_at": "2025-12-03T00:00:00Z",
-    "updated_at": "2025-12-03T00:00:00Z",
-    "email": "tsuji.kodai@ndisol.com",
-    "family_name": "辻",
-    "given_name": "航大"
+    "updated_at": "2025-12-20T09:15:00Z"
   },
   {
     "tenant_id": "tenant-a",
     "user_id": "f7f41ad8-9011-70d0-bfcc-5b9d6e6ce35e",
+    "email": "yazama.takako@ndisol.com",
+    "family_name": "矢間",
+    "given_name": "貴子",
     "departments": {
       "COMMON": "共通",
       "MOBILE": "モバイル"
     },
     "role": "user",
     "status": "ACTIVE",
+    "version": 1,
+    "last_login_at": "2025-12-18T11:00:00Z",
+    "last_login_ip": "153.123.45.70",
+    "status_changed_at": "2025-12-03T00:00:00Z",
+    "status_changed_by": "SYSTEM_INIT",
     "created_at": "2025-12-03T00:00:00Z",
-    "updated_at": "2025-12-03T00:00:00Z",
-    "email": "yazama.takako@ndisol.com",
-    "family_name": "矢間",
-    "given_name": "貴子"
+    "updated_at": "2025-12-18T11:00:00Z"
   }
 ]

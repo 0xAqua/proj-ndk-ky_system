@@ -90,85 +90,117 @@ export const UserAdminTable = ({ users, onDeleteClick }: Props) => {
         ));
     };
 
+    const LastLoginDisplay = ({ date }: { date?: string }) => {
+        if (!date) {
+            return <Badge variant="subtle" colorPalette="orange" size="sm">未ログイン</Badge>;
+        }
+        return (
+            <Text fontSize="sm" color="gray.600">
+                {new Date(date).toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" })}
+            </Text>
+        );
+    };
+
     return (
         <>
             <Table.Root size="md" interactive>
                 <Table.Header bg="gray.50">
                     <Table.Row>
-                        <Table.ColumnHeader py={4}>名前 / メール</Table.ColumnHeader>
-                        <Table.ColumnHeader>部署</Table.ColumnHeader>
-                        <Table.ColumnHeader>権限</Table.ColumnHeader>
-                        <Table.ColumnHeader>ステータス</Table.ColumnHeader>
-                        <Table.ColumnHeader>更新日時</Table.ColumnHeader>
+                        <Table.ColumnHeader py={4}>ユーザー</Table.ColumnHeader>
+                        <Table.ColumnHeader>所属部署</Table.ColumnHeader>
+                        <Table.ColumnHeader textAlign="center">権限</Table.ColumnHeader>
+                        <Table.ColumnHeader textAlign="center">状態</Table.ColumnHeader>
+                        <Table.ColumnHeader>最終ログイン</Table.ColumnHeader>
                         <Table.ColumnHeader width="50px"></Table.ColumnHeader>
+
                     </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                    {/* currentUsers (20件分) を回す */}
-                    {currentUsers.map((user) => (
-                        <Table.Row key={user.user_id} _hover={{ bg: "gray.50" }}>
-
-                            {/* 1. 氏名・メール */}
-                            <Table.Cell>
-                                <HStack gap={3}>
-                                    <Avatar size="sm" name={getFullName(user)} />
-                                    <Box>
-                                        <Text fontWeight="bold" fontSize="sm">
-                                            {getFullName(user)}
-                                        </Text>
-                                        <Text fontSize="xs" color="gray.500">
-                                            {user.email}
-                                        </Text>
-                                    </Box>
-                                </HStack>
-                            </Table.Cell>
-
-                            {/* 2. 部署 */}
-                            <Table.Cell>
-                                <Flex gap={2} wrap="wrap">
-                                    {Object.keys(user.departments).length > 0 ? (
-                                        getDepartmentBadges(user.departments)
-                                    ) : (
-                                        <Text fontSize="xs" color="gray.400">-</Text>
-                                    )}
-                                </Flex>
-                            </Table.Cell>
-
-                            {/* 3. 権限・ステータス・日付 */}
-                            <Table.Cell><RoleBadge role={user.role} /></Table.Cell>
-                            <Table.Cell><StatusBadge status={user.status} /></Table.Cell>
-                            <Table.Cell>
-                                <Text fontSize="sm" color="gray.600">
-                                    {new Date(user.updated_at).toLocaleString("ja-JP")}
-                                </Text>
-                            </Table.Cell>
-
-                            {/* 4. アクションメニュー */}
-                            <Table.Cell>
-                                <Menu.Root positioning={{ placement: "bottom-end" }}>
-                                    <Menu.Trigger asChild>
-                                        <IconButton aria-label="Options" variant="ghost" size="sm" color="gray.500">
-                                            <PiDotsThreeOutline size={20} />
-                                        </IconButton>
-                                    </Menu.Trigger>
-                                    <Menu.Positioner>
-                                        <Menu.Content minW="140px">
-                                            <Menu.Item value="edit">
-                                                <PiPencilSimple /> 編集
-                                            </Menu.Item>
-                                            <Menu.Item
-                                                value="delete"
-                                                color="red.500"
-                                                onClick={() => onDeleteClick(user.user_id, user.email)}
-                                            >
-                                                <PiTrash /> 削除
-                                            </Menu.Item>
-                                        </Menu.Content>
-                                    </Menu.Positioner>
-                                </Menu.Root>
+                    {currentUsers.length === 0 ? (
+                        <Table.Row>
+                            <Table.Cell colSpan={6} textAlign="center" py={10} color="gray.500">
+                                該当するユーザーが見つかりません
                             </Table.Cell>
                         </Table.Row>
-                    ))}
+                    ) : (
+                        currentUsers.map((user) => (
+                            <Table.Row key={user.user_id} _hover={{ bg: "gray.50" }}>
+                                {/* 1. 氏名・メール */}
+                                <Table.Cell>
+                                    <HStack gap={3}>
+                                        <Avatar size="sm" name={getFullName(user)} />
+                                        <Box>
+                                            <Text fontWeight="bold" fontSize="sm">{getFullName(user)}</Text>
+                                            <Text fontSize="xs" color="gray.500">{user.email}</Text>
+                                        </Box>
+                                    </HStack>
+                                </Table.Cell>
+
+                                {/* 2. 部署 */}
+                                <Table.Cell>
+                                    <Flex gap={2} wrap="wrap">
+                                        {Object.keys(user.departments).length > 0 ? (
+                                            getDepartmentBadges(user.departments)
+                                        ) : (
+                                            <Text fontSize="xs" color="gray.400">-</Text>
+                                        )}
+                                    </Flex>
+                                </Table.Cell>
+
+                                {/* 3. 権限 */}
+                                <Table.Cell>
+                                    <HStack gap={2}>
+                                        <RoleBadge role={user.role} />
+                                    </HStack>
+                                </Table.Cell>
+
+                                {/* 4. ステータス */}
+                                <Table.Cell>
+                                    <HStack gap={2}>
+                                        <StatusBadge status={user.status} />
+                                    </HStack>
+                                </Table.Cell>
+
+                                {/* 5. 最終ログイン */}
+                                <Table.Cell>
+                                    <LastLoginDisplay date={user.last_login_at} />
+                                </Table.Cell>
+
+                                {/* 6. 更新日時 */}
+                                <Table.Cell>
+                                    <Text fontSize="xs" color="gray.500">
+                                        {new Date(user.updated_at).toLocaleString("ja-JP")}
+                                    </Text>
+                                </Table.Cell>
+
+                                {/* 6. アクションメニュー */}
+                                <Table.Cell>
+                                    <Menu.Root positioning={{ placement: "bottom-end" }}>
+                                        <Menu.Trigger asChild>
+                                            <IconButton aria-label="Options" variant="ghost" size="sm" color="gray.500">
+                                                <PiDotsThreeOutline size={20} />
+                                            </IconButton>
+                                        </Menu.Trigger>
+                                        <Menu.Positioner>
+                                            <Menu.Content minW="140px">
+                                                <Menu.Item value="edit">
+                                                    <PiPencilSimple /> 編集
+                                                </Menu.Item>
+                                                <Menu.Item
+                                                    value="delete"
+                                                    color="red.500"
+                                                    onClick={() => onDeleteClick(user.user_id, user.email)}
+                                                >
+                                                    <PiTrash /> 削除
+                                                </Menu.Item>
+                                            </Menu.Content>
+                                        </Menu.Positioner>
+                                    </Menu.Root>
+                                </Table.Cell>
+
+                            </Table.Row>
+                        ))
+                    )}
                 </Table.Body>
             </Table.Root>
 

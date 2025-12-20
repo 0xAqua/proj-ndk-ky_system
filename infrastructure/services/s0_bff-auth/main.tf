@@ -45,7 +45,7 @@ resource "aws_iam_role_policy" "cognito" {
   })
 }
 
-# 3. DynamoDB権限 ★修正: ユーザーマスタへの読み取りを追加
+# 3. DynamoDB権限
 resource "aws_iam_role_policy" "dynamodb" {
   name = "dynamodb-access"
   role = aws_iam_role.bff_auth.id
@@ -53,15 +53,18 @@ resource "aws_iam_role_policy" "dynamodb" {
     Version = "2012-10-17"
     Statement = [
       {
-        # セッション管理テーブル
+        # セッション管理テーブル (変更なし)
         Effect = "Allow"
         Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
         Resource = [var.auth_sessions_table_arn]
       },
       {
-        # ★追加: ユーザーマスタテーブル (role取得用)
+        # ★修正: ユーザーマスタテーブル (role取得 + ログイン情報更新用)
         Effect = "Allow"
-        Action = ["dynamodb:GetItem"]
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem" # ← これを追加
+        ]
         Resource = [var.tenant_user_master_table_arn]
       }
     ]

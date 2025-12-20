@@ -65,7 +65,7 @@ def get_session(event):
         return response.get('Item')
 
     except Exception as e:
-        print(f"Session check failed: {str(e)}")
+        logger.error(f"Session check failed: {str(e)}")
         return None
 
 @tracer.capture_lambda_handler

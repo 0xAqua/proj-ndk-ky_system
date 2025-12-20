@@ -1,6 +1,6 @@
 import json
-import uuid
-from datetime import datetime
+import os
+from datetime import datetime, timezone
 from aws_lambda_powertools import Logger, Tracer
 from botocore.exceptions import ClientError
 from .cognito_client import cognito, USER_POOL_ID, tenant_user_master_table
@@ -8,14 +8,13 @@ from .cognito_client import cognito, USER_POOL_ID, tenant_user_master_table
 logger = Logger()
 tracer = Tracer()
 
-# ★ 修正: CORS対応（OriginとCredentials）を組み込んだレスポンス生成
 def create_response(status_code: int, body: dict, origin: str) -> dict:
     return {
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": origin,         # ★ 特定のOriginを返す
-            "Access-Control-Allow-Credentials": "true"      # ★ Cookie使用時は必須
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true"
         },
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
@@ -24,34 +23,34 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
 def handle(event, ctx):
     """ユーザー新規作成（Cognito + DynamoDB）"""
     tenant_id = ctx["tenant_id"]
-    origin = ctx.get("origin", "*") # ★ main.pyから渡されるoriginを取得
+    caller_user_id = ctx["caller_user_id"] # 操作を行っている管理者のID
+    origin = ctx.get("origin", "*")
 
-    # リクエストボディ取得
     try:
         body = json.loads(event.body) if event.body else {}
     except json.JSONDecodeError:
-        logger.warning("JSONパースに失敗しました", action_category="ERROR")
         return create_response(400, {"message": "Invalid JSON"}, origin)
 
-    # バリデーション
+    # 必須バリデーション
     required = ["email", "password", "family_name", "given_name"]
     missing = [f for f in required if not body.get(f)]
     if missing:
-        logger.warning(f"必須フィールドがありません: {missing}", action_category="ERROR")
         return create_response(400, {"message": f"Missing fields: {missing}"}, origin)
 
     email = body["email"]
     password = body["password"]
     family_name = body["family_name"]
     given_name = body["given_name"]
+    role = body.get("role", "user") # デフォルトをuserに
+
+    # 部署情報の整形
     departments = body.get("departments", {})
-    departments["COMMON"] = "共通"
-    role = body.get("role", "viewer")
+    departments["COMMON"] = "共通" # 強制付与
 
-    user_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat() + "Z"
+    # タイムスタンプ生成 (ISO8601形式で統一)
+    now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
-    logger.info(f"ユーザーを作成します: {email}", action_category="EXECUTE")
+    logger.info(f"ユーザー作成を開始: {email}", action_category="EXECUTE")
 
     try:
         # 1. Cognito にユーザー作成
@@ -61,21 +60,18 @@ def handle(event, ctx):
             UserAttributes=[
                 {"Name": "email", "Value": email},
                 {"Name": "email_verified", "Value": "true"},
-                {"Name": "given_name", "Value": given_name},
                 {"Name": "family_name", "Value": family_name},
+                {"Name": "given_name", "Value": given_name},
                 {"Name": "custom:tenant_id", "Value": tenant_id},
             ],
-            MessageAction="SUPPRESS"
+            MessageAction="SUPPRESS" # ウェルカムメールを抑制（後で別途送る場合など）
         )
 
-        # ★ 修正: Cognito が発行した一意の ID (sub) を取得する
+        # Cognito が発行した一意の ID (sub) を取得
         attributes = response.get("User", {}).get("Attributes", [])
-        cognito_sub = next(attr["Value"] for attr in attributes if attr["Name"] == "sub")
+        user_id = next(attr["Value"] for attr in attributes if attr["Name"] == "sub")
 
-        # この ID を DynamoDB のキーに使用する
-        user_id = cognito_sub
-
-        # 2. パスワードを設定
+        # 2. パスワードを永続設定
         cognito.admin_set_user_password(
             UserPoolId=USER_POOL_ID,
             Username=email,
@@ -83,8 +79,8 @@ def handle(event, ctx):
             Permanent=True
         )
 
-        # 3. DynamoDB に登録
-        tenant_user_master_table.put_item(Item={
+        # 3. DynamoDB に登録（監査項目とバージョンを追加）
+        user_item = {
             "tenant_id": tenant_id,
             "user_id": user_id,
             "email": email,
@@ -93,30 +89,33 @@ def handle(event, ctx):
             "departments": departments,
             "role": role,
             "status": "ACTIVE",
-            "created_at": now,
-            "updated_at": now
-        })
+            "version": 1,                      # 初期バージョン
+            "created_at": now_iso,
+            "updated_at": now_iso,
+            "status_changed_at": now_iso,      # ステータス変更日時
+            "status_changed_by": caller_user_id # 作成した管理者のID
+        }
+
+        tenant_user_master_table.put_item(Item=user_item)
 
         logger.info(f"ユーザー作成完了: {email} ({user_id})", action_category="EXECUTE")
         return create_response(201, {
             "message": "User created successfully",
-            "user_id": user_id,
-            "email": email
+            "user": user_item
         }, origin)
 
     except cognito.exceptions.UsernameExistsException:
-        logger.warning(f"ユーザーは既に存在します: {email}", action_category="ERROR")
-        return create_response(409, {"message": "ユーザーは既に存在します"}, origin)
+        return create_response(409, {"message": "このメールアドレスは既に登録されています"}, origin)
 
-    except (ClientError, Exception) as e:
-        logger.exception("ユーザー作成に失敗しました", action_category="ERROR")
+    except Exception as e:
+        logger.exception("ユーザー作成に失敗しました。ロールバックを実行します。")
         _rollback_cognito_user(email)
-        return create_response(500, {"message": "Internal error"}, origin)
+        return create_response(500, {"message": "Internal error during user creation"}, origin)
 
 def _rollback_cognito_user(email: str):
-    """ロールバック: Cognitoユーザー削除"""
+    """DynamoDB書き込み失敗時などにCognitoユーザーを削除して整合性を保つ"""
     try:
         cognito.admin_delete_user(UserPoolId=USER_POOL_ID, Username=email)
-        logger.info(f"ロールバック完了: {email}", action_category="EXECUTE")
-    except Exception:
-        logger.warning(f"ロールバック失敗: {email}", action_category="ERROR")
+        logger.info(f"ロールバック成功: {email}")
+    except Exception as e:
+        logger.error(f"ロールバック失敗 (手動削除が必要です): {email}, Error: {str(e)}")
