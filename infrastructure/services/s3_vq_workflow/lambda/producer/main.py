@@ -159,7 +159,14 @@ def handle_get(event, session, origin):
     if not item or item.get('tenant_id') != tenant_id:
         return create_response(403, {"error": "Unauthorized"}, origin)
 
-    return create_response(200, item, origin)
+    view_item = {
+        "job_id": item.get("job_id"),
+        "status": item.get("status"),
+        "reply": item.get("reply"),
+        "error_msg": item.get("error_msg")  # 失敗時のエラー理由
+    }
+
+    return create_response(200, view_item, origin)
 
 # --- メインハンドラ ---
 @tracer.capture_lambda_handler

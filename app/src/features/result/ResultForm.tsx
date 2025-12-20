@@ -55,11 +55,11 @@ export const ResultForm = () => {
             ) : (
                 <Box
                     bg="white"
-                    borderRadius="xl"
                     borderWidth="1px"
                     borderColor="gray.200"
                     overflow="hidden"
-                    shadow="sm"
+                    borderRadius="2xl"
+                    boxShadow="0 4px 16px rgba(0, 0, 0, 0.08)"
                 >
                     {/* 待機中はスケルトン、完了後は本番データを表示 */}
                     {isWaiting && incidents.length === 0 ? (
