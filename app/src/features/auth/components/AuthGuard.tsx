@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAutoLogout } from "@/features/auth/hooks/useAutoLogout";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import {Box} from "@chakra-ui/react";
+import {useTokenRefresh} from "@/features/auth/hooks/useTokenRefresh.ts";
 
 type UserRole = 'admin' | 'user';
 
@@ -17,6 +18,8 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
 
     // 無操作ログアウトの監視
     useAutoLogout();
+
+    useTokenRefresh();
 
     // 1. ローディング中の処理
     // isLoadingがtrueの間は、children（中身）を絶対にレンダリングさせない
