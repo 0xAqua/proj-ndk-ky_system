@@ -2,6 +2,7 @@ import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAutoLogout } from "@/features/auth/hooks/useAutoLogout";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import {Box} from "@chakra-ui/react";
 
 type UserRole = 'admin' | 'user';
 
@@ -18,8 +19,22 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
     useAutoLogout();
 
     // 1. ローディング中の処理
-    if (isLoading && !isAuthenticated) {
-        return null
+    // isLoadingがtrueの間は、children（中身）を絶対にレンダリングさせない
+    if (isLoading) {
+        return (
+            <Box
+                w="100vw"
+                h="100vh"
+                position="fixed"
+                top={0}
+                left={0}
+                backgroundColor="#fcfaf2"
+                backgroundImage={`
+                    radial-gradient(ellipse at 100% 100%, rgba(191, 219, 254, 0.4) 0%, transparent 50%),
+                    linear-gradient(-45deg, #fcfaf2, #fcfaf2, #faf5f0, #fcfaf2)
+                `}
+            />
+        );
     }
 
     // 2. 未認証ならログインへリダイレクト（宣言的リダイレクト）
