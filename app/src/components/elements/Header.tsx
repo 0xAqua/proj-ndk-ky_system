@@ -1,8 +1,6 @@
 import { Box, Flex, Text, Image, HStack, Separator } from "@chakra-ui/react";
 import { LuLogOut, LuChevronDown } from "react-icons/lu";
-import { authService } from '@/lib/service/auth';
-import {useEffect, useState} from "react";
-import { useLogout } from "@/hooks/useLogout";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import logo from '@/assets/logo.jpg';
 
 import { Avatar } from "@/components/ui/avatar.tsx";
@@ -14,38 +12,12 @@ import {
 } from "@/components/ui/menu.tsx";
 
 export const Header = () => {
-    const { logout } = useLogout();
+    // 1. useAuthから必要な情報をすべて取り出す（APIリクエストはキャッシュから返される）
+    const { logout, user } = useAuth();
 
-    // ユーザー情報を保存するState
-    const [userEmail, setUserEmail] = useState("");
-    const [userName, setUserName] = useState("");
-
-    // ★修正: BFF APIからユーザー情報を取得
-    useEffect(() => {
-        const getUserData = async () => {
-            try {
-                const session = await authService.checkSession();
-
-                if (!session.authenticated || !session.user) {
-                    setUserName("ゲスト");
-                    return;
-                }
-
-                const user = session.user;
-
-                if (user.email) {
-                    setUserEmail(user.email);
-                }
-
-                const name = user.name || user.given_name || user.email || "User";
-                setUserName(name);
-            } catch (error) {
-                console.error("ユーザー情報の取得に失敗しました", error);
-            }
-        };
-
-        void getUserData();
-    }, []);
+    // 2. 表示名の判定ロジック
+    const displayEmail = user?.email || "";
+    const displayName = user?.name || user?.family_name || user?.given_name || user?.email || "ユーザー";
 
     return (
         <Box
@@ -64,12 +36,9 @@ export const Header = () => {
             zIndex="sticky"
         >
             <Flex justify="space-between" align="center" position="relative" h="32px">
+                <Box /> {/* 左側のスペース保持 */}
 
-                <Box>
-                    {/*<LuMenu size={24} />*/}
-                </Box>
-
-                {/* 中央：タイトル */}
+                {/* 中央：ロゴとタイトル */}
                 <HStack align="center" gap={3} flex="1" justify="center" overflow="hidden">
                     <Image src={logo} alt="Logo" h="42px" objectFit="contain" flexShrink={0} />
                     <Text
@@ -84,12 +53,12 @@ export const Header = () => {
                     </Text>
                 </HStack>
 
-                {/* --- 右側：アバターメニュー --- */}
+                {/* 右側：アバターメニュー */}
                 <MenuRoot positioning={{ placement: "bottom-end" }}>
                     <MenuTrigger asChild>
                         <HStack gap={1} cursor="pointer" _hover={{ opacity: 0.8 }}>
                             <Avatar
-                                name={userName}
+                                name={displayName}
                                 size="sm"
                                 colorPalette="blue"
                             />
@@ -103,12 +72,13 @@ export const Header = () => {
                         <Box px={3} py={2}>
                             <Text fontSize="xs" color="gray.500">ログイン中</Text>
                             <Text fontSize="sm" fontWeight="medium" truncate>
-                                {userEmail || "読み込み中..."}
+                                {displayEmail || "---"}
                             </Text>
                         </Box>
 
                         <Separator />
 
+                        {/* 先ほどuseAuthで定義したセキュアなlogout関数を呼び出す */}
                         <MenuItem
                             value="logout"
                             color="red.600"
@@ -122,7 +92,6 @@ export const Header = () => {
                         </MenuItem>
                     </MenuContent>
                 </MenuRoot>
-
             </Flex>
         </Box>
     );

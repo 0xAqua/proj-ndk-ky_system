@@ -1,27 +1,32 @@
+// src/features/auth/hooks/useAutoLogout.ts
 import { useEffect, useRef, useCallback } from 'react';
-import { useLogout } from '@/hooks/useLogout';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
-// 無操作許容時間（ミリ秒）: 15分
 const TIMEOUT_MS = 15 * 60 * 1000;
 
 export const useAutoLogout = () => {
-    const { logout } = useLogout();
+    const { logout, isAuthenticated } = useAuth();
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const resetTimer = useCallback(() => {
         if (timerRef.current) clearTimeout(timerRef.current);
+        // ログインしていない場合はタイマーを回さない
+        if (!isAuthenticated) return;
+
         timerRef.current = setTimeout(logout, TIMEOUT_MS);
-    }, [logout]);
+    }, [logout, isAuthenticated]);
 
     useEffect(() => {
-        const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+        if (!isAuthenticated) return;
 
+        const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
         events.forEach((event) => window.addEventListener(event, resetTimer));
+
         resetTimer();
 
         return () => {
             if (timerRef.current) clearTimeout(timerRef.current);
             events.forEach((event) => window.removeEventListener(event, resetTimer));
         };
-    }, [resetTimer]);
+    }, [resetTimer, isAuthenticated]);
 };

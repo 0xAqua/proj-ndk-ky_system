@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useUserStore } from "@/stores/useUserStore";
-import {constructionService} from "@/lib/service/construction";
+import { useAuth } from "@/features/auth/hooks/useAuth"; // useUserStoreではなくuseAuthを使う
+import { constructionService } from "@/lib/service/construction";
 
 export type ConstructionTask = { id: string; title: string; };
 export type SafetyEquipment = { id: string; title: string; is_high_risk: boolean; };
@@ -19,27 +19,33 @@ export type ProcessCategory = {
 };
 
 export const useConstructionMaster = () => {
-    const { departments } = useUserStore();
+    const { user } = useAuth();
 
-    // --- 1. React Queryによるデータ取得 ---
-    // 初回はAPIを叩きますが、2回目以降はキャッシュを使います
+    const myDeptNames = useMemo(() => {
+        // snake_case と camelCase 両方をチェックする安全なアクセス
+        const depts = user?.tenant_user?.departments || user?.tenantUser?.departments;
+
+        if (!depts) {return [];
+        }
+
+        const values = Object.values(depts);
+        return values;
+    }, [user]);
+
     const { data: rawTree, isLoading, isError, error } = useQuery({
-        queryKey: ['constructionMaster'], // キャッシュのキー
-        queryFn: constructionService.getMaster, // 実行する関数
-        staleTime: 1000 * 60 * 60,        // 1時間はデータを「最新」とみなす（再フェッチしない）
-        retry: 2,                         // 失敗時は2回まで自動リトライ
-        refetchOnWindowFocus: false,      // ウィンドウフォーカス時の再取得を無効化（入力画面なら不要なことが多い）
+        queryKey: ['constructionMaster'],
+        queryFn: constructionService.getMaster,
+        staleTime: 1000 * 60 * 60,
+        placeholderData: (previousData) => previousData,
     });
 
-    // --- 2. データ整形ロジック (useMemoでメモ化) ---
-    // データ(rawTree) または 部署(departments) が変わった時だけ計算が走ります
+    // 4. データ整形ロジック
     const { constructions, environments } = useMemo(() => {
-        // データがまだ無い、または部署情報が無い場合は空を返す
-        if (!rawTree || departments.length === 0) {
+        // 部署名が取得できていない、またはマスタデータがない場合は空を返す
+        if (!rawTree || myDeptNames.length === 0) {
             return { constructions: [], environments: [] };
         }
 
-        const myDeptNames = departments.map(d => d.name);
         const tempConstructions: ProcessCategory[] = [];
         const tempEnvironments: ProcessCategory[] = [];
 
@@ -65,7 +71,8 @@ export const useConstructionMaster = () => {
                 return;
             }
 
-            // B. 工事系データ (部署フィルタリングあり)
+            // B. 工事系データ：APIの rootNode.title (例: 'ネットワーク') が
+            // 自分の所属部署名 (myDeptNames) に含まれているかチェック
             if (myDeptNames.includes(rootNode.title)) {
                 rootNode.children?.forEach((typeNode: any) => {
                     const processes = typeNode.children?.map((projNode: any) => ({
@@ -88,7 +95,7 @@ export const useConstructionMaster = () => {
 
         return { constructions: tempConstructions, environments: tempEnvironments };
 
-    }, [rawTree, departments]); // 依存配列: これらが変わった時のみ再計算
+    }, [rawTree, myDeptNames]); // 依存配列に myDeptNames を指定
 
     return {
         constructions,

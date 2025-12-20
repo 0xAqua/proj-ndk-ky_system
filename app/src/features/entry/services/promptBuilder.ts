@@ -7,7 +7,7 @@ import {
 // ▼ ここで数を変更できます
 const PROMPT_CONFIG = {
     totalIncidents: 3,        // 合計出力数
-    factIncidents: 1,         // そのうち過去事例(Fact)にする数
+    factIncidents: 1,         // 同様のインシデント数
     countermeasuresPerCase: 3 // 対応策の数
 };
 
