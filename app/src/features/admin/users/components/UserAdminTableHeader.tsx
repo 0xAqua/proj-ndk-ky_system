@@ -94,7 +94,7 @@ export const UserAdminTableHeader = ({ onSearch, onFilterChange }: UserAdminFilt
 
                     {/* フィルターボタン一式 */}
                     <HStack gap={2}>
-                        <Tooltip content="条件で絞り込む" showArrow>
+                        <Tooltip content="条件で絞り込む" showArrow openDelay={0}>
                             <Button
                                 variant="outline"
                                 size="md"
@@ -108,13 +108,15 @@ export const UserAdminTableHeader = ({ onSearch, onFilterChange }: UserAdminFilt
                         </Tooltip>
 
                         {hasActiveFilters && (
-                            <Tooltip content="フィルターをリセット" showArrow>
+                            <Tooltip content="フィルターをリセット" showArrow openDelay={0}>
                                 <Button
-                                    variant="ghost"
-                                    size="sm"
+                                    variant="outline"
+                                    size="md"
                                     onClick={handleFilterReset}
                                     colorScheme="red"
                                     borderRadius="lg"
+                                    bg="white"
+                                    _hover={{ bg: "gray.50" }}
                                 >
                                     <PiArrowCounterClockwise />
                                 </Button>
@@ -124,7 +126,7 @@ export const UserAdminTableHeader = ({ onSearch, onFilterChange }: UserAdminFilt
                 </Flex>
 
                 {/* ユーザー追加ボタン：伸縮アニメーション追加 */}
-                <Tooltip content="新規ユーザーを追加" positioning={{ placement: "bottom" }} showArrow>
+                <Tooltip content="新規ユーザーを追加" positioning={{ placement: "bottom" }} showArrow openDelay={0}>
                     <Button
                         aria-label="ユーザーを追加"
                         variant="solid"

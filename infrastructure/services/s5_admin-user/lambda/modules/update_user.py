@@ -71,9 +71,14 @@ def handle(event, ctx, user_id):
                 cognito.admin_enable_user(UserPoolId=USER_POOL_ID, Username=email)
 
         # 4. DynamoDB 更新クエリの組み立て
-        update_expr_parts = ["SET updated_at = :now, version = version + :inc"]
+        # versionが未定義の場合を考慮して if_not_exists を使用
+        update_expr_parts = ["updated_at = :now", "version = if_not_exists(version, :zero) + :inc"]
         expr_names = {}
-        expr_values = {":now": now_iso, ":inc": 1}
+        expr_values = {
+            ":now": now_iso,
+            ":inc": 1,
+            ":zero": 0  # 初期値用
+        }
 
         # 更新を許可するフィールドのループ
         allowed_fields = ["family_name", "given_name", "departments", "role", "status"]
@@ -89,10 +94,10 @@ def handle(event, ctx, user_id):
                     update_expr_parts.append("status_changed_by = :by")
                     expr_values[":by"] = caller_user_id
 
-        # 条件付き更新を実行 (テナント隔離の再確認と存在チェック)
+        # クエリ実行
         tenant_user_master_table.update_item(
             Key={"tenant_id": tenant_id, "user_id": user_id},
-            UpdateExpression=", ".join(update_expr_parts),
+            UpdateExpression="SET " + ", ".join(update_expr_parts), # SET をここで結合
             ExpressionAttributeNames=expr_names,
             ExpressionAttributeValues=expr_values,
             ConditionExpression="attribute_exists(user_id)"

@@ -10,10 +10,10 @@ export const UserAdminTableSkeleton = () => {
                 <Table.Header bg="gray.50">
                     <Table.Row>
                         <Table.ColumnHeader py={4}>名前 / メール</Table.ColumnHeader>
-                        <Table.ColumnHeader>部署</Table.ColumnHeader>
+                        <Table.ColumnHeader>所属部署</Table.ColumnHeader>
                         <Table.ColumnHeader>権限</Table.ColumnHeader>
                         <Table.ColumnHeader>ステータス</Table.ColumnHeader>
-                        <Table.ColumnHeader>更新日時</Table.ColumnHeader>
+                        <Table.ColumnHeader>最終ログイン</Table.ColumnHeader>
                         <Table.ColumnHeader width="50px"></Table.ColumnHeader>
                     </Table.Row>
                 </Table.Header>

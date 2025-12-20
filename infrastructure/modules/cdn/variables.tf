@@ -11,7 +11,6 @@ variable "api_gateway_domain" {
 variable "web_acl_arn" {
   description = "ARN of the WAF Web ACL (Virginia)"
   type        = string
-  default     = ""
 }
 
 variable "acm_certificate_arn" {

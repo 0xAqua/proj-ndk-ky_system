@@ -74,8 +74,8 @@ const compareUsers = (a: User, b: User, sortBy: string): number => {
             bValue = b.email.toLowerCase();
             break;
         case "createdAt":
-            aValue = new Date(a.created_at).getTime();
-            bValue = new Date(b.created_at).getTime();
+            // aValue = new Date(a.last_login_at).getTime();
+            // bValue = new Date(b.last_login_at).getTime();
             break;
         default:
             return 0;
