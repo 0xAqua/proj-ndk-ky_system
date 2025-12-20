@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 import { Box, Spinner, VStack, Text, useDisclosure } from "@chakra-ui/react";
 import { useUserStore } from "@/stores/useUserStore";
-import { api } from "@/lib/api";
+import { api } from "@/lib/client";
+import { ENDPOINTS } from "@/lib/endpoints";
 import ConstructionDate from "@/features/entry/components/elements/ConstructionDate";
 
 // Hooks & Services
@@ -48,7 +49,7 @@ export const EntryForm = () => {
         const initData = async () => {
             setLoading(true);
             try {
-                const userRes = await api.get('/me');
+                const userRes = await api.get(ENDPOINTS.ME);
 
                 // ★ ここでレスポンスの中身をチェック
                 console.log("API Response Data:", userRes.data);
@@ -98,7 +99,7 @@ export const EntryForm = () => {
             console.log("Current Tenant ID:", tenantId);
 
             // 2. API送信
-            const res = await api.post('/jobs', {
+            const res = await api.post(ENDPOINTS.JOBS.LIST, {
                 message: promptText
             });
 

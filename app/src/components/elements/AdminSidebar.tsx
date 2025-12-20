@@ -1,5 +1,5 @@
-import {useEffect, useState} from "react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useState, useCallback } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
     Box,
     Flex,
@@ -8,14 +8,22 @@ import {
     Text,
     Center,
     Icon,
-    IconButton, Image, MenuRoot, MenuTrigger, MenuContent, Separator, MenuItem, Portal, MenuPositioner
+    IconButton,
+    Image,
+    MenuRoot,
+    MenuTrigger,
+    MenuContent,
+    Separator,
+    MenuItem,
+    Portal,
+    MenuPositioner,
+    Spinner,
 } from "@chakra-ui/react";
 import { LuLogOut, LuChevronDown } from "react-icons/lu";
 import { Tooltip } from "@/components/ui/tooltip.tsx";
 import { Avatar } from "@/components/ui/avatar.tsx";
-import { bffAuth } from '@/lib/bffAuth';
+import { authService } from "@/lib/service/auth";
 
-// Phosphor Icons (pi)
 import {
     PiSquaresFour,
     PiUsers,
@@ -28,13 +36,30 @@ import {
     PiSidebarSimple,
     PiDatabase,
 } from "react-icons/pi";
-import logo from '@/assets/logo.jpg';
+import logo from "@/assets/logo.jpg";
 import type { IconType } from "react-icons";
 
+// ================================================================
+// セキュリティ定数
+// ================================================================
 
-// ----------------------------------------------------------------
-// ナビゲーションアイテム
-// ----------------------------------------------------------------
+// セッションチェック間隔（5分）- トークン有効期限より短く設定
+const SESSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+// 非機密のUI設定のみlocalStorageに保存（認証情報は絶対に保存しない）
+const SIDEBAR_EXPANDED_KEY = "ui_sidebar_expanded";
+
+// ================================================================
+// 型定義
+// ================================================================
+
+type AuthState = "checking" | "authenticated" | "unauthenticated";
+
+type UserInfo = {
+    name: string;
+    email: string;
+};
+
 type NavItemProps = {
     icon: IconType;
     to: string;
@@ -45,7 +70,48 @@ type NavItemProps = {
     iconBg?: string;
 };
 
-const NavItem = ({ icon, to, label, isExpanded, isExternal, iconColor, iconBg }: NavItemProps) => {
+// ================================================================
+// セキュアなストレージユーティリティ
+// ================================================================
+
+/**
+ * UI設定のみを安全に保存・取得するユーティリティ
+ * 注意: 認証情報、トークン、個人情報は絶対に保存しないこと
+ */
+const secureUIStorage = {
+    getSidebarExpanded: (): boolean => {
+        try {
+            // localStorageはXSS攻撃に脆弱なため、機密情報は保存しない
+            // サイドバーの開閉状態は非機密のUI設定なので許容
+            const value = localStorage.getItem(SIDEBAR_EXPANDED_KEY);
+            return value === "true";
+        } catch {
+            // プライベートブラウジングなどでlocalStorageが使えない場合
+            return false;
+        }
+    },
+    setSidebarExpanded: (expanded: boolean): void => {
+        try {
+            localStorage.setItem(SIDEBAR_EXPANDED_KEY, String(expanded));
+        } catch {
+            // 保存失敗しても機能に影響なし
+        }
+    },
+};
+
+// ================================================================
+// ナビゲーションアイテムコンポーネント
+// ================================================================
+
+const NavItem = ({
+                     icon,
+                     to,
+                     label,
+                     isExpanded,
+                     isExternal,
+                     iconColor,
+                     iconBg,
+                 }: NavItemProps) => {
     return (
         <Box w="full" px={2} mb={2}>
             <Tooltip
@@ -72,7 +138,7 @@ const NavItem = ({ icon, to, label, isExpanded, isExternal, iconColor, iconBg }:
                                         bg: activeState ? "#ebe5db" : "#faf5f0",
                                     }}
                                     _active={{
-                                        transform: "scale(0.90)"
+                                        transform: "scale(0.90)",
                                     }}
                                     overflow="hidden"
                                     position="relative"
@@ -84,7 +150,11 @@ const NavItem = ({ icon, to, label, isExpanded, isExternal, iconColor, iconBg }:
                                             bg={iconBg}
                                             borderRadius="full"
                                         >
-                                            <Icon as={icon} fontSize={iconBg ? "lg" : "2xl"} color={iconColor} />
+                                            <Icon
+                                                as={icon}
+                                                fontSize={iconBg ? "lg" : "2xl"}
+                                                color={iconColor}
+                                            />
                                         </Center>
                                     </Center>
 
@@ -108,80 +178,213 @@ const NavItem = ({ icon, to, label, isExpanded, isExternal, iconColor, iconBg }:
     );
 };
 
-// ----------------------------------------------------------------
-// サイドバー本体
-// ----------------------------------------------------------------
+// ================================================================
+// ローディングコンポーネント
+// ================================================================
+
+const AuthCheckingSpinner = () => (
+    <Flex
+        w="64px"
+        h="100vh"
+        align="center"
+        justify="center"
+        borderRightWidth="1px"
+        borderColor="gray.200"
+    >
+        <Spinner size="sm" color="gray.400" />
+    </Flex>
+);
+
+// ================================================================
+// メインコンポーネント
+// ================================================================
+
 export const AdminSidebar = () => {
-    const [isExpanded, setIsExpanded] = useState(() => {
-        return localStorage.getItem("sidebar-expanded") === "true";
+    const navigate = useNavigate();
+
+    // 認証状態（checking → authenticated/unauthenticated）
+    const [authState, setAuthState] = useState<AuthState>("checking");
+
+    // UI状態
+    const [isExpanded, setIsExpanded] = useState(() =>
+        secureUIStorage.getSidebarExpanded()
+    );
+
+    // ユーザー情報（認証後のみ設定）
+    const [userInfo, setUserInfo] = useState<UserInfo>({
+        name: "",
+        email: "",
     });
 
-    const handleLogoutClick = async () => {
+    // ログアウト処理中フラグ
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    /**
+     * セッション検証
+     * - HttpOnly Cookieベースの認証をBFF経由で検証
+     * - トークンはフロントエンドに露出させない
+     */
+    const verifySession = useCallback(async (): Promise<boolean> => {
         try {
-            await bffAuth.logout();
-            window.location.href = "/login";
+            // BFF APIを通じてセッションを検証
+            // HttpOnly Cookieが自動的に送信される
+            const session = await authService.checkSession();
+
+            if (!session.authenticated || !session.user) {
+                return false;
+            }
+
+            const user = session.user;
+
+            // ユーザー情報を状態に設定（機密情報はメモリ内のみ）
+            let displayName = user.name;
+            if (!displayName && (user.family_name || user.given_name)) {
+                displayName = `${user.family_name || ""} ${user.given_name || ""}`.trim();
+            }
+            if (!displayName) {
+                displayName = user.email || "ユーザー";
+            }
+
+            setUserInfo({
+                name: displayName,
+                email: user.email || "",
+            });
+
+            return true;
         } catch (error) {
-            console.error("ログアウトに失敗しました", error);
+            console.error("セッション検証エラー:", error);
+            return false;
         }
-    };
+    }, []);
 
-    // ユーザー情報を保存するState
-    const [userEmail, setUserEmail] = useState("");
-    const [userName, setUserName] = useState("読込中...");
+    /**
+     * 認証失敗時の処理
+     */
+    const handleAuthFailure = useCallback(() => {
+        setAuthState("unauthenticated");
+        // 状態をクリア
+        setUserInfo({ name: "", email: "" });
+        // ログインページへリダイレクト（現在のURLを保持）
+        const currentPath = window.location.pathname;
+        const returnUrl = encodeURIComponent(currentPath);
+        navigate(`/login?returnUrl=${returnUrl}`, { replace: true });
+    }, [navigate]);
 
-    // ★修正: BFF APIからユーザー情報を取得
+    /**
+     * 初回認証チェック
+     */
     useEffect(() => {
-        const getUserData = async () => {
-            try {
-                const session = await bffAuth.checkSession();
+        let isMounted = true;
 
-                if (!session.authenticated || !session.user) {
-                    setUserName("ゲスト");
-                    return;
-                }
+        const initAuth = async () => {
+            const isValid = await verifySession();
 
-                const user = session.user;
+            if (!isMounted) return;
 
-                if (user.email) {
-                    setUserEmail(user.email);
-                }
-
-                // 姓名を結合してフルネームを作成
-                let displayName = user.name;
-                if (!displayName && (user.family_name || user.given_name)) {
-                    displayName = `${user.family_name || ''} ${user.given_name || ''}`.trim();
-                }
-                if (!displayName) {
-                    displayName = user.email || "ユーザー";
-                }
-
-                setUserName(displayName);
-            } catch (error) {
-                console.error("ユーザー情報の取得に失敗しました", error);
-                setUserName("ユーザー");
+            if (isValid) {
+                setAuthState("authenticated");
+            } else {
+                handleAuthFailure();
             }
         };
 
-        void getUserData();
-    }, []);
+        void initAuth();
 
+        return () => {
+            isMounted = false;
+        };
+    }, [verifySession, handleAuthFailure]);
+
+    /**
+     * 定期的なセッション検証
+     * - トークン期限切れを検出
+     * - 不正アクセスを早期検出
+     */
+    useEffect(() => {
+        if (authState !== "authenticated") return;
+
+        const intervalId = setInterval(async () => {
+            const isValid = await verifySession();
+            if (!isValid) {
+                handleAuthFailure();
+            }
+        }, SESSION_CHECK_INTERVAL_MS);
+
+        return () => clearInterval(intervalId);
+    }, [authState, verifySession, handleAuthFailure]);
+
+    /**
+     * ページ可視性変更時のセッション再検証
+     * - タブがアクティブになった時に検証
+     */
+    useEffect(() => {
+        if (authState !== "authenticated") return;
+
+        const handleVisibilityChange = async () => {
+            if (document.visibilityState === "visible") {
+                const isValid = await verifySession();
+                if (!isValid) {
+                    handleAuthFailure();
+                }
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [authState, verifySession, handleAuthFailure]);
+
+    /**
+     * セキュアなログアウト処理
+     */
+    const handleLogout = async () => {
+        if (isLoggingOut) return;
+
+        setIsLoggingOut(true);
+
+        try {
+            // BFF経由でログアウト（サーバー側でCookieを無効化）
+            await authService.logout();
+        } catch (error) {
+            console.error("ログアウトエラー:", error);
+        } finally {
+            // エラーが発生してもクライアント側の状態はクリア
+            setUserInfo({ name: "", email: "" });
+            setAuthState("unauthenticated");
+            // ログインページへリダイレクト
+            navigate("/login", { replace: true });
+        }
+    };
+
+    /**
+     * サイドバー開閉トグル
+     */
     const toggleExpanded = () => {
         setIsExpanded((prev) => {
             const next = !prev;
-            localStorage.setItem("sidebar-expanded", String(next));
+            secureUIStorage.setSidebarExpanded(next);
             return next;
         });
     };
 
+    // ================================================================
+    // レンダリング
+    // ================================================================
+
+    // 認証チェック中は最小限のUIを表示
+    if (authState === "checking") {
+        return <AuthCheckingSpinner />;
+    }
+
+    // 未認証の場合は何も表示しない（リダイレクト中）
+    if (authState === "unauthenticated") {
+        return null;
+    }
+
     const COLLAPSED_W = "64px";
     const EXPANDED_W = "240px";
     const width = isExpanded ? EXPANDED_W : COLLAPSED_W;
-
-    const user = {
-        name: userName,
-        email: userEmail,
-        avatarUrl: undefined
-    };
 
     return (
         <Box
@@ -198,19 +401,16 @@ export const AdminSidebar = () => {
             shadow={isExpanded ? "xl" : "none"}
         >
             <Flex direction="column" h="full">
-
-                {/* 1. ヘッダーエリア */}
+                {/* ヘッダーエリア */}
                 <Flex
                     align="center"
                     h="64px"
                     px={2}
                     mb={4}
                     flexShrink={0}
-                    // 閉じてる時は真ん中、開いてる時は両端
                     justifyContent={isExpanded ? "space-between" : "center"}
                     transition="all 0.3s cubic-bezier(0.2, 0, 0, 1)"
                 >
-                    {/* ロゴエリア (開いた時だけ出現) */}
                     <Flex
                         align="center"
                         gap={2}
@@ -222,10 +422,15 @@ export const AdminSidebar = () => {
                         ml={isExpanded ? 2 : 0}
                         mt={4}
                     >
-                        <Image src={logo} alt="Logo" h="62px"  objectFit="contain" flexShrink={0} />
+                        <Image
+                            src={logo}
+                            alt="Logo"
+                            h="62px"
+                            objectFit="contain"
+                            flexShrink={0}
+                        />
                     </Flex>
 
-                    {/* 開閉ボタン (常に表示) */}
                     <IconButton
                         aria-label="Toggle Menu"
                         onClick={toggleExpanded}
@@ -238,25 +443,69 @@ export const AdminSidebar = () => {
                         transition="all 0.2s"
                         mt={4}
                     >
-                        {isExpanded ? <PiSidebarSimple size={24} style={{ transform: "rotate(180deg)" }} /> : <PiList size={24} />}
+                        {isExpanded ? (
+                            <PiSidebarSimple
+                                size={24}
+                                style={{ transform: "rotate(180deg)" }}
+                            />
+                        ) : (
+                            <PiList size={24} />
+                        )}
                     </IconButton>
-
                 </Flex>
 
-                {/* 2. ナビゲーションリスト */}
-                <VStack gap={0} flex={1} w="full" align="flex-start" overflowX="hidden" mt={4}>
-                    <NavItem to="/sample" icon={PiSquaresFour} label="ダッシュボード" isExpanded={isExpanded} />
-                    <NavItem to="/users" icon={PiUsers} label="ユーザー管理" isExpanded={isExpanded} />
-                    <NavItem to="/results" icon={PiListChecks} label="結果一覧" isExpanded={isExpanded} />
-                    <NavItem to="/master" icon={PiDatabase} label="工事マスタ管理" isExpanded={isExpanded} />
-                    <NavItem to="/advanced-settings" icon={PiSparkle} label="高度な設定" isExpanded={isExpanded} />
-                    <NavItem to="/logs" icon={PiFileText} label="ログ管理" isExpanded={isExpanded} />
+                {/* ナビゲーションリスト */}
+                <VStack
+                    gap={0}
+                    flex={1}
+                    w="full"
+                    align="flex-start"
+                    overflowX="hidden"
+                    mt={4}
+                >
+                    <NavItem
+                        to="/sample"
+                        icon={PiSquaresFour}
+                        label="ダッシュボード"
+                        isExpanded={isExpanded}
+                    />
+                    <NavItem
+                        to="/users"
+                        icon={PiUsers}
+                        label="ユーザー管理"
+                        isExpanded={isExpanded}
+                    />
+                    <NavItem
+                        to="/results"
+                        icon={PiListChecks}
+                        label="結果一覧"
+                        isExpanded={isExpanded}
+                    />
+                    <NavItem
+                        to="/master"
+                        icon={PiDatabase}
+                        label="工事マスタ管理"
+                        isExpanded={isExpanded}
+                    />
+                    <NavItem
+                        to="/advanced-settings"
+                        icon={PiSparkle}
+                        label="高度な設定"
+                        isExpanded={isExpanded}
+                    />
+                    <NavItem
+                        to="/logs"
+                        icon={PiFileText}
+                        label="ログ管理"
+                        isExpanded={isExpanded}
+                    />
                 </VStack>
 
-                {/* 3. フッターエリア */}
+                {/* フッターエリア */}
                 <VStack gap={0} mb={4} w="full" align="flex-start" overflowX="hidden">
-
-                    <Box w="full" px={2}><Box w="full" h="1px" bg="gray.200" my={2} /></Box>
+                    <Box w="full" px={2}>
+                        <Box w="full" h="1px" bg="gray.200" my={2} />
+                    </Box>
 
                     <NavItem
                         to="/entry"
@@ -268,8 +517,14 @@ export const AdminSidebar = () => {
                         iconBg="orange.500"
                     />
 
-                    <NavItem to="/settings" icon={PiGear} label="システム設定" isExpanded={isExpanded} />
+                    <NavItem
+                        to="/settings"
+                        icon={PiGear}
+                        label="システム設定"
+                        isExpanded={isExpanded}
+                    />
 
+                    {/* ユーザーメニュー */}
                     <Box w="full" px={2} mt={2}>
                         <MenuRoot>
                             <MenuTrigger asChild>
@@ -285,7 +540,7 @@ export const AdminSidebar = () => {
                                     cursor="pointer"
                                 >
                                     <Center w="48px" h="40px" flexShrink={0}>
-                                        <Avatar name={user.name} size="xs" />
+                                        <Avatar name={userInfo.name} size="xs" />
                                     </Center>
 
                                     <Box
@@ -297,8 +552,12 @@ export const AdminSidebar = () => {
                                         ml={1}
                                         flex={1}
                                     >
-                                        <Text fontSize="sm" fontWeight="bold" color="black">{user.name}</Text>
-                                        <Text fontSize="xs" color="gray.500">{user.email}</Text>
+                                        <Text fontSize="sm" fontWeight="bold" color="black">
+                                            {userInfo.name}
+                                        </Text>
+                                        <Text fontSize="xs" color="gray.500">
+                                            {userInfo.email}
+                                        </Text>
                                     </Box>
 
                                     {isExpanded && (
@@ -321,12 +580,12 @@ export const AdminSidebar = () => {
                                         css={{
                                             animation: "none !important",
                                             transition: "none !important",
-                                            transform: "none !important"
+                                            transform: "none !important",
                                         }}
                                     >
                                         <Box px={3} py={2}>
                                             <Text fontSize="sm" color="gray.500">
-                                                {user.email || "読み込み中..."}
+                                                {userInfo.email || "読み込み中..."}
                                             </Text>
                                         </Box>
 
@@ -336,21 +595,26 @@ export const AdminSidebar = () => {
                                             value="logout"
                                             color="red.600"
                                             _hover={{ bg: "red.50", color: "red.700" }}
-                                            onClick={handleLogoutClick}
+                                            onClick={handleLogout}
+                                            disabled={isLoggingOut}
                                             gap={2}
                                             cursor="pointer"
                                         >
-                                            <LuLogOut />
-                                            <Text fontWeight="bold">ログアウト</Text>
+                                            {isLoggingOut ? (
+                                                <Spinner size="xs" />
+                                            ) : (
+                                                <LuLogOut />
+                                            )}
+                                            <Text fontWeight="bold">
+                                                {isLoggingOut ? "ログアウト中..." : "ログアウト"}
+                                            </Text>
                                         </MenuItem>
                                     </MenuContent>
                                 </MenuPositioner>
                             </Portal>
                         </MenuRoot>
                     </Box>
-
                 </VStack>
-
             </Flex>
         </Box>
     );

@@ -262,9 +262,9 @@ module "frontend" {
 # 9. DNSレコード登録 (API用サブドメイン)
 # ★これも忘れずにコメントアウトしてください！
 # ─────────────────────────────
-# resource "aws_route53_record" "api" {
+# resource "aws_route53_record" "client" {
 #   zone_id = module.dns.zone_id
-#   name    = "api.${var.root_domain}"
+#   name    = "client.${var.root_domain}"
 #   type    = "A"
 #
 #   alias {
@@ -492,6 +492,7 @@ module "bff_auth" {
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
+  kms_key_id = module.kms.lambda_key_id
 
   # CORS設定
   allowed_origins = [

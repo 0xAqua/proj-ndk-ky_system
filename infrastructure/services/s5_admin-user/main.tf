@@ -29,6 +29,7 @@ resource "aws_lambda_function" "admin_user" {
       USER_POOL_ID           = var.user_pool_id
       POWERTOOLS_SERVICE_NAME = "AdminUser"
       LOG_LEVEL               = "INFO"
+      COOKIE_SAME_SITE  = "Lax"
     }
   }
 

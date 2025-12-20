@@ -65,6 +65,16 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
 }
 
+# API用: キャッシュ無効化ポリシー
+data "aws_cloudfront_cache_policy" "caching_disabled" {
+  name = "Managed-CachingDisabled"
+}
+
+# API用: 全ヘッダー・クエリ・Cookieを転送
+data "aws_cloudfront_origin_request_policy" "all_viewer" {
+  name = "Managed-AllViewer"
+}
+
 # セキュリティヘッダー
 resource "aws_cloudfront_response_headers_policy" "security_headers" {
   name = "${var.name_prefix}-frontend-security-headers"
@@ -115,6 +125,59 @@ resource "aws_cloudfront_distribution" "this" {
     domain_name              = aws_s3_bucket.this.bucket_regional_domain_name
     origin_id                = "S3FrontendOrigin"
     origin_access_control_id = aws_cloudfront_origin_access_control.this.id
+  }
+
+  # API Gateway オリジン（api_endpointが設定されている場合のみ）
+  dynamic "origin" {
+    for_each = var.api_endpoint != "" ? [1] : []
+    content {
+      domain_name = replace(replace(var.api_endpoint, "https://", ""), "/", "")
+      origin_id   = "APIGatewayOrigin"
+
+      custom_origin_config {
+        http_port              = 80
+        https_port             = 443
+        origin_protocol_policy = "https-only"
+        origin_ssl_protocols   = ["TLSv1.2"]
+      }
+    }
+  }
+
+  # API用キャッシュビヘイビア（api_endpointが設定されている場合のみ）
+  # /bff/* - 認証系API
+  dynamic "ordered_cache_behavior" {
+    for_each = var.api_endpoint != "" ? [1] : []
+    content {
+      path_pattern     = "/bff/*"
+      target_origin_id = "APIGatewayOrigin"
+
+      viewer_protocol_policy = "https-only"
+      allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+      cached_methods         = ["GET", "HEAD"]
+
+      cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+      origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
+
+      response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id
+    }
+  }
+
+  # /construction-master* - 工事マスタAPI
+  dynamic "ordered_cache_behavior" {
+    for_each = var.api_endpoint != "" ? [1] : []
+    content {
+      path_pattern     = "/construction-master*"
+      target_origin_id = "APIGatewayOrigin"
+
+      viewer_protocol_policy = "https-only"
+      allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+      cached_methods         = ["GET", "HEAD"]
+
+      cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+      origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
+
+      response_headers_policy_id = aws_cloudfront_response_headers_policy.security_headers.id
+    }
   }
 
   default_cache_behavior {

@@ -113,7 +113,7 @@ resource "aws_lambda_function" "this" {
       TARGET_LOG_GROUPS      = jsonencode(var.target_log_group_names)
       POWERTOOLS_SERVICE_NAME = "LogArchiver"
       LOG_LEVEL               = "INFO"
-      # ★ 追加: セッション検証用
+      COOKIE_SAME_SITE  = "Lax"
       SESSION_TABLE_NAME     = var.session_table_name
     }
   }

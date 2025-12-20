@@ -30,6 +30,7 @@ resource "aws_lambda_function" "logs" {
       LOG_LEVEL                 = "INFO"
       SESSION_TABLE             = var.session_table_name
       POWERTOOLS_SERVICE_NAME   = "LogsService"
+      COOKIE_SAME_SITE  = "Lax"
     }
   }
   kms_key_arn = var.lambda_kms_key_arn

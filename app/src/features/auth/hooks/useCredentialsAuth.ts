@@ -1,5 +1,6 @@
+// useCredentialsAuth.ts
 import { useState } from "react";
-import { bffAuth } from "@/lib/bffAuth";
+import { authService } from '@/lib/service/auth';
 
 export const useCredentialsAuth = () => {
     const [username, setUsername] = useState("");
@@ -8,9 +9,17 @@ export const useCredentialsAuth = () => {
     const [error, setError] = useState<string | null>(null);
 
     const handleLogin = async () => {
+        const trimmedUsername = username.trim();
+        const trimmedPassword = password.trim();
 
-        if (!username || !password) {
+        if (!trimmedUsername || !trimmedPassword) {
             setError("メールアドレスとパスワードを入力してください。");
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedUsername)) {
+            setError("有効なメールアドレスを入力してください。");
             return;
         }
 
@@ -18,22 +27,15 @@ export const useCredentialsAuth = () => {
         setError(null);
 
         try {
-            // BFF API経由でログイン
-            await bffAuth.login(username, password);
-
-            // ログイン成功 (HttpOnly Cookieが自動設定される)
-            console.log("Login successful.");
-
-            // 成功を返す (useLoginFormで画面遷移を処理)
+            await authService.login(trimmedUsername, trimmedPassword);
+            setPassword("");
             return { success: true };
 
-        } catch (err: any) {
-            console.error("Login failed:", err);
-
-            // バックエンドからのエラーメッセージを取得
-            const message = err.response?.data?.error || 'ログインに失敗しました';
+        } catch (err: unknown) {
+            // BFFは { error: "メッセージ" } 形式で返す
+            const axiosError = err as { response?: { data?: { error?: string } } };
+            const message = axiosError.response?.data?.error || 'ログインに失敗しました';
             setError(message);
-
             return { success: false };
         } finally {
             setIsLoading(false);

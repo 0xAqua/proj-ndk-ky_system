@@ -30,7 +30,7 @@ interface Props {
 const DESTINATION_OPTIONS = [
     { value: "/admin/users", label: "/admin/users (ユーザー管理)" },
     { value: "/admin/settings", label: "/admin/settings (設定)" },
-    { value: "/api/v1/data", label: "/api/v1/data (API)" },
+    { value: "/client/v1/data", label: "/client/v1/data (API)" },
 ];
 
 // UserAdminFilterModal と同じスタイル

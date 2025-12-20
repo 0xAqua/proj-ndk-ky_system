@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api } from "@/lib/client.ts";
+import { ENDPOINTS } from "@/lib/endpoints";
+
 
 export type JobStatus =
     | "LOADING"
@@ -31,7 +33,7 @@ export const useJobResult = ({ jobId, intervalMs = 3000 }: UseJobResultOptions) 
         // データ取得関数
         queryFn: async (): Promise<JobResponse> => {
             if (!jobId) throw new Error("No Job ID");
-            const res = await api.get(`/jobs/${jobId}`);
+            const res = await api.get(ENDPOINTS.JOBS.DETAIL(jobId));
             return res.data;
         },
 

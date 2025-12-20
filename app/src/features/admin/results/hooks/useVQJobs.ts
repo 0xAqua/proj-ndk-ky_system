@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { api } from '@/lib/client.ts';
+import { ENDPOINTS } from '@/lib/endpoints';
+
 
 // 最適化されたレスポンスに合わせた型定義
 export interface VQJobIncident {
@@ -42,11 +44,7 @@ export const useVQJobs = () => {
                 params.last_evaluated_key = lastKey;
             }
 
-            console.log('Fetching VQ jobs with params:', params);
-
-            const response = await api.get<VQJobsResponse>('/vq-jobs', { params });
-
-            console.log('Response received:', response.data);
+            const response = await api.get<VQJobsResponse>(ENDPOINTS.VQ_JOBS.LIST, { params });
 
             const data = response.data;
 

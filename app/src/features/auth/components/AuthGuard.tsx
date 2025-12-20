@@ -1,36 +1,57 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { bffAuth } from "@/lib/bffAuth";
+import { authService } from '@/lib/service/auth';
 import { Spinner, Center } from "@chakra-ui/react";
 import { useAutoLogout } from "@/features/auth/hooks/useAutoLogout";
 
-export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
+// ロールの型定義（ユーザー情報の定義に合わせる）
+type UserRole = 'admin' | 'user';
+
+interface AuthGuardProps {
+    children: React.ReactNode;
+    allowedRoles?: UserRole[];
+}
+
+export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
     const [isChecked, setIsChecked] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
-    // 一定時間操作がない場合の自動ログアウト監視
     useAutoLogout();
 
     useEffect(() => {
+        let isMounted = true;
+
         const checkAuth = async () => {
             try {
-                const session = await bffAuth.checkSession();
+                // 1. セッションチェック
+                const session = await authService.checkSession();
 
-                if (session.authenticated) {
+                if (!isMounted) return;
+
+                if (session.authenticated && session.user) {
+                    // 2. ロール（権限）の判定
+                    if (allowedRoles && !allowedRoles.includes(session.user.role as UserRole)) {
+                        // 権限がない場合はトップやエラーページへ
+                        console.warn("Access denied: Insufficient permissions");
+                        navigate("/entry", { replace: true });
+                        return;
+                    }
                     setIsChecked(true);
                 } else {
-                    // 認証失敗時はログイン画面へ。戻り先情報を state に持たせる
-                    navigate("/login", { state: { from: location }, replace: true });
+                    throw new Error("Not authenticated");
                 }
             } catch (err) {
-                navigate("/login", { state: { from: location }, replace: true });
+                if (isMounted) {
+                    navigate("/login", { state: { from: location }, replace: true });
+                }
             }
         };
-        void checkAuth();
-    }, [navigate, location]);
 
-    // 認証確認中はローディングスピナーを表示
+        void checkAuth();
+        return () => { isMounted = false; };
+    }, [navigate, location, allowedRoles]);
+
     if (!isChecked) {
         return (
             <Center h="100vh" bg="gray.50">
@@ -39,6 +60,5 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
         );
     }
 
-    // 認証済みの場合は子コンポーネントを表示
     return <>{children}</>;
 };

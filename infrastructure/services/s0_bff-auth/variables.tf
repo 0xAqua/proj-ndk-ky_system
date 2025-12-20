@@ -52,3 +52,8 @@ variable "tenant_user_master_table_arn" {
   description = "ユーザーマスタのARN (IAM権限用)"
   type        = string
 }
+
+variable "kms_key_id" {
+  description = "KMS key ID for token encryption"
+  type        = string
+}

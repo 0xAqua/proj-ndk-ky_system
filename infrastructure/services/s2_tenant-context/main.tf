@@ -91,6 +91,7 @@ resource "aws_lambda_function" "this" {
       POWERTOOLS_SERVICE_NAME        = "TenantContext"
       LOG_LEVEL                      = "INFO"
       SESSION_TABLE            = var.session_table_name
+      COOKIE_SAME_SITE  = "Lax"
     }
   }
 

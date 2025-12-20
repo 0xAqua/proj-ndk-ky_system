@@ -1,11 +1,11 @@
 // src/hooks/useLoginForm.ts
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useCredentialsAuth } from "./useCredentialsAuth";
-import { bffAuth } from "@/lib/bffAuth";
-import { fetchConstructionMaster } from "@/api/constructionApi.ts";
+import { authService } from '@/lib/service/auth';
+import { constructionService } from "@/lib/service/construction";
 
 export const useLoginForm = () => {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -13,18 +13,13 @@ export const useLoginForm = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
-    const prefetchMasterData = () => {
+    const prefetchMasterData = useCallback(() => {
         void queryClient.prefetchQuery({
             queryKey: ['constructionMaster'],
-            queryFn: fetchConstructionMaster,
+            queryFn: constructionService.getMaster,
             staleTime: 1000 * 60 * 60,
         });
-    };
-
-    const handleSuccess = () => {
-        prefetchMasterData();
-        navigate("/entry");
-    };
+    }, [queryClient]);
 
     const credentialsAuth = useCredentialsAuth();
 
@@ -32,32 +27,27 @@ export const useLoginForm = () => {
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const session = await bffAuth.checkSession();
+                const session = await authService.checkSession();
                 if (session.authenticated) {
-                    console.log("Already logged in");
                     prefetchMasterData();
                     navigate("/entry", { replace: true });
                 }
-            } catch (err) {
-                console.log("Not logged in");
+            } catch {
+                // 未ログインは正常（何もしない）
             } finally {
                 setIsCheckingSession(false);
             }
         };
         void checkAuth();
-    }, [navigate]);
+    }, [navigate, prefetchMasterData]);
 
-    // ★修正: e.preventDefault() を追加
     const handleLogin = async (e: React.FormEvent) => {
-        console.log("★ handleLogin called!");  // ★追加
         e.preventDefault();
-
-        console.log("★ About to call credentialsAuth.handleLogin");  // ★追加
         const result = await credentialsAuth.handleLogin();
-        console.log("★ Result:", result);  // ★追加
 
         if (result?.success) {
-            handleSuccess();
+            prefetchMasterData();
+            navigate("/entry");
         }
     };
 

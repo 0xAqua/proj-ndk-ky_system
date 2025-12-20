@@ -1,9 +1,8 @@
 import { Box, Flex, Text, Image, HStack, Separator } from "@chakra-ui/react";
 import { LuLogOut, LuChevronDown } from "react-icons/lu";
-import { bffAuth } from '@/lib/bffAuth'; // ★変更
-import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { useUserStore } from "@/stores/useUserStore.ts";
+import { authService } from '@/lib/service/auth';
+import {useEffect, useState} from "react";
+import { useLogout } from "@/hooks/useLogout";
 import logo from '@/assets/logo.jpg';
 
 import { Avatar } from "@/components/ui/avatar.tsx";
@@ -15,8 +14,7 @@ import {
 } from "@/components/ui/menu.tsx";
 
 export const Header = () => {
-    const navigate = useNavigate();
-    const clearUser = useUserStore((state) => state.clearUser);
+    const { logout } = useLogout();
 
     // ユーザー情報を保存するState
     const [userEmail, setUserEmail] = useState("");
@@ -26,7 +24,7 @@ export const Header = () => {
     useEffect(() => {
         const getUserData = async () => {
             try {
-                const session = await bffAuth.checkSession();
+                const session = await authService.checkSession();
 
                 if (!session.authenticated || !session.user) {
                     setUserName("ゲスト");
@@ -48,17 +46,6 @@ export const Header = () => {
 
         void getUserData();
     }, []);
-
-    // ★修正: BFF APIでログアウト
-    const handleLogoutClick = async () => {
-        try {
-            await bffAuth.logout();
-            clearUser();
-            navigate('/login');
-        } catch (error) {
-            console.error("Logout failed", error);
-        }
-    };
 
     return (
         <Box
@@ -126,7 +113,7 @@ export const Header = () => {
                             value="logout"
                             color="red.600"
                             _hover={{ bg: "red.50", color: "red.700" }}
-                            onClick={handleLogoutClick}
+                            onClick={logout}
                             gap={2}
                             cursor="pointer"
                         >

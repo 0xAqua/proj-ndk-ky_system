@@ -27,6 +27,7 @@ resource "aws_lambda_function" "vq_jobs" {
       TENANT_VQ_MANAGER_TABLE = var.tenant_vq_manager_table_name
       LOG_LEVEL               = "INFO"
       SESSION_TABLE      = var.session_table_name
+      COOKIE_SAME_SITE  = "Lax"
     }
   }
 

@@ -4,6 +4,7 @@ import time
 import base64
 import boto3
 from botocore.exceptions import ClientError
+import hashlib
 
 # Powertoolsのインポート
 from aws_lambda_powertools import Logger, Tracer
@@ -52,6 +53,11 @@ def get_session_from_cookie(event: APIGatewayProxyEventV2) -> str | None:
     return None
 
 
+def hash_session_id(session_id: str) -> str:
+    """セッションIDをSHA-256でハッシュ化"""
+    return hashlib.sha256(session_id.encode()).hexdigest()
+
+
 def get_session(session_id: str) -> dict | None:
     """DynamoDBからセッション情報を取得"""
     if not SESSION_TABLE:
@@ -60,7 +66,8 @@ def get_session(session_id: str) -> dict | None:
 
     try:
         session_table = dynamodb.Table(SESSION_TABLE)
-        response = session_table.get_item(Key={"session_id": session_id})
+        hashed_id = hash_session_id(session_id)  # ← 追加
+        response = session_table.get_item(Key={"session_id": hashed_id})  # ← 修正
         item = response.get("Item")
 
         # 期限チェック
@@ -147,26 +154,12 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
     # 6. レスポンス返却
     user_item = response.get("Item") or {}
 
-    # 1. IDトークン（Cognito）から情報を取得
-    id_token = session.get("id_token", "")
-    token_info = decode_id_token(id_token) if id_token else {}
-
-    # 2. 名前の構築 (Cognitoの苗字と名前を結合)
-    # Cognitoの 'name' 属性が空でも、family_name と given_name から生成します
-    full_name = token_info.get("name")
-    if not full_name:
-        f_name = token_info.get("family_name", "")
-        g_name = token_info.get("given_name", "")
-        full_name = f"{f_name}{g_name}".strip() or None
-
     logger.info("テナントユーザー情報を取得しました", action_category="EXECUTE")
 
     # 3. レスポンスボディの構築（必要なものだけに絞り込む）
     response_body = {
         "tenantId": tenant_id,
         "userId": user_id,
-        "email": token_info.get("email"),  # CognitoのEmailを使用
-        "name": full_name,                # 結合した名前
         "tenantUser": {
             "departments": user_item.get("departments", {}), # 必須データ
             "role": user_item.get("role"),

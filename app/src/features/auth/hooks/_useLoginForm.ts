@@ -6,7 +6,7 @@
 // import { useCredentialsAuth } from "./useCredentialsAuth";
 // import { useOtpAuth } from "./useOtpAuth";
 // import { usePasskeyAuth } from "./usePasskeyAuth";
-// import { fetchConstructionMaster } from "@/api/constructionApi.ts";
+// import { fetchConstructionMaster } from "@/client/construction.ts";
 //
 // export type LoginStep = 'INPUT_CREDENTIALS' | 'INPUT_OTP';
 //

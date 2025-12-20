@@ -76,7 +76,10 @@ resource "aws_iam_role_policy" "kms" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["kms:Decrypt"]
+      Action   = [
+        "kms:Encrypt",
+        "kms:Decrypt"
+      ]
       Resource = [var.lambda_kms_key_arn]
     }]
   })
@@ -111,6 +114,7 @@ resource "aws_lambda_function" "bff_auth" {
 
   environment {
     variables = {
+      KMS_KEY_ID              = var.kms_key_id
       USER_POOL_ID             = var.user_pool_id
       CLIENT_ID                = var.user_pool_client_id
       SESSION_TABLE            = var.auth_sessions_table_name
@@ -119,6 +123,7 @@ resource "aws_lambda_function" "bff_auth" {
       ALLOWED_ORIGINS          = join(",", var.allowed_origins)
       POWERTOOLS_SERVICE_NAME  = "BFFAuth"
       POWERTOOLS_LOG_LEVEL     = "INFO"
+      COOKIE_SAME_SITE  = "Lax"
     }
   }
 }

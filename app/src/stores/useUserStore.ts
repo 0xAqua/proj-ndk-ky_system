@@ -1,8 +1,17 @@
-import {create} from 'zustand';
+import { create } from 'zustand';
 
 export interface Department {
     id: string;
     name: string;
+}
+
+// ① APIレスポンスの型を定義（any を避ける）
+interface UserApiResponse {
+    tenantId: string;
+    userId: string;
+    tenantUser: {
+        departments: Record<string, string>;
+    };
 }
 
 interface UserState {
@@ -11,7 +20,7 @@ interface UserState {
     departments: Department[];
     isLoading: boolean;
 
-    setUserData: (apiResponse: any) => void;
+    setUserData: (apiResponse: UserApiResponse) => void;
     clearUser: () => void;
     setLoading: (loading: boolean) => void;
 }
@@ -23,26 +32,26 @@ export const useUserStore = create<UserState>((set) => ({
     isLoading: false,
 
     setUserData: (data) => {
-        // オプショナルチェイニングで安全に取得
         const nestedDepts = data?.tenantUser?.departments;
 
-        // nestedDepts が null/undefined の場合は {} を使用する
         const formattedDepts: Department[] = Object.entries(nestedDepts ?? {}).map(([key, value]) => ({
             id: key,
             name: String(value)
         }));
 
         set({
-            tenantId: data?.tenantId,
-            userId: data?.userId,
+            tenantId: data?.tenantId ?? null,
+            userId: data?.userId ?? null,
             departments: formattedDepts,
         });
     },
 
+    // ② isLoading もリセット
     clearUser: () => set({
         tenantId: null,
         userId: null,
-        departments: []
+        departments: [],
+        isLoading: false,
     }),
 
     setLoading: (loading) => set({ isLoading: loading }),

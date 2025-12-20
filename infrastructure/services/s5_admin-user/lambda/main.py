@@ -1,6 +1,7 @@
 import os
 import json
 import boto3
+import hashlib
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.data_classes import event_source, APIGatewayProxyEventV2
@@ -27,44 +28,43 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
         "body": json.dumps(body, default=str, ensure_ascii=False)
     }
 
+import hashlib  # ★ 追加
+
+def hash_session_id(session_id: str) -> str:
+    """セッションIDをSHA-256でハッシュ化"""
+    return hashlib.sha256(session_id.encode()).hexdigest()
+
 def get_session(event):
     """
     Cookie から sessionId を抽出し、DynamoDB からセッション情報を取得します。
     """
-    # API Gateway v2 形式では event['cookies'] にリストで入っています
     cookies = event.get('cookies', [])
     session_id = None
 
-    # Cookie リストから sessionId を探す
     for cookie_str in cookies:
         if cookie_str.startswith("sessionId="):
-            # "sessionId=abc123xxx" -> "abc123xxx"
             session_id = cookie_str.split("=")[1]
             break
 
-    # セッションIDが見つからない場合は未認証として返す
     if not session_id:
         return None
 
+    # ★ ハッシュ化してから検索
+    hashed_id = hash_session_id(session_id)
+
     try:
-        # 環境変数 SESSION_TABLE からテーブルを取得
-        # ※ SESSION_TABLE は各 main.tf で設定済み
         table_name = os.environ.get('SESSION_TABLE')
         table = dynamodb.Table(table_name)
 
-        # ★ 修正ポイント:
-        # DynamoDB のキー定義に合わせて "session_id" (スネークケース) を使用
         response = table.get_item(
             Key={
-                'session_id': session_id
+                'session_id': hashed_id  # ★ 修正
             }
         )
 
-        # 取得できた Item (セッション情報) を返す
         return response.get('Item')
 
     except Exception as e:
-        # 権限不足やキー名の間違いがあるとここでログが出る
         print(f"Session check failed: {str(e)}")
         return None
 

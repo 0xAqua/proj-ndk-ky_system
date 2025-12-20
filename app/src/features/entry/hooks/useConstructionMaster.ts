@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useUserStore } from "@/stores/useUserStore";
-import {fetchConstructionMaster} from "@/api/constructionApi.ts";
+import {constructionService} from "@/lib/service/construction";
 
 export type ConstructionTask = { id: string; title: string; };
 export type SafetyEquipment = { id: string; title: string; is_high_risk: boolean; };
@@ -25,7 +25,7 @@ export const useConstructionMaster = () => {
     // 初回はAPIを叩きますが、2回目以降はキャッシュを使います
     const { data: rawTree, isLoading, isError, error } = useQuery({
         queryKey: ['constructionMaster'], // キャッシュのキー
-        queryFn: fetchConstructionMaster, // 実行する関数
+        queryFn: constructionService.getMaster, // 実行する関数
         staleTime: 1000 * 60 * 60,        // 1時間はデータを「最新」とみなす（再フェッチしない）
         retry: 2,                         // 失敗時は2回まで自動リトライ
         refetchOnWindowFocus: false,      // ウィンドウフォーカス時の再取得を無効化（入力画面なら不要なことが多い）

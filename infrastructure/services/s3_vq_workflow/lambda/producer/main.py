@@ -3,6 +3,7 @@ import json
 import time
 import boto3
 import requests
+import hashlib
 from decimal import Decimal
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
@@ -50,6 +51,10 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
         "body": json.dumps(body, cls=DecimalEncoder, ensure_ascii=False)
     }
 
+def hash_session_id(session_id: str) -> str:
+    """セッションIDをSHA-256でハッシュ化"""
+    return hashlib.sha256(session_id.encode()).hexdigest()
+
 def get_session(event: APIGatewayProxyEventV2):
     """Cookieからセッション情報を取得"""
     raw_cookies = event.get('cookies', [])
@@ -62,9 +67,12 @@ def get_session(event: APIGatewayProxyEventV2):
     if not session_id:
         return None
 
+    # ★ ハッシュ化してから検索
+    hashed_id = hash_session_id(session_id)
+
     try:
         session_db = dynamodb.Table(SESSION_TABLE)
-        resp = session_db.get_item(Key={'session_id': session_id})
+        resp = session_db.get_item(Key={'session_id': hashed_id})  # ★ 修正
         item = resp.get('Item')
         if item and item.get('expires_at', 0) > int(time.time()):
             return item

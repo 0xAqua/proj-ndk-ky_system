@@ -1,14 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api } from "@/lib/client";
+import { ENDPOINTS } from "@/lib/endpoints";
 import type { User, UsersResponse, CreateUserInput, UpdateUserInput } from "@/features/admin/users/types/types";
-import {sortUsersByRole} from "@/features/admin/users/utils/sortUsersByRole";
+import { sortUsersByRole } from "@/features/admin/users/utils/sortUsersByRole";
 
 // ユーザー一覧取得
 export const useUsers = () => {
     return useQuery({
         queryKey: ["admin", "users"],
         queryFn: async () => {
-            const { data } = await api.get<UsersResponse>("/admin/users");
+            const { data } = await api.get<UsersResponse>(ENDPOINTS.ADMIN.USERS.LIST);
             return data;
         },
         select: (data) => ({
@@ -23,7 +24,7 @@ export const useUser = (userId: string) => {
     return useQuery({
         queryKey: ["admin", "users", userId],
         queryFn: async () => {
-            const res = await api.get<{ user: User }>(`/admin/users/${userId}`);
+            const res = await api.get<{ user: User }>(ENDPOINTS.ADMIN.USERS.DETAIL(userId));
             return res.data.user;
         },
         enabled: !!userId,
@@ -36,7 +37,7 @@ export const useCreateUser = () => {
 
     return useMutation({
         mutationFn: async (input: CreateUserInput) => {
-            const res = await api.post("/admin/users", input);
+            const res = await api.post(ENDPOINTS.ADMIN.USERS.LIST, input);
             return res.data;
         },
         onSuccess: () => {
@@ -51,7 +52,7 @@ export const useUpdateUser = () => {
 
     return useMutation({
         mutationFn: async ({ userId, data }: { userId: string; data: UpdateUserInput }) => {
-            const res = await api.patch(`/admin/users/${userId}`, data);
+            const res = await api.patch(ENDPOINTS.ADMIN.USERS.DETAIL(userId), data);
             return res.data;
         },
         onSuccess: () => {
@@ -66,7 +67,7 @@ export const useDeleteUser = () => {
 
     return useMutation({
         mutationFn: async (userId: string) => {
-            const res = await api.delete(`/admin/users/${userId}`);
+            const res = await api.delete(ENDPOINTS.ADMIN.USERS.DETAIL(userId));
             return res.data;
         },
         onSuccess: () => {

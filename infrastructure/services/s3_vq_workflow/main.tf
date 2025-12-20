@@ -192,6 +192,7 @@ resource "aws_lambda_function" "producer" {
       MESSAGE_API_URL  = "${var.external_api_base_url}/public-api/v1/message"
       CALLBACK_URL     = "${var.api_endpoint}/webhook"
       SESSION_TABLE    = var.session_table_name
+      COOKIE_SAME_SITE  = "Lax"
     }
   }
 
@@ -235,6 +236,7 @@ resource "aws_lambda_function" "worker" {
       POLLING_INTERVAL = "10"
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
       SESSION_TABLE    = var.session_table_name
+      COOKIE_SAME_SITE  = "Lax"
     }
   }
 

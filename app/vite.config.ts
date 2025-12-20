@@ -9,4 +9,14 @@ export default defineConfig({
             '@': path.resolve(__dirname, './src'),
         },
     },
+    server: {
+        proxy: {
+            '/api/v1': {
+                target: 'https://ptaion2deh.execute-api.ap-northeast-1.amazonaws.com',
+                changeOrigin: true,
+                secure: true,
+                rewrite: (path) => path.replace(/^\/api\/v1/, ''),
+            },
+        },
+    },
 })

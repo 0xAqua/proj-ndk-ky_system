@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { LoginPage } from '@/pages/LoginPage';
 import { EntryPage } from "@/pages/EntryPage";
 import { ResultPage } from "@/pages/ResultPage";
@@ -12,79 +12,27 @@ import { LogsPage } from "@/pages/LogsPage.tsx";
 export const AppRoutes = () => {
     return (
         <Routes>
-            {/* デフォルトルートはログイン画面へリダイレクト */}
+            {/* 1. 公開ルート: ガードなし */}
+            <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
 
-            {/* 公開ページ（ログイン画面）: ここは監視不要なのでそのまま */}
-            <Route path="/login" element={<LoginPage />} />
+            {/* 2. 一般ユーザー・管理者 共通の保護ルート */}
+            <Route element={<AuthGuard><Outlet /></AuthGuard>}>
+                <Route path="/entry" element={<EntryPage />} />
+                <Route path="/result" element={<ResultPage />} />
+            </Route>
 
-            {/* ─── 以下、ログイン必須ページ（AuthGuardで囲む＝自動ログアウト対象） ─── */}
+            {/* 3. 管理者(admin)専用の保護ルート */}
+            <Route element={<AuthGuard allowedRoles={['admin']}><Outlet /></AuthGuard>}>
+                <Route path="/sample" element={<SamplePage />} />
+                <Route path="/advanced-settings" element={<SettingsPage />} />
+                <Route path="/users" element={<UserAdminPage />} />
+                <Route path="/results" element={<ResultListPage />} />
+                <Route path="/logs" element={<LogsPage />} />
+            </Route>
 
-            <Route
-                path="/entry"
-                element={
-                    <AuthGuard>
-                        <EntryPage />
-                    </AuthGuard>
-                }
-            />
-
-            <Route
-                path="/result"
-                element={
-                    <AuthGuard>
-                        <ResultPage />
-                    </AuthGuard>
-                }
-            />
-
-            {/* ↓↓ これらも全て AuthGuard で囲みました ↓↓ */}
-            <Route
-                path="/sample"
-                element={
-                    <AuthGuard>
-                        <SamplePage />
-                    </AuthGuard>
-                }
-            />
-
-            <Route
-                path="/advanced-settings"
-                element={
-                    <AuthGuard>
-                        <SettingsPage />
-                    </AuthGuard>
-                }
-            />
-
-            <Route
-                path="/users"
-                element={
-                    <AuthGuard>
-                        <UserAdminPage />
-                    </AuthGuard>
-                }
-            />
-
-            <Route
-                path="/results"
-                element={
-                    <AuthGuard>
-                        <ResultListPage />
-                    </AuthGuard>
-                }
-            />
-
-
-            <Route
-                path="/logs"
-                element={
-                    <AuthGuard>
-                        <LogsPage />
-                    </AuthGuard>
-                }
-            />
-
+            {/* 4. 404対策 */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
     );
 };

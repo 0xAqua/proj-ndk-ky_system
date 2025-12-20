@@ -27,7 +27,6 @@ export const getAuthErrorMessage = (error: any): string => {
             return '認証コードの有効期限が切れています。再度コードをリクエストしてください。';
 
         default:
-            console.error('Unknown Auth Error:', error); // 開発用ログ
             return 'システムエラーが発生しました。しばらく時間をおいて再試行してください。';
     }
 };
