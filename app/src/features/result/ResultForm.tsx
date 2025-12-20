@@ -1,28 +1,24 @@
 import { useMemo, useState } from "react";
 import { useLocation, Navigate } from "react-router-dom";
-import {
-    Box,
-    Spinner,
-    Stack, StackSeparator,
-    Text,
-    VStack,
-} from "@chakra-ui/react";
+import { Box, Stack, StackSeparator } from "@chakra-ui/react";
+
+// Hooks & Utils
 import { useJobResult } from "@/features/result/hooks/useJobResult";
 import { normalizeIncidents } from "@/features/result/utils/normalizeIncidents";
 
+// Components
 import { IncidentCardHeader } from "@/features/result/components/elements/IncidentCardHeader";
 import { IncidentCardContent } from "@/features/result/components/elements/IncidentCardContent";
+import { ResultFormSkeleton } from "@/features/result/components/elements/ResultFormSkeleton";
+import { ProcessingModal } from "@/features/result/components/elements/ProcessingModal";
 
-import type { IncidentData, RawIncident } from "@/features/result/types";
+import type { RawIncident } from "@/features/result/types";
 
 export const ResultForm = () => {
-
     const location = useLocation();
-    // stateがnullの場合も考慮して安全に取得
     const state = location.state as { jobId?: string } | null;
     const jobId = state?.jobId;
 
-    // jobIdがない場合は空文字を渡してクラッシュを防ぐ（実際には直後にリダイレクトされるためAPIは走りきりません）
     const { status, result, error, isLoading } = useJobResult({
         jobId: jobId ?? "",
         intervalMs: 3000,
@@ -30,109 +26,67 @@ export const ResultForm = () => {
 
     const [selectedCases, setSelectedCases] = useState<string[]>([]);
 
-    const rawIncidents: RawIncident[] = useMemo(() => {
+    const incidents = useMemo(() => {
         if (result && typeof result === 'object' && 'incidents' in result) {
-            return result.incidents as RawIncident[];
+            return normalizeIncidents(result.incidents as RawIncident[]);
         }
         return [];
     }, [result]);
 
-    const incidents: IncidentData[] = useMemo(
-        () => normalizeIncidents(rawIncidents),
-        [rawIncidents],
-    );
-
     // ──────────────────────────────────────────
-    // ★ここでリダイレクト判定
-    // ──────────────────────────────────────────
-    if (!jobId) {
-        // jobIdがないなら強制的にトップへ戻す（履歴も置き換え）
-        return <Navigate to="/" replace />;
-    }
-
-    const handleCaseClick = (caseId: string) => {
-        setSelectedCases((prev) =>
-            prev.includes(caseId)
-                ? prev.filter((id) => id !== caseId)
-                : [...prev, caseId],
-        );
-    };
-
-    // ──────────────────────────────────────────
-    // 描画分岐
+    // ロジック判定
     // ──────────────────────────────────────────
 
-    // ローディング
-    if (isLoading && !result && !error) {
-        return (
-            <Box
-                display="flex"
-                flexDir="column"
-                justifyContent="center"
-                alignItems="center"
-                h="100vh"
-            >
-                <Spinner size="xl" color="blue.500" />
-                <Text mt={4}>
-                    {status === "LOADING" ? "読み込み中..." : "AIが解析中..."}
-                </Text>
-            </Box>
-        );
-    }
+    if (!jobId) return <Navigate to="/" replace />;
 
-    // エラー
-    if (error) {
-        return (
-            <VStack m="auto" maxW="sm" gap={6} px={2} py={8}>
-                <Box p={6} bg="white" borderRadius="md" w="full">
-                    <Text color="red.500" fontWeight="bold" mb={2}>
-                        エラーが発生しました
-                    </Text>
-                    <Text fontSize="sm" color="gray.700">
-                        {error}
-                    </Text>
-                </Box>
-            </VStack>
-        );
-    }
+    // 待機判定：ロード中、または完了・失敗以外のステータス（PROCESSING等）
+    const isWaiting = isLoading || (status !== "COMPLETED" && status !== "FAILED");
 
-    // 通常ケース
     return (
-        <Box w="full">
-            <Box
-                bg="white"
-                borderRadius="xl"
-                borderWidth="1px"
-                borderColor="gray.200"
-                overflow="hidden"
-                shadow="sm"
-            >
-                <Stack gap={0} separator={<StackSeparator borderColor="gray.100" />}>
-                    {incidents.map((incident) => {
-                        const isOpen = selectedCases.includes(incident.id);
-                        const onToggle = () => handleCaseClick(incident.id);
+        <Box w="full" maxW="4xl" mx="auto" position="relative">
+            {/* 1. 解析中ダイアログ（最前面：背景をぼかしてスケルトンを見せる） */}
+            <ProcessingModal isOpen={isWaiting && !error} status={status} />
 
-                        return (
-                            <Box
-                                key={incident.id}
-                                bg={isOpen ? "gray.50" : "white"}
-                                transition="background 0.2s"
-                            >
-                                <IncidentCardHeader
-                                    incident={incident}
-                                    isOpen={isOpen}
-                                    onToggle={onToggle}
-                                />
+            {/* 2. メインコンテンツエリア */}
+            {error ? (
+                <Box p={8} bg="white" borderRadius="xl" border="1px solid" borderColor="red.100" textAlign="center">
+                    <Box color="red.600" fontWeight="bold">解析エラー: {error}</Box>
+                </Box>
+            ) : (
+                <Box
+                    bg="white"
+                    borderRadius="xl"
+                    borderWidth="1px"
+                    borderColor="gray.200"
+                    overflow="hidden"
+                    shadow="sm"
+                >
+                    {/* 待機中はスケルトン、完了後は本番データを表示 */}
+                    {isWaiting && incidents.length === 0 ? (
+                        <ResultFormSkeleton />
+                    ) : (
+                        <Stack gap={0} separator={<StackSeparator borderColor="gray.100" />}>
+                            {incidents.map((incident) => {
+                                const isOpen = selectedCases.includes(incident.id);
+                                const onToggle = () => {
+                                    setSelectedCases(prev =>
+                                        prev.includes(incident.id)
+                                            ? prev.filter(id => id !== incident.id)
+                                            : [...prev, incident.id]
+                                    );
+                                };
 
-                                <IncidentCardContent
-                                    incident={incident}
-                                    isOpen={isOpen}
-                                />
-                            </Box>
-                        );
-                    })}
-                </Stack>
-            </Box>
+                                return (
+                                    <Box key={incident.id} bg={isOpen ? "gray.50" : "white"} transition="0.2s">
+                                        <IncidentCardHeader incident={incident} isOpen={isOpen} onToggle={onToggle} />
+                                        <IncidentCardContent incident={incident} isOpen={isOpen} />
+                                    </Box>
+                                );
+                            })}
+                        </Stack>
+                    )}
+                </Box>
+            )}
         </Box>
     );
 };

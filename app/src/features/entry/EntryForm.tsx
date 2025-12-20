@@ -20,6 +20,7 @@ import { EntryFormSkeleton } from "@/features/entry/components/elements/EntryFor
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useConstructionMaster } from "@/features/entry/hooks/useConstructionMaster";
 import { buildConstructionPrompt } from "@/features/entry/services/promptBuilder";
+import {useNotification} from "@/hooks/useNotification.ts";
 
 /**
  * KYシステム 入力フォーム
@@ -27,6 +28,7 @@ import { buildConstructionPrompt } from "@/features/entry/services/promptBuilder
  */
 export const EntryForm = () => {
     const navigate = useNavigate();
+    const notify = useNotification();
     const { open, onOpen, onClose } = useDisclosure();
 
     // 1. 認証と詳細プロフィール情報をキャッシュから取得
@@ -53,7 +55,6 @@ export const EntryForm = () => {
     const handleFinalSubmit = async () => {
         setIsSubmitting(true);
         try {
-            // プロンプトの組み立て
             const promptText = buildConstructionPrompt({
                 date,
                 constructions,
@@ -63,26 +64,53 @@ export const EntryForm = () => {
                 selectedEnvIds
             });
 
-            // API送信 (BFF経由でVQシステムへ)
             const res = await api.post(ENDPOINTS.JOBS.LIST, {
                 message: promptText,
-                tenant_id: user?.tenantId || user?.tenant_id // 両方のネストに対応
+                tenant_id: user?.tenantId || user?.tenant_id
             });
 
             const { job_id: jobId } = res.data;
             if (!jobId) throw new Error("Job ID not returned");
 
+            // 成功時は遷移するので通知は不要かもしれませんが、入れるならここ
+            // notify.success("解析を開始しました");
+
             onClose();
-            // 結果表示画面へ遷移 (ジョブIDを渡す)
             navigate('/result', { state: { jobId } });
 
         } catch (e) {
             console.error("Submission error:", e);
-            alert("【送信エラー】\nサーバーへの送信に失敗しました。");
+            // ★ alert から notify.error へ変更
+            notify.error("サーバーへの送信に失敗しました。", "送信エラー");
         } finally {
             setIsSubmitting(false);
         }
     };
+
+    // ──────────────────────────────────────────
+    // バリデーション付きの確認画面オープン
+    // ──────────────────────────────────────────
+    const handlePreSubmitCheck = () => {
+        // 各項目ごとにチェックして、足りないものを個別に通知する
+        if (selectedTypeIds.length === 0) {
+            notify.warning("工事種別を1つ以上選択してください。", "入力チェック");
+            return;
+        }
+
+        if (selectedProcessIds.length === 0) {
+            notify.warning("工事工程を1つ以上選択してください。", "入力チェック");
+            return;
+        }
+
+        if (selectedEnvIds.length === 0) {
+            notify.warning("現場状況・環境を1つ以上選択してください。", "入力チェック");
+            return;
+        }
+
+        // すべてOKなら確認モーダルを開く
+        onOpen();
+    };
+
 
     // ──────────────────────────────────────────
     // UIガード (スケルトン・エラー表示)
@@ -106,65 +134,56 @@ export const EntryForm = () => {
     // メインコンテンツ
     // ──────────────────────────────────────────
     return (
-        <Box maxW="600px" mx="auto" pb={10} px={4}>
-            <VStack gap={8} align="stretch">
-                <ConstructionDate value={date} onChange={setDate} />
+        <VStack gap={8} align="stretch">
+            <ConstructionDate value={date} onChange={setDate} />
 
-                <ConstructionProject
-                    masterCategories={constructions}
-                    selectedTypeIds={selectedTypeIds}
-                    onChange={(newTypeIds) => {
-                        setSelectedTypeIds(newTypeIds);
-                        setSelectedProcessIds([]); // 工事種別変更時に工程をリセット
-                    }}
-                />
+            <ConstructionProject
+                masterCategories={constructions}
+                selectedTypeIds={selectedTypeIds}
+                onChange={(newTypeIds) => {
+                    setSelectedTypeIds(newTypeIds);
+                    setSelectedProcessIds([]); // 工事種別変更時に工程をリセット
+                }}
+            />
 
-                <ConstructionProcess
-                    masterCategories={constructions}
-                    targetTypeIds={selectedTypeIds}
-                    value={selectedProcessIds}
-                    onChange={setSelectedProcessIds}
-                />
+            <ConstructionProcess
+                masterCategories={constructions}
+                targetTypeIds={selectedTypeIds}
+                value={selectedProcessIds}
+                onChange={setSelectedProcessIds}
+            />
 
-                <ImportantEquipment
-                    masterCategories={constructions}
-                    selectedProcessIds={selectedProcessIds}
-                />
+            <ImportantEquipment
+                masterCategories={constructions}
+                selectedProcessIds={selectedProcessIds}
+            />
 
-                <SiteCondition
-                    masterEnvironments={environments}
-                    value={selectedEnvIds}
-                    onChange={setSelectedEnvIds}
-                />
+            <SiteCondition
+                masterEnvironments={environments}
+                value={selectedEnvIds}
+                onChange={setSelectedEnvIds}
+            />
 
-                <SubmitButton
-                    onClick={() => {
-                        // 簡易バリデーション
-                        if (selectedTypeIds.length === 0 || selectedProcessIds.length === 0) {
-                            alert("工事種別と工程を選択してください。");
-                            return;
-                        }
-                        onOpen();
-                    }}
-                    loading={isSubmitting}
-                >
-                    入力内容の確認
-                </SubmitButton>
+            <SubmitButton
+                onClick={handlePreSubmitCheck}
+                loading={isSubmitting}
+            >
+                入力内容の確認
+            </SubmitButton>
 
-                {/* 確認用モーダル */}
-                <SiteConditionConfirmModal
-                    open={open}
-                    onClose={onClose}
-                    onSubmit={handleFinalSubmit}
-                    isSubmitting={isSubmitting}
-                    date={date}
-                    constructions={constructions}
-                    selectedTypeIds={selectedTypeIds}
-                    selectedProcessIds={selectedProcessIds}
-                    masterEnvironments={environments}
-                    value={selectedEnvIds}
-                />
-            </VStack>
-        </Box>
+            {/* 確認用モーダル */}
+            <SiteConditionConfirmModal
+                open={open}
+                onClose={onClose}
+                onSubmit={handleFinalSubmit}
+                isSubmitting={isSubmitting}
+                date={date}
+                constructions={constructions}
+                selectedTypeIds={selectedTypeIds}
+                selectedProcessIds={selectedProcessIds}
+                masterEnvironments={environments}
+                value={selectedEnvIds}
+            />
+        </VStack>
     );
 };
