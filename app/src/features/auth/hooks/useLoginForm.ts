@@ -53,14 +53,11 @@ export const useLoginForm = () => {
         const result = await credentialsAuth.handleLogin();
 
         if (result?.success) {
-            // ★ 瞬間表示のための「並列プリフェッチ」
-            // 全て同時に開始し、完了を待たずに遷移しても TanStack Query が裏で維持します
+            // 1. 【重要】セッション情報のキャッシュを無効化し、強制的に最新（ログイン済み）にする
+            await queryClient.invalidateQueries({ queryKey: ['session'] });
+
+            // 2. 遷移後の画面で使うデータを「並列プリフェッチ」
             void Promise.all([
-                queryClient.prefetchQuery({
-                    queryKey: ['session'],
-                    queryFn: authService.checkSession,
-                    staleTime: 5 * 60 * 1000,
-                }),
                 queryClient.prefetchQuery({
                     queryKey: ['userProfile'],
                     queryFn: authService.getMe,
@@ -73,7 +70,7 @@ export const useLoginForm = () => {
                 })
             ]);
 
-            // プリフェッチを開始したら、すぐに遷移（裏で通信は続く）
+            // 3. 遷移を実行
             navigate("/entry", { replace: true });
         }
     };

@@ -18,10 +18,10 @@ resource "aws_sqs_queue" "main" {
   # Worker Lambdaのタイムアウト
   visibility_timeout_seconds = 70
 
-  # リトライ設定: 3回失敗したらDLQへ送る
+  # リトライ設定: N回失敗したらDLQへ送る
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.dlq.arn
-    maxReceiveCount     = 3
+    maxReceiveCount     = 10
   })
 }
 

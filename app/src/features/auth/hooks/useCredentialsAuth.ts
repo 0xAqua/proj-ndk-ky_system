@@ -1,6 +1,7 @@
 // useCredentialsAuth.ts
 import { useState } from "react";
 import { authService } from '@/lib/service/auth';
+import { getAuthErrorMessage } from "@/features/auth/utils/authErrors";
 
 export const useCredentialsAuth = () => {
     const [username, setUsername] = useState("");
@@ -32,9 +33,18 @@ export const useCredentialsAuth = () => {
             return { success: true };
 
         } catch (err: unknown) {
-            // BFFは { error: "メッセージ" } 形式で返す
+            // 1. BFF (Axios) からのエラーレスポンスを解析
             const axiosError = err as { response?: { data?: { error?: string } } };
-            const message = axiosError.response?.data?.error || 'ログインに失敗しました';
+
+            // 2. BFF が返したエラーコード（例: "LimitExceededException"）を取得
+            const errorCode = axiosError.response?.data?.error;
+
+            // 3. getAuthErrorMessage を呼び出して日本語メッセージに変換
+            // オブジェクト形式で渡すのが今の実装と最も相性が良いです。
+            const message = getAuthErrorMessage({
+                code: errorCode || 'DefaultError'
+            });
+
             setError(message);
             return { success: false };
         } finally {

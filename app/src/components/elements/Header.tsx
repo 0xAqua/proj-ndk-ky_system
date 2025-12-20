@@ -83,7 +83,10 @@ export const Header = () => {
                             value="logout"
                             color="red.600"
                             _hover={{ bg: "red.50", color: "red.700" }}
-                            onClick={logout}
+                            onClick={(e) => {
+                                e.preventDefault(); // 明示的に止める
+                                void logout();
+                            }}
                             gap={2}
                             cursor="pointer"
                         >

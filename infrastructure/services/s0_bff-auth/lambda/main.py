@@ -190,7 +190,9 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
         if len(username) > 128 or len(password) > 256:
             return create_response(400, {'error': '入力が長すぎます'}, cors_headers)
 
-        # Cognito認証
+        # ──────────────────────────────────────────────────────────
+        # 1. Cognito認証（エラーコードをそのままフロントに返す）
+        # ──────────────────────────────────────────────────────────
         try:
             resp = cognito.initiate_auth(
                 ClientId=CLIENT_ID,
@@ -202,14 +204,27 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
             )
         except cognito.exceptions.NotAuthorizedException:
             logger.warning("Login failed: invalid credentials")
-            return create_response(401, {'error': '認証に失敗しました'}, cors_headers)
+            return create_response(401, {'error': 'NotAuthorizedException'}, cors_headers)
+
         except cognito.exceptions.UserNotFoundException:
             logger.warning("Login failed: user not found")
-            return create_response(401, {'error': '認証に失敗しました'}, cors_headers)
+            # セキュリティのため NotAuthorizedException と同じコードを返す
+            return create_response(401, {'error': 'NotAuthorizedException'}, cors_headers)
+
         except cognito.exceptions.UserNotConfirmedException:
-            return create_response(401, {'error': 'ユーザーが確認されていません'}, cors_headers)
+            return create_response(401, {'error': 'UserNotConfirmedException'}, cors_headers)
+
         except cognito.exceptions.PasswordResetRequiredException:
-            return create_response(401, {'error': 'パスワードのリセットが必要です'}, cors_headers)
+            return create_response(401, {'error': 'PasswordResetRequiredException'}, cors_headers)
+
+        except cognito.exceptions.LimitExceededException:
+            # これが「アカウントロック」や「試行制限」のコード
+            return create_response(400, {'error': 'LimitExceededException'}, cors_headers)
+
+        except Exception as e:
+            error_code = getattr(e, 'response', {}).get('Error', {}).get('Code', 'InternalServerError')
+            logger.exception("Login error")
+            return create_response(500, {'error': error_code}, cors_headers)
 
         tokens = resp['AuthenticationResult']
         user_info = decode_id_token(tokens['IdToken'])

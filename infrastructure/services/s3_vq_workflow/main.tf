@@ -187,7 +187,7 @@ resource "aws_lambda_function" "producer" {
       JOB_TABLE_NAME   = var.job_table_name
       SQS_QUEUE_URL    = aws_sqs_queue.main.url
       VQ_SECRET_ARN    = var.vq_secret_arn
-      POLLING_INTERVAL = "10"
+      POLLING_INTERVAL = "3"
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
       MESSAGE_API_URL  = "${var.external_api_base_url}/public-api/v1/message"
       CALLBACK_URL     = "${var.api_endpoint}/webhook"
