@@ -18,7 +18,7 @@ data "aws_cloudfront_response_headers_policy" "security_headers" {
 
 # S3バケット
 resource "aws_s3_bucket" "frontend" {
-  bucket = "${var.name_prefix}-frontend-hosting"
+  bucket = "${var.name_prefix}-frontend"
 }
 
 # OAC (S3保護)
@@ -37,7 +37,8 @@ resource "aws_cloudfront_function" "api_rewrite" {
   code    = <<EOF
 function handler(event) {
     var request = event.request;
-    // /api/v1/xxx → /xxx に書き換え
+    // /api/v1/xxx を /xxx に書き換え
+    // Viteの rewrite: (path) => path.replace(/^\/api\/v1/, '') と同じ処理
     request.uri = request.uri.replace('/api/v1/', '/');
     return request;
 }

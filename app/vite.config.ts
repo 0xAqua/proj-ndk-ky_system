@@ -14,11 +14,10 @@ export default defineConfig({
     server: {
         proxy: {
             '/api/v1': {
-                // 先ほど出力された api_endpoint_original を直接指定
-                target: 'https://ptaion2deh.execute-api.ap-northeast-1.amazonaws.com',
+                target: 'https://ptaion2deh.execute-api.ap-northeast-1.amazonaws.com/',
                 changeOrigin: true,
                 secure: true,
-                // CloudFrontを通さないので、ここではパスを書き換える（/api/v1 を消す）
+                // /api/v1/me -> /me に変換。targetと合体して /bff/me になる
                 rewrite: (path) => path.replace(/^\/api\/v1/, ''),
             },
         },

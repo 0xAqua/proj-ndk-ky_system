@@ -1,0 +1,25 @@
+export const ENDPOINTS = {
+    AUTH: {
+        LOGIN: '/bff/auth/login',
+        LOGOUT: '/bff/auth/logout',
+        SESSION: '/bff/auth/session',
+        REFRESH: '/bff/auth/refresh',
+    },
+    ME: '/me',
+    JOBS: {
+        LIST: '/jobs',
+        DETAIL: (id: string) => `/jobs/${id}`,
+    },
+    CONSTRUCTION: {
+        MASTER: '/construction-master',
+    },
+    ADMIN: {
+        USERS: {
+            LIST: '/admin/users',
+            DETAIL: (id: string) => `/admin/users/${id}`,
+        },
+    },
+    VQ_JOBS: {
+        LIST: '/vq-jobs',
+    },
+} as const;
