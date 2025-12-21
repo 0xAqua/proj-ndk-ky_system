@@ -15,7 +15,6 @@ export default defineConfig({
                 target: 'https://ucjr9phbdb.execute-api.ap-northeast-1.amazonaws.com/',
                 changeOrigin: true,
                 secure: true,
-                // /api/v1/me -> /me に変換。targetと合体して /bff/me になる
                 rewrite: (path) => path.replace(/^\/api\/v1/, ''),
             },
         },

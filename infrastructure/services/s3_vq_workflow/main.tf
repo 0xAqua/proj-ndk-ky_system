@@ -175,6 +175,7 @@ resource "aws_lambda_function" "producer" {
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   timeout          = 15
+  architectures    = ["arm64"]
 
   filename         = data.archive_file.producer_zip.output_path
   source_code_hash = data.archive_file.producer_zip.output_base64sha256
@@ -212,6 +213,7 @@ resource "aws_lambda_function" "worker" {
   handler          = "main.lambda_handler"
   runtime          = "python3.12"
   timeout          = 60
+  architectures    = ["arm64"]
 
   filename         = data.archive_file.worker_zip.output_path
   source_code_hash = data.archive_file.worker_zip.output_base64sha256

@@ -46,11 +46,13 @@ def build_ky_prompt(input_data: dict) -> str:
     cfg = PROMPT_CONFIG
 
     type_names = input_data.get("typeNames", [])
+    process_names = input_data.get("processNames", [])  # ★ 追加
     equipments = input_data.get("equipments", [])
     environment_items = input_data.get("environmentItems", [])
 
     # 入力データの整形
     type_names_str = "\n".join(type_names) if type_names else "(指定なし)"
+    process_names_str = "\n".join(process_names) if process_names else "(指定なし)"  # ★ 追加
     equipments_str = "\n".join(f"-{e}" for e in equipments) if equipments else "(指定なし)"
     env_str = "\n".join(f"-{e}" for e in environment_items) if environment_items else "(特記事項なし)"
 
@@ -66,7 +68,7 @@ def build_ky_prompt(input_data: dict) -> str:
 #工事概要
 {type_names_str}
 #本日の工事
-{type_names_str}
+{process_names_str}
 #使用機材
 {equipments_str}
 
@@ -178,7 +180,8 @@ def handle_post(event, session, origin):
 
         tenant_id = session.get('tenant_id')
         user_id = session.get('user_id')
-        user_name = session.get('user_name', '')
+        family_name = session.get('family_name', '')
+        given_name = session.get('given_name', '')
         logger.append_keys(tenant_id=tenant_id, user_id=user_id)
 
         # 1. VQ API 認証
@@ -199,7 +202,6 @@ def handle_post(event, session, origin):
 
         resp_vq = requests.post(MESSAGE_API_URL, json=vq_payload, headers={"Authorization": f"Bearer {token}"})
 
-        # ★ raise_for_status() の代わりに手動チェック
         if not resp_vq.ok:
             logger.error(f"VQ API error: {resp_vq.status_code} - {resp_vq.text}")
             return create_response(500, {"error": "VQ API error", "detail": resp_vq.text}, origin)
@@ -215,11 +217,13 @@ def handle_post(event, session, origin):
             'job_id': job_id,
             'tenant_id': tenant_id,
             'user_id': user_id,
-            'user_name': user_name,
+            'family_name': family_name,
+            'given_name': given_name,
             'tid': tid,
             'mid': mid,
             'input_message': input_message,
             'type_names': input_data.get('typeNames', []),
+            'process_names': input_data.get('processNames', []),  # ★ 追加
             'equipments': input_data.get('equipments', []),
             'environment_items': input_data.get('environmentItems', []),
             'status': 'PENDING',
@@ -244,6 +248,27 @@ def handle_post(event, session, origin):
     except Exception as e:
         logger.exception(f"handle_post unexpected error: {str(e)}")
         return create_response(500, {"error": str(e)}, origin)
+
+
+# --- GET: ジョブ取得 ---
+def handle_get(event, session, origin):
+    job_id = event.path_parameters.get('jobId')
+    tenant_id = session.get('tenant_id')
+
+    resp = table.get_item(Key={'job_id': job_id})
+    item = resp.get('Item')
+
+    if not item or item.get('tenant_id') != tenant_id:
+        return create_response(403, {"error": "Unauthorized"}, origin)
+
+    view_item = {
+        "job_id": item.get("job_id"),
+        "status": item.get("status"),
+        "reply": item.get("reply"),
+        "error_msg": item.get("error_msg")  # 失敗時のエラー理由
+    }
+
+    return create_response(200, view_item, origin)
 
 # --- メインハンドラ ---
 @tracer.capture_lambda_handler

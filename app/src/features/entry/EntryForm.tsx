@@ -60,11 +60,15 @@ export const EntryForm = () => {
                 .filter(cat => selectedTypeIds.includes(cat.id))
                 .map(cat => cat.name);
 
-            // 使用機材（重複除去）
+            // ★ selectedProcesses を先に定義
             const selectedProcesses = constructions
                 .flatMap(cat => cat.processes)
                 .filter(proc => selectedProcessIds.includes(proc.id));
 
+            // 本日の工事（工程名）
+            const processNames = selectedProcesses.map(proc => proc.label);
+
+            // 使用機材（重複除去）
             const equipments = [...new Set(
                 selectedProcesses.flatMap(proc =>
                     proc.safety_equipments.map(eq => eq.title)
@@ -88,10 +92,12 @@ export const EntryForm = () => {
                 tenant_id: user?.tenantId || user?.tenant_id,
                 input: {
                     typeNames,
+                    processNames,
                     equipments,
                     environmentItems
                 }
             });
+
 
             const { job_id: jobId } = res.data;
             if (!jobId) throw new Error("Job ID not returned");
