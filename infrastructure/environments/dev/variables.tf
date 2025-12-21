@@ -9,8 +9,15 @@ variable "root_domain" {
 
 locals {
   project     = "ndk-ky-system"
-  environment = "dev"
+  environment = terraform.workspace
   region      = "ap-northeast-1"
+}
+
+locals {
+  allowed_origins_string = join(",", [
+    "http://localhost:3000",
+    "https://${module.frontend.cloudfront_domain}"
+  ])
 }
 
 variable "enable_advanced_auth" {

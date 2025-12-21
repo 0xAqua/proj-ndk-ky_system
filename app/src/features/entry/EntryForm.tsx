@@ -72,9 +72,6 @@ export const EntryForm = () => {
             const { job_id: jobId } = res.data;
             if (!jobId) throw new Error("Job ID not returned");
 
-            // 成功時は遷移するので通知は不要かもしれませんが、入れるならここ
-            // notify.success("解析を開始しました");
-
             onClose();
             navigate('/result', { state: { jobId } });
 
