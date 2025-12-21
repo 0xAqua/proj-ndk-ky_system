@@ -27,6 +27,7 @@ data "aws_iam_policy_document" "assume_role" {
 resource "null_resource" "producer_deps" {
   triggers = {
     requirements = filesha256("${local.producer_src_dir}/requirements.txt")
+    main_py      = filesha256("${local.producer_src_dir}/main.py")
   }
 
   provisioner "local-exec" {
@@ -43,6 +44,7 @@ resource "null_resource" "producer_deps" {
 resource "null_resource" "worker_deps" {
   triggers = {
     requirements = filesha256("${local.worker_src_dir}/requirements.txt")
+    main_py      = filesha256("${local.producer_src_dir}/main.py")
   }
 
   provisioner "local-exec" {
