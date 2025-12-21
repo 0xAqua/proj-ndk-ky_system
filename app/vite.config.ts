@@ -12,7 +12,7 @@ export default defineConfig({
     server: {
         proxy: {
             '/api/v1': {
-                target: 'https://ptaion2deh.execute-api.ap-northeast-1.amazonaws.com/',
+                target: 'https://ucjr9phbdb.execute-api.ap-northeast-1.amazonaws.com/',
                 changeOrigin: true,
                 secure: true,
                 // /api/v1/me -> /me に変換。targetと合体して /bff/me になる

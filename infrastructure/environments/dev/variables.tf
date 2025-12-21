@@ -16,7 +16,7 @@ locals {
 locals {
   allowed_origins_string = join(",", [
     "http://localhost:3000",
-    "https://${module.frontend.cloudfront_domain}"
+    "https://${module.cdn.cloudfront_domain_name}"
   ])
 }
 

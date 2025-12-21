@@ -1,7 +1,7 @@
-import { Box, Flex, Icon, Stack, Text, Badge, Separator, Grid } from "@chakra-ui/react";
+import { Box, Flex, Icon, Stack, Text, Badge } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
 import { HiSparkles, HiChevronRight, HiOutlineClock } from "react-icons/hi";
-import { MdWarning, MdHistory } from "react-icons/md";
+import { MdWarning } from "react-icons/md";
 import { formatDate } from "../utils/formatDate";
 import type { VQJob } from "../hooks/useVQJobs";
 
@@ -126,26 +126,3 @@ export const JobCard = ({ job }: JobCardProps) => {
         </Box>
     );
 };
-
-// サブコンポーネント: リストアイテムのプレビュー
-const PreviewItem = ({ icon, color, title, isFact }: any) => (
-    <Flex align="start" gap={3}>
-        <Box
-            mt={0.5}
-            color={`${color}.500`}
-            bg={`${color}.50`}
-            p={1}
-            borderRadius="md"
-        >
-            <Icon as={icon} boxSize={4} />
-        </Box>
-        <Box flex={1}>
-            <Text fontSize="xs" color="gray.500" mb={0.5}>
-                {isFact ? "過去事例" : "AI予測"}
-            </Text>
-            <Text fontSize="sm" fontWeight="medium" color="gray.800" lineClamp={1}>
-                {title}
-            </Text>
-        </Box>
-    </Flex>
-);

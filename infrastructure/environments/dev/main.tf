@@ -30,12 +30,12 @@ module "auth" {
 
   callback_urls = [
     "http://localhost:3000/callback",
-    "https://${module.frontend.cloudfront_domain}/callback"
+    "https://${module.cdn.cloudfront_domain_name}/callback"
   ]
 
   logout_urls = [
     "http://localhost:3000",
-    "https://${module.frontend.cloudfront_domain}"
+    "https://${module.cdn.cloudfront_domain_name}"
   ]
 
   # Passkeyの有無
@@ -45,7 +45,7 @@ module "auth" {
   create_auth_lambda_arn = module.auth_challenge.create_challenge_lambda_arn
   verify_auth_lambda_arn = module.auth_challenge.verify_challenge_lambda_arn
 
-  webauthn_relying_party_id = local.environment == "dev" ? "localhost" : module.frontend.cloudfront_domain
+  webauthn_relying_party_id = local.environment == "dev" ? "localhost" : module.cdn.cloudfront_domain_name
 }
 
 # ─────────────────────────────
@@ -64,8 +64,7 @@ module "api_gateway" {
   source = "../../modules/api-gateway"
 
   allowed_origins = [
-    "http://localhost:3000",
-    "https://${module.frontend.cloudfront_domain}"
+    "http://localhost:3000"
   ]
 
   name_prefix         = "${local.project}-${local.environment}"
@@ -239,26 +238,6 @@ module "cdn" {
 }
 
 # ─────────────────────────────
-# 8-2. Frontend (S3 + CloudFront)
-# ─────────────────────────────
-module "frontend" {
-  source      = "../../modules/frontend"
-  name_prefix = "${local.project}-${local.environment}"
-
-  # まだ独自ドメインも ACM も使わないので空でOK
-  acm_certificate_arn = ""
-  alias_domain        = ""
-
-  # WAF 共有したければここで付与
-  web_acl_arn = module.waf.web_acl_arn
-
-  tags = {
-    Project     = local.project
-    Environment = local.environment
-  }
-}
-
-# ─────────────────────────────
 # 9. DNSレコード登録 (API用サブドメイン)
 # ★これも忘れずにコメントアウトしてください！
 # ─────────────────────────────
@@ -293,12 +272,12 @@ output "cloudfront_domain" {
 
 output "frontend_bucket_name" {
   description = "S3 bucket for frontend static files"
-  value       = module.frontend.bucket_name
+  value       = module.cdn.bucket_name
 }
 
 output "frontend_cloudfront_domain" {
   description = "CloudFront domain for frontend SPA"
-  value       = module.frontend.cloudfront_domain
+  value       = module.cdn.cloudfront_domain_name
 }
 
 # ★これもコメントアウト（module.dnsがないため）
@@ -497,6 +476,6 @@ module "bff_auth" {
   # CORS設定
   allowed_origins = [
     "http://localhost:3000",
-    "https://${module.frontend.cloudfront_domain}"
+    "https://${module.cdn.cloudfront_domain_name}"
   ]
 }
