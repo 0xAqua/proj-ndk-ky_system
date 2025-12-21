@@ -2,60 +2,51 @@
 import { Box, Flex, Input, Stack, Text, Separator } from "@chakra-ui/react";
 import { Switch } from "@/components/ui/switch";
 import { useState } from "react";
-import { PiListNumbers, PiSparkle, PiInfo } from "react-icons/pi";
+// PiFiles を追加
+import { PiListNumbers, PiSparkle, PiInfo, PiFiles } from "react-icons/pi";
 
 // 定数の定義
 const MAX_INCIDENT_COUNT = 10;
 const DEFAULT_INCIDENT_COUNT = 3;
-const DEFAULT_PREDICTION_COUNT = 2;
+const DEFAULT_FACT_COUNT = 1;
 
 export const AIOutputSettings = () => {
-    const [includePrediction, setIncludePrediction] = useState(true);
-    const [predictionCount, setPredictionCount] = useState<number | "">(DEFAULT_PREDICTION_COUNT);
     const [incidentCount, setIncidentCount] = useState<number | "">(DEFAULT_INCIDENT_COUNT);
+    const [factIncidents, setFactIncidents] = useState<number | "">(DEFAULT_FACT_COUNT);
+    const [includePrediction, setIncludePrediction] = useState(true);
 
-    // 数値として扱うためのヘルパー
     const incidentCountNum = typeof incidentCount === "number" ? incidentCount : 0;
+
     const handleIncidentCountChange = (value: string) => {
         if (value === "") {
             setIncidentCount("");
             return;
         }
-
         let num = Number(value);
         if (isNaN(num)) return;
-
-        // 最大値の制限（定数を使用）
         if (num > MAX_INCIDENT_COUNT) num = MAX_INCIDENT_COUNT;
-
         setIncidentCount(num);
-
-        // インシデント件数を減らしたとき、予測件数がそれを超えないように調整
-        if (typeof predictionCount === "number" && predictionCount > num) {
-            setPredictionCount(num);
+        if (typeof factIncidents === "number" && factIncidents > num) {
+            setFactIncidents(num);
         }
     };
 
-    const handlePredictionCountChange = (value: string) => {
+    const handleFactCountChange = (value: string) => {
         if (value === "") {
-            setPredictionCount("");
+            setFactIncidents("");
             return;
         }
-
         let num = Number(value);
         if (isNaN(num)) return;
-
-        // インシデント出力件数を超えないように制限
         const limit = incidentCountNum > 0 ? incidentCountNum : MAX_INCIDENT_COUNT;
         if (num > limit) num = limit;
-
-        setPredictionCount(num);
+        setFactIncidents(num);
     };
 
     return (
         <Box>
             <Stack gap={8}>
-                {/* インシデント出力件数 */}
+                {/* 1. インシデント出力件数 */}
                 <Box>
                     <Flex justify="space-between" align="center">
                         <Flex align="start" gap={3} flex={1}>
@@ -67,7 +58,7 @@ export const AIOutputSettings = () => {
                                     インシデント出力件数
                                 </Text>
                                 <Text fontSize="sm" color="gray.500" mt={1}>
-                                    1回の生成でAIが提案するリスク事例の数
+                                    1回の生成でAIが提案するリスク事例の総数
                                 </Text>
                             </Box>
                         </Flex>
@@ -85,7 +76,6 @@ export const AIOutputSettings = () => {
                         </Box>
                     </Flex>
 
-                    {/* 注意メッセージ */}
                     <Flex
                         mt={3}
                         p={3}
@@ -106,7 +96,41 @@ export const AIOutputSettings = () => {
 
                 <Separator borderColor="gray.100" />
 
-                {/* 推測されるインシデントを含める */}
+                {/* 2. 同様のインシデント数 */}
+                <Box>
+                    <Flex justify="space-between" align="center">
+                        <Flex align="start" gap={3} flex={1}>
+                            <Box color="teal.500" mt={1}>
+                                {/* ここを PiFiles に変更しました */}
+                                <PiFiles size={20} />
+                            </Box>
+                            <Box flex={1}>
+                                <Text fontWeight="semibold" color="gray.800">
+                                    同様のインシデント数
+                                </Text>
+                                <Text fontSize="sm" color="gray.500" mt={1}>
+                                    過去の事例から引用する件数（出力件数以下）
+                                </Text>
+                            </Box>
+                        </Flex>
+                        <Box w="100px" ml={4}>
+                            <Input
+                                type="number"
+                                value={factIncidents}
+                                onChange={(e) => handleFactCountChange(e.target.value)}
+                                min={0}
+                                max={incidentCountNum || MAX_INCIDENT_COUNT}
+                                textAlign="right"
+                                borderColor="gray.300"
+                                _focus={{ borderColor: "teal.500", boxShadow: "0 0 0 1px var(--chakra-colors-teal-500)" }}
+                            />
+                        </Box>
+                    </Flex>
+                </Box>
+
+                <Separator borderColor="gray.100" />
+
+                {/* 3. 推測されるインシデントを含めるスイッチ */}
                 <Flex
                     justify="space-between"
                     align="center"
@@ -127,73 +151,25 @@ export const AIOutputSettings = () => {
                                 推測されるインシデントを含める
                             </Text>
                             <Text fontSize="sm" color="gray.500" mt={1}>
-                                過去事例に加えて、AIによる予測インシデントも表示します
+                                過去事例に加えて、AIによる予測インシデントも生成に含めます
                             </Text>
                         </Box>
                     </Flex>
 
-                    <Switch
-                        colorPalette="blue"
-                        checked={includePrediction}
-                        onCheckedChange={(e) => setIncludePrediction(!!e.checked)}
-                        size="lg"
-                    />
+                    {/* 【修正箇所】
+                       Switch自体にonClickをつけるのではなく、
+                       Boxで囲ってそこで stopPropagation します。
+                       これで確実にイベントのバブリング（親への伝播）を阻止できます。
+                    */}
+                    <Box onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                            colorPalette="blue"
+                            checked={includePrediction}
+                            onCheckedChange={(e) => setIncludePrediction(!!e.checked)}
+                            size="lg"
+                        />
+                    </Box>
                 </Flex>
-
-                {/* AI予測件数（includePredictionがtrueの時のみ表示） */}
-                {includePrediction && (
-                    <>
-                        <Separator borderColor="gray.100" />
-
-                        <Box>
-                            <Flex justify="space-between" align="center">
-                                <Flex align="start" gap={3} flex={1}>
-                                    <Box color="purple.500" mt={1}>
-                                        <PiSparkle size={20} />
-                                    </Box>
-                                    <Box flex={1}>
-                                        <Text fontWeight="semibold" color="gray.800">
-                                            AI予測インシデント件数
-                                        </Text>
-                                        <Text fontSize="sm" color="gray.500" mt={1}>
-                                            予測されるインシデントの最大表示件数（出力件数以下）
-                                        </Text>
-                                    </Box>
-                                </Flex>
-                                <Box w="100px" ml={4}>
-                                    <Input
-                                        type="number"
-                                        value={predictionCount}
-                                        onChange={(e) => handlePredictionCountChange(e.target.value)}
-                                        min={1}
-                                        max={incidentCountNum || MAX_INCIDENT_COUNT}
-                                        textAlign="right"
-                                        borderColor="gray.300"
-                                        _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px var(--chakra-colors-blue-500)" }}
-                                    />
-                                </Box>
-                            </Flex>
-
-                            {/* 注意メッセージ */}
-                            <Flex
-                                mt={3}
-                                p={3}
-                                bg="purple.50"
-                                borderRadius="md"
-                                borderLeftColor="purple.400"
-                                gap={2}
-                                align="start"
-                            >
-                                <Box color="purple.500" mt={0.5}>
-                                    <PiInfo size={16} />
-                                </Box>
-                                <Text fontSize="xs" color="purple.700">
-                                    予測精度を保つため、{Math.max(1, incidentCountNum - 1)}件以下を推奨します
-                                </Text>
-                            </Flex>
-                        </Box>
-                    </>
-                )}
             </Stack>
         </Box>
     );

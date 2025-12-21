@@ -1,7 +1,7 @@
-import { Box, Center, Flex, Icon, Stack, Text, Badge } from "@chakra-ui/react";
+import { Box, Flex, Icon, Stack, Text, Badge, Separator, Grid } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
-import { HiSparkles, HiChevronRight } from "react-icons/hi";
-import { MdWarning } from "react-icons/md";
+import { HiSparkles, HiChevronRight, HiOutlineClock } from "react-icons/hi";
+import { MdWarning, MdHistory } from "react-icons/md";
 import { formatDate } from "../utils/formatDate";
 import type { VQJob } from "../hooks/useVQJobs";
 
@@ -13,6 +13,10 @@ export const JobCard = ({ job }: JobCardProps) => {
     const navigate = useNavigate();
     const incidents = job.incidents || [];
 
+    // データを分類
+    const factIncidents = incidents.filter(i => i.classification === "過去に起きたインシデント");
+    const aiIncidents = incidents.filter(i => i.classification !== "過去に起きたインシデント");
+
     const handleClick = () => {
         navigate("/result", { state: { jobId: job.job_id } });
     };
@@ -20,97 +24,128 @@ export const JobCard = ({ job }: JobCardProps) => {
     return (
         <Box
             as="article"
-            position="relative"
             bg="white"
             borderRadius="xl"
             border="1px solid"
-            borderColor="gray.100"
+            borderColor="gray.200"
             cursor="pointer"
             onClick={handleClick}
-            transition="all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
+            overflow="hidden"
+            transition="all 0.2s"
             _hover={{
-                transform: "translateY(-2px)",
-                boxShadow: "0 12px 20px -8px rgba(0, 0, 0, 0.1)",
-                borderColor: "blue.200",
+                borderColor: "blue.400",
+                boxShadow: "lg",
+                transform: "translateY(-2px)"
             }}
         >
-            {/* ヘッダー: 日付と件数 */}
+            {/* ヘッダーエリア */}
             <Flex
-                py={3}
-                px={5}
-                align="center"
-                justify="space-between"
                 bg="gray.50"
-                borderTopRadius="xl"
-                borderBottomWidth="1px"
+                px={5}
+                py={3}
+                justify="space-between"
+                align="center"
+                borderBottom="1px solid"
                 borderColor="gray.100"
             >
-                <Text fontSize="xs" fontWeight="bold" color="gray.500" letterSpacing="wider">
-                    {formatDate(job.created_at).toUpperCase()}
-                </Text>
-                <Badge colorScheme="blue" variant="subtle" px={2} borderRadius="full">
-                    {incidents.length} Incidents
-                </Badge>
+                <Flex align="center" gap={2} color="gray.500">
+                    <Icon as={HiOutlineClock} />
+                    <Text fontSize="xs" fontWeight="bold">
+                        {formatDate(job.created_at)}
+                    </Text>
+                </Flex>
+                <Icon as={HiChevronRight} color="gray.400" />
             </Flex>
 
-            {/* コンテンツエリア */}
-            <Box px={5} py={5}>
-                <Stack gap={3}>
-                    {incidents.slice(0, 3).map((incident) => {
-                        const isPast = incident.classification === "過去に起きたインシデント";
-                        const themeColor = isPast ? "orange" : "purple";
-                        const StatusIcon = isPast ? MdWarning : HiSparkles;
+            {/* メインコンテンツ */}
+            <Box p={5}>
+                {/* 統計バッジエリア */}
+                <Flex gap={3} mb={5}>
+                    <Badge
+                        colorPalette="orange"
+                        variant="surface"
+                        px={2.5} py={1}
+                        borderRadius="md"
+                        display="flex"
+                        alignItems="center"
+                        gap={1.5}
+                    >
+                        <Icon as={MdWarning} />
+                        過去事例: {factIncidents.length}件
+                    </Badge>
+                    <Badge
+                        colorPalette="purple"
+                        variant="surface"
+                        px={2.5} py={1}
+                        borderRadius="md"
+                        display="flex"
+                        alignItems="center"
+                        gap={1.5}
+                    >
+                        <Icon as={HiSparkles} />
+                        AI予測: {aiIncidents.length}件
+                    </Badge>
+                </Flex>
 
-                        return (
-                            <Box
-                                key={incident.id}
-                                p={3}
-                                borderRadius="lg"
-                                bg={`${themeColor}.50`}
-                                border="1px solid"
-                                borderColor={`${themeColor}.100`}
-                            >
-                                <Flex gap={3} align="flex-start">
-                                    <Center
-                                        boxSize="24px"
-                                        bg="white"
-                                        borderRadius="full"
-                                        shadow="sm"
-                                        flexShrink={0}
-                                    >
-                                        <Icon as={StatusIcon} boxSize={3.5} color={`${themeColor}.500`} />
-                                    </Center>
-                                    <Box flex={1}>
-                                        <Text
-                                            fontSize="sm"
-                                            color="gray.800"
-                                            fontWeight="bold"
-                                            lineHeight="1.4"
-                                        >
-                                            {incident.title}
-                                        </Text>
-                                        <Text
-                                            fontSize="xs"
-                                            color="gray.600"
-                                            mt={1}
-                                            lineHeight="1.5"
-                                        >
-                                            {incident.summary}
-                                        </Text>
-                                    </Box>
-                                </Flex>
-                            </Box>
-                        );
-                    })}
+                {/* プレビューリスト（各カテゴリから最大1件ずつ表示など） */}
+                <Stack gap={1.5}>
+                    {factIncidents.length > 0 && (
+                        <Box
+                            bg="orange.50"
+                            px={3}
+                            py={1.5}
+                            borderRadius="md"
+                        >
+                            <Text fontSize="sm" color="gray.800" lineClamp={1}>
+                                {factIncidents[0].title}
+                            </Text>
+                        </Box>
+                    )}
+
+                    {aiIncidents.length > 0 && (
+                        <Box
+                            bg="purple.50"
+                            px={3}
+                            py={1.5}
+                            borderRadius="md"
+                        >
+                            <Text fontSize="sm" color="gray.800" lineClamp={1}>
+                                {aiIncidents[0].title}
+                            </Text>
+                        </Box>
+                    )}
                 </Stack>
 
-                <Flex mt={4} align="center" justify="center">
-                    <Text fontSize="xs" fontWeight="bold" color="blue.500">
-                        詳細を表示
+
+                {(factIncidents.length > 1 || aiIncidents.length > 1) && (
+                    <Text fontSize="xs" color="gray.400" mt={4} textAlign="center">
+                        他 {incidents.length - Math.min(incidents.length, 2)} 件のインシデント...
                     </Text>
-                    <Icon as={HiChevronRight} color="blue.500" />
-                </Flex>
+                )}
             </Box>
         </Box>
     );
 };
+
+// サブコンポーネント: リストアイテムのプレビュー
+const PreviewItem = ({ icon, color, title, isFact }: any) => (
+    <Flex align="start" gap={3}>
+        <Box
+            mt={0.5}
+            color={`${color}.500`}
+            bg={`${color}.50`}
+            p={1}
+            borderRadius="md"
+        >
+            <Icon as={icon} boxSize={4} />
+        </Box>
+        <Box flex={1}>
+            <Text fontSize="xs" color="gray.500" mb={0.5}>
+                {isFact ? "過去事例" : "AI予測"}
+            </Text>
+            <Text fontSize="sm" fontWeight="medium" color="gray.800" lineClamp={1}>
+                {title}
+            </Text>
+        </Box>
+    </Flex>
+);
