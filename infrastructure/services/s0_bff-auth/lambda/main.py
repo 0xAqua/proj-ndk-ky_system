@@ -418,16 +418,26 @@ def handle_refresh(event: dict, cors_headers: dict) -> dict:
         new_tokens = resp['AuthenticationResult']
         new_expires_at = int(time.time()) + SESSION_TTL_SECONDS
 
+        update_expression = 'SET id_token = :id, access_token = :access, expires_at = :exp, #ttl = :ttl'
+
+        expression_values = {
+            ':id': encrypt_token(new_tokens['IdToken']),
+            ':access': encrypt_token(new_tokens['AccessToken']),
+            ':exp': new_expires_at,
+            ':ttl': new_expires_at + 86400,
+        }
+
+        # Rotation有効時は必ず入ってくるが、念のため存在チェックを入れると安全
+        if 'RefreshToken' in new_tokens:
+            update_expression += ', refresh_token = :refresh'
+            expression_values[':refresh'] = encrypt_token(new_tokens['RefreshToken'])
+
+        # DynamoDB更新実行
         session_table.update_item(
             Key={'session_id': hashed_id},
-            UpdateExpression='SET id_token = :id, access_token = :access, expires_at = :exp, #ttl = :ttl',
+            UpdateExpression=update_expression,
             ExpressionAttributeNames={'#ttl': 'ttl'},
-            ExpressionAttributeValues={
-                ':id': encrypt_token(new_tokens['IdToken']),
-                ':access': encrypt_token(new_tokens['AccessToken']),
-                ':exp': new_expires_at,
-                ':ttl': new_expires_at + 86400,
-            }
+            ExpressionAttributeValues=expression_values
         )
 
         cookie = build_cookie('sessionId', session_id, SESSION_TTL_SECONDS)

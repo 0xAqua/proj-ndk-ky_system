@@ -117,6 +117,9 @@ resource "aws_cognito_user_pool_client" "web" {
   name         = "${local.name_prefix}-web-client"
   user_pool_id = aws_cognito_user_pool.this.id
 
+  # トークンの取り消し（Revocation）を有効にする
+  enable_token_revocation = true
+
   # パスワード認証(SRP)と、カスタム認証(OTP)の両方を許可します
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
@@ -139,14 +142,9 @@ resource "aws_cognito_user_pool_client" "web" {
   # ユーザー存在エラーの隠蔽（セキュリティ対策）
   prevent_user_existence_errors = "ENABLED"
 
-  # トークン有効期限
-  # access_token_validity  = 60   # 分
-  # id_token_validity      = 60   # 分
-  # refresh_token_validity = 30   # 日
-
   access_token_validity  = 15   # 15分
   id_token_validity      = 15   # 15分
-  refresh_token_validity = 1    # 1日（ローカルストレージに置いてる）
+  refresh_token_validity = 1    # 1日
 
   token_validity_units {
     access_token  = "minutes"

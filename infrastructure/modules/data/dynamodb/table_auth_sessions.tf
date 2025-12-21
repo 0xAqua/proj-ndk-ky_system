@@ -31,7 +31,7 @@ resource "aws_dynamodb_table" "auth_sessions" {
   }
 
   ttl {
-    attribute_name = "expires_at"
+    attribute_name = "ttl"
     enabled        = true
   }
 
@@ -52,5 +52,5 @@ resource "aws_dynamodb_table" "auth_sessions" {
 # id_token       : S  - Cognito IDトークン
 # refresh_token  : S  - Cognitoリフレッシュトークン
 # created_at     : N  - 作成日時 (UNIXタイムスタンプ)
-# expires_at     : N  - 有効期限 (UNIXタイムスタンプ) ※TTL属性
+# ttl            : N  - 有効期限 (UNIXタイムスタンプ) ※TTL属性
 # last_accessed  : N  - 最終アクセス日時 (オプション)
