@@ -19,13 +19,13 @@ import { SiteConditionConfirmModal } from "@/features/entry/components/elements/
 import { EntryFormSkeleton } from "@/features/entry/components/elements/EntryFormSkeleton";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useConstructionMaster } from "@/features/entry/hooks/useConstructionMaster";
-import { buildConstructionPrompt } from "@/features/entry/services/promptBuilder";
 import {useNotification} from "@/hooks/useNotification.ts";
 
 /**
  * KYシステム 入力フォーム
  * 認可(Auth)とマスタ(Master)の状態を監視し、スケルトン表示を制御します
  */
+
 export const EntryForm = () => {
     const navigate = useNavigate();
     const notify = useNotification();
@@ -55,18 +55,42 @@ export const EntryForm = () => {
     const handleFinalSubmit = async () => {
         setIsSubmitting(true);
         try {
-            const promptText = buildConstructionPrompt({
-                date,
-                constructions,
-                environments,
-                selectedTypeIds,
-                selectedProcessIds,
-                selectedEnvIds
+            // 工事種別名
+            const typeNames = constructions
+                .filter(cat => selectedTypeIds.includes(cat.id))
+                .map(cat => cat.name);
+
+            // 使用機材（重複除去）
+            const selectedProcesses = constructions
+                .flatMap(cat => cat.processes)
+                .filter(proc => selectedProcessIds.includes(proc.id));
+
+            const equipments = [...new Set(
+                selectedProcesses.flatMap(proc =>
+                    proc.safety_equipments.map(eq => eq.title)
+                )
+            )];
+
+            // 現場環境項目
+            const environmentItems: string[] = [];
+            environments.forEach(large => {
+                large.children?.forEach(mid => {
+                    mid.processes.forEach(item => {
+                        if (selectedEnvIds.includes(item.id)) {
+                            environmentItems.push(item.label);
+                        }
+                    });
+                });
             });
 
+            // 構造化データのみ送信
             const res = await api.post(ENDPOINTS.JOBS.LIST, {
-                message: promptText,
-                tenant_id: user?.tenantId || user?.tenant_id
+                tenant_id: user?.tenantId || user?.tenant_id,
+                input: {
+                    typeNames,
+                    equipments,
+                    environmentItems
+                }
             });
 
             const { job_id: jobId } = res.data;
@@ -77,7 +101,6 @@ export const EntryForm = () => {
 
         } catch (e) {
             console.error("Submission error:", e);
-            // ★ alert から notify.error へ変更
             notify.error("サーバーへの送信に失敗しました。", "送信エラー");
         } finally {
             setIsSubmitting(false);

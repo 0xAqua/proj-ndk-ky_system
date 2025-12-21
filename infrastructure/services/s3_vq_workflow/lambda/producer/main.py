@@ -34,6 +34,78 @@ class DecimalEncoder(json.JSONEncoder):
             return float(obj)
         return super(DecimalEncoder, self).default(obj)
 
+PROMPT_CONFIG = {
+    "total_incidents": 3,
+    "fact_incidents": 1,
+    "countermeasures_per_case": 3
+}
+
+
+def build_ky_prompt(input_data: dict) -> str:
+    """KY活動用プロンプトを構築"""
+    cfg = PROMPT_CONFIG
+
+    type_names = input_data.get("typeNames", [])
+    equipments = input_data.get("equipments", [])
+    environment_items = input_data.get("environmentItems", [])
+
+    # 入力データの整形
+    type_names_str = "\n".join(type_names) if type_names else "(指定なし)"
+    equipments_str = "\n".join(f"-{e}" for e in equipments) if equipments else "(指定なし)"
+    env_str = "\n".join(f"-{e}" for e in environment_items) if environment_items else "(特記事項なし)"
+
+    # 対応策テンプレート
+    countermeasures_template = ",\n        ".join([
+        f'{{"no": {i+1}, "title": "", "description": "", "responsible": ""}}'
+        for i in range(cfg["countermeasures_per_case"])
+    ])
+
+    return f"""以下の条件をもとに、類似状況で起こった過去のインシデントとその対応策を教えてください。
+###条件
+##実施する工事について
+#工事概要
+{type_names_str}
+#本日の工事
+{type_names_str}
+#使用機材
+{equipments_str}
+
+##現場の状況について
+#危険が予測される現場状況
+{env_str}
+
+###出力形式
+##内容
+・類似状況のインシデントがない場合、推測できるインシデントとその対応策を記載
+・登録されているドキュメントと同様インシデントについては（過去に起きたインシデント）と記載
+・インシデントは合計{cfg["total_incidents"]}つ出力を行う
+・出力するインシデントの中で同様のインシデントは{cfg["fact_incidents"]}つ
+・１つのインシデントに対して対応策を{cfg["countermeasures_per_case"]}つ記載
+・対応策は誰が実施すべきか、を明確にする
+・対応策は実際の作業でどのように実施するかを具体的に記載
+・対応策は実際の作業時に行えるものを記載する
+##出力
+・出力形式はJSONのみ
+・説明文、補足文、Markdownは禁止
+・以下のフォーマットに完全準拠すること
+・キーの追加、削除、変更は禁止
+
+#JSONフォーマット
+{{
+  "incidents": [
+    {{
+      "id": 1,
+      "title": "",
+      "classification": "過去に起きたインシデント | 推測されるインシデント",
+      "summary": "",
+      "cause": "",
+      "countermeasures": [
+        {countermeasures_template}
+      ]
+    }}
+  ]
+}}"""
+
 # --- 共通ユーティリティ ---
 
 def create_response(status_code: int, body: dict, origin: str) -> dict:
@@ -95,78 +167,83 @@ def get_vq_credentials(target_tenant_id):
 
 # --- POST: ジョブ作成 ---
 def handle_post(event, session, origin):
-    body = json.loads(event.body or '{}')
-    input_message = body.get('message')
+    try:
+        body = json.loads(event.body or '{}')
+        input_data = body.get('input', {})
 
-    tenant_id = session.get('tenant_id')
-    user_id = session.get('user_id')
-    logger.append_keys(tenant_id=tenant_id, user_id=user_id)
+        logger.info(f"Received input_data: {json.dumps(input_data, ensure_ascii=False)}")
 
-    # 1. VQ API 認証 & 実行
-    creds = get_vq_credentials(tenant_id)
-    resp_auth = requests.post(AUTH_API_URL, json={"api_key": creds['api_key'], "login_id": creds['login_id']})
-    resp_auth.raise_for_status()
-    token = resp_auth.json().get('token')
+        input_message = build_ky_prompt(input_data)
+        logger.info(f"Generated prompt length: {len(input_message)}")
 
-    vq_payload = {
-        "message": input_message,
-        "model_id": creds['model_id'],
-        "callback_url": CALLBACK_URL
-    }
-    resp_vq = requests.post(MESSAGE_API_URL, json=vq_payload, headers={"Authorization": f"Bearer {token}"})
-    resp_vq.raise_for_status()
-    vq_data = resp_vq.json()
+        tenant_id = session.get('tenant_id')
+        user_id = session.get('user_id')
+        user_name = session.get('user_name', '')
+        logger.append_keys(tenant_id=tenant_id, user_id=user_id)
 
-    tid = vq_data.get('tid')
-    mid = vq_data.get('mid')
-    job_id = tid
+        # 1. VQ API 認証
+        creds = get_vq_credentials(tenant_id)
+        resp_auth = requests.post(AUTH_API_URL, json={"api_key": creds['api_key'], "login_id": creds['login_id']})
+        if not resp_auth.ok:
+            logger.error(f"Auth API error: {resp_auth.status_code} - {resp_auth.text}")
+            return create_response(500, {"error": "Auth failed"}, origin)
 
-    # 2. DynamoDB登録
-    table.put_item(Item={
-        'job_id': job_id,
-        'tenant_id': tenant_id,
-        'user_id': user_id,
-        'tid': tid,
-        'mid': mid,
-        'input_message': input_message,
-        'status': 'PENDING',
-        'retry_count': 0,
-        'created_at': int(time.time()),
-        'updated_at': int(time.time())
-    })
+        token = resp_auth.json().get('token')
 
-    # 3. SQS送信
-    sqs.send_message(
-        QueueUrl=SQS_QUEUE_URL,
-        MessageBody=json.dumps({
+        # 2. VQ API 実行
+        vq_payload = {
+            "message": input_message,
+            "model_id": creds['model_id'],
+            "callback_url": CALLBACK_URL
+        }
+
+        resp_vq = requests.post(MESSAGE_API_URL, json=vq_payload, headers={"Authorization": f"Bearer {token}"})
+
+        # ★ raise_for_status() の代わりに手動チェック
+        if not resp_vq.ok:
+            logger.error(f"VQ API error: {resp_vq.status_code} - {resp_vq.text}")
+            return create_response(500, {"error": "VQ API error", "detail": resp_vq.text}, origin)
+
+        vq_data = resp_vq.json()
+
+        tid = vq_data.get('tid')
+        mid = vq_data.get('mid')
+        job_id = tid
+
+        # 3. DynamoDB登録
+        table.put_item(Item={
             'job_id': job_id,
+            'tenant_id': tenant_id,
+            'user_id': user_id,
+            'user_name': user_name,
             'tid': tid,
             'mid': mid,
-            'tenant_id': tenant_id
+            'input_message': input_message,
+            'type_names': input_data.get('typeNames', []),
+            'equipments': input_data.get('equipments', []),
+            'environment_items': input_data.get('environmentItems', []),
+            'status': 'PENDING',
+            'retry_count': 0,
+            'created_at': int(time.time()),
+            'updated_at': int(time.time())
         })
-    )
 
-    return create_response(200, {"job_id": job_id, "message": "Job accepted"}, origin)
+        # 4. SQS送信
+        sqs.send_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MessageBody=json.dumps({
+                'job_id': job_id,
+                'tid': tid,
+                'mid': mid,
+                'tenant_id': tenant_id
+            })
+        )
 
-# --- GET: ジョブ取得 ---
-def handle_get(event, session, origin):
-    job_id = event.path_parameters.get('jobId')
-    tenant_id = session.get('tenant_id')
+        return create_response(200, {"job_id": job_id, "message": "Job accepted"}, origin)
 
-    resp = table.get_item(Key={'job_id': job_id})
-    item = resp.get('Item')
-
-    if not item or item.get('tenant_id') != tenant_id:
-        return create_response(403, {"error": "Unauthorized"}, origin)
-
-    view_item = {
-        "job_id": item.get("job_id"),
-        "status": item.get("status"),
-        "reply": item.get("reply"),
-        "error_msg": item.get("error_msg")  # 失敗時のエラー理由
-    }
-
-    return create_response(200, view_item, origin)
+    except Exception as e:
+        logger.exception(f"handle_post unexpected error: {str(e)}")
+        return create_response(500, {"error": str(e)}, origin)
 
 # --- メインハンドラ ---
 @tracer.capture_lambda_handler
