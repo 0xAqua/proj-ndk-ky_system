@@ -70,26 +70,45 @@ def get_session(event):
         return None
 
 
-def filter_and_transform_job(item: dict) -> dict | None:
-    # ... (既存のフィルタリングロジックはそのまま維持) ...
-    if "error_msg" in item and item["error_msg"]: return None
-    reply = item.get("reply")
-    if isinstance(reply, str):
-        try: reply = json.loads(reply)
-        except json.JSONDecodeError: return None
-    incidents = (reply or {}).get("incidents", [])
-    if not incidents: return None
+FACT_LABEL = "過去に起きたインシデント"
+AI_LABEL = "推測されるインシデント"
 
-    filtered_incidents = [{
-        "id": i.get("id"), "title": i.get("title"),
-        "summary": i.get("summary"), "classification": i.get("classification")
-    } for i in incidents]
+def filter_and_transform_job(item: dict) -> dict | None:
+    # 一覧は completed のみ
+    if item.get("status") != "COMPLETED":
+        return None
+
+    reply = item.get("reply")
+    if not reply:
+        return None
+
+    if isinstance(reply, str):
+        try:
+            reply = json.loads(reply)
+        except json.JSONDecodeError:
+            return None
+
+    incidents = (reply or {}).get("incidents", [])
+    if not incidents:
+        return None
+
+    if any(not (i.get("classification")) for i in incidents):
+        return None
+
+    fact_count = sum(1 for i in incidents if i.get("classification") == FACT_LABEL)
+    ai_count = len(incidents) - fact_count
 
     return {
         "job_id": item.get("job_id"),
         "created_at": item.get("created_at"),
-        "incidents": filtered_incidents
+        "family_name": item.get("family_name"),
+        "given_name": item.get("given_name"),
+        "type_names": item.get("type_names", []),
+        "fact_incident_count": fact_count,
+        "ai_incident_count": ai_count,
     }
+
+
 
 @tracer.capture_lambda_handler
 @event_source(data_class=APIGatewayProxyEventV2)
