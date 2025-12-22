@@ -21,5 +21,6 @@ export const ENDPOINTS = {
     },
     VQ_JOBS: {
         LIST: '/vq-jobs',
+        REPLY: (id: string) => `/vq-jobs/${id}/reply`,
     },
 } as const;
