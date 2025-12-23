@@ -9,7 +9,7 @@ import {
     VStack,
     Badge,
 } from "@chakra-ui/react";
-import {type Incident, useVQJobReply} from "@/features/admin/results/hooks/fetchVQJobReply.ts";
+import {type Incident, useVQJobReply} from "@/features/admin/results/hooks/useFetchVQJobReply.ts";
 
 
 type Props = {

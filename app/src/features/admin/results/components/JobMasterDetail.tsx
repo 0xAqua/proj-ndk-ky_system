@@ -1,4 +1,4 @@
-import { Box, Flex, Heading, Text } from "@chakra-ui/react";
+import { Box, Flex, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import type { VQJobListItem } from "../hooks/useVQJobs";
 import { JobRow } from "./JobRow";
@@ -24,13 +24,6 @@ export const JobMasterDetail = ({ jobs, isLoading = false }: Props) => {
                 overflow="hidden"
                 bg="white"
             >
-                <Box px={4} py={3} borderBottom="1px solid" borderColor="gray.100">
-                    <Heading size="sm">ジョブ一覧</Heading>
-                    <Text fontSize="xs" color="gray.500">
-                        {isLoading ? "読み込み中..." : `${jobs.length} 件`}
-                    </Text>
-                </Box>
-
                 <Box maxH={{ base: "auto", md: "calc(100vh - 200px)" }} overflow="auto">
                     {jobs.map((job) => (
                         <JobRow

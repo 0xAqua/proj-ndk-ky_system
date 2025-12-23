@@ -1,5 +1,4 @@
-import { Box, Spinner, Text, VStack, Button, HStack, Icon } from "@chakra-ui/react";
-import { HiOutlineRefresh } from "react-icons/hi";
+import { Box, Spinner, Text, VStack, Button, HStack } from "@chakra-ui/react";
 import { useVQJobs } from "./hooks/useVQJobs";
 import { JobMasterDetail } from "./components/JobMasterDetail";
 
@@ -69,7 +68,6 @@ export const ResultListForm = () => {
                     loading={loading}
                     size="sm"
                     variant="outline"
-                    leftIcon={<Icon as={HiOutlineRefresh} />}
                 >
                     更新
                 </Button>
