@@ -21,38 +21,35 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
 def handle(event, ctx):
     """ユーザー一覧取得：フロントエンドの型に最適化したデータを返却"""
     tenant_id = ctx["tenant_id"]
-    caller_user_id = ctx["caller_user_id"]
+    caller_email = ctx["caller_email"]  # ← 変更
     origin = ctx.get("origin", "*")
 
     logger.info("ユーザー一覧取得処理を開始", extra={
         "tenant_id": tenant_id,
-        "requested_by": caller_user_id
+        "requested_by": caller_email  # ← 変更
     })
 
     try:
-        # [cite_start]1. DynamoDBから該当テナントの全属性を取得 [cite: 3, 4]
+        # 1. DynamoDBから該当テナントの全属性を取得
         response = tenant_user_master_table.query(
             KeyConditionExpression="tenant_id = :tid",
             ExpressionAttributeValues={":tid": tenant_id}
         )
         raw_users = response.get("Items", [])
 
-        # 2. フロントエンドの User 型に必要な項目だけに絞り込む (マッピング)
+        # 2. フロントエンドの User 型に必要な項目だけに絞り込む
         filtered_users = []
         for u in raw_users:
             # 部署から COMMON を除外
             deps = {k: v for k, v in u.get("departments", {}).items() if k != "COMMON"}
 
-            # React側の User 型に必要なプロパティのみを抽出
+            # emailベースに変更
             filtered_user = {
-                "user_id": u.get("user_id"),
-                "email": u.get("email"),
-                "family_name": u.get("family_name"),
-                "given_name": u.get("given_name"),
+                "email": u.get("email"),  # ← キー（識別子）
                 "departments": deps,
                 "role": u.get("role"),
                 "status": u.get("status"),
-                "last_login_at": u.get("last_login_at") # 存在しない場合は None(null) になる
+                "last_login_at": u.get("last_login_at")
             }
             filtered_users.append(filtered_user)
 

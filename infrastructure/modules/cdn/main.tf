@@ -65,11 +65,39 @@ function handler(event) {
 EOF
 }
 
+resource "aws_cloudfront_origin_request_policy" "api_policy" {
+  name    = "${var.name_prefix}-api-origin-policy"
+  comment = "Forward necessary headers to API Gateway"
+
+  cookies_config {
+    cookie_behavior = "all"
+  }
+
+  headers_config {
+    header_behavior = "whitelist"
+    headers {
+      items = [
+        "Origin",
+        "X-Requested-With",
+        "Content-Type",
+        "Accept",
+      ]
+    }
+  }
+
+  query_strings_config {
+    query_string_behavior = "all"
+  }
+}
+
 # --- CloudFront Distribution ---
 resource "aws_cloudfront_distribution" "this" {
   enabled             = true
   default_root_object = "index.html"
   web_acl_id          = var.web_acl_arn
+
+  # ★追加: 料金クラス（日本含むアジア対応）
+  price_class = "PriceClass_200"
 
   # API Gateway オリジン
   origin {
@@ -80,6 +108,10 @@ resource "aws_cloudfront_distribution" "this" {
       https_port             = 443
       origin_protocol_policy = "https-only"
       origin_ssl_protocols   = ["TLSv1.2"]
+    }
+    custom_header {
+      name  = "X-Origin-Verify"
+      value = var.origin_verify_secret
     }
   }
 
@@ -101,7 +133,8 @@ resource "aws_cloudfront_distribution" "this" {
     viewer_protocol_policy = "redirect-to-https"
 
     cache_policy_id            = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer.id
+    # ★修正: カスタムポリシーに変更
+    origin_request_policy_id   = aws_cloudfront_origin_request_policy.api_policy.id
     response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security_headers.id
 
     function_association {
@@ -125,12 +158,10 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-  # ★ custom_error_response は削除（コメントアウト or 削除）
-
   restrictions {
     geo_restriction {
-      restriction_type = "none"
-      locations        = []
+      restriction_type = "whitelist"  # ← "none" から変更
+      locations        = ["JP"]       # ← 日本のみ許可
     }
   }
 
@@ -169,5 +200,23 @@ resource "aws_s3_bucket_policy" "frontend" {
       }
     ]
   })
+}
+
+# ログ用S3バケット
+resource "aws_s3_bucket" "cloudfront_logs" {
+  bucket = "${var.name_prefix}-cloudfront-logs"
+}
+
+resource "aws_s3_bucket_ownership_controls" "cloudfront_logs" {
+  bucket = aws_s3_bucket.cloudfront_logs.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_acl" "cloudfront_logs" {
+  depends_on = [aws_s3_bucket_ownership_controls.cloudfront_logs]
+  bucket     = aws_s3_bucket.cloudfront_logs.id
+  acl        = "private"
 }
 

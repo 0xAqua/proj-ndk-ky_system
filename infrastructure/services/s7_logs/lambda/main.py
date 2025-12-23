@@ -64,6 +64,12 @@ def get_session(event):
         return None
 @logger.inject_lambda_context
 def handler(event: dict, context: LambdaContext) -> dict:
+    headers = {k.lower(): v for k, v in event.get("headers", {}).items()}
+    expected = os.environ.get("ORIGIN_VERIFY_SECRET")
+
+    if expected and headers.get("x-origin-verify") != expected:
+        return {"statusCode": 403, "body": "Forbidden"}
+
     origin = event.get('headers', {}).get('origin', '')
 
     # 1. CSRF対策チェック

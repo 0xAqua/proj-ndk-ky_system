@@ -2,6 +2,11 @@ locals {
   name_prefix = "${var.project}-${var.environment}"
 }
 
+resource "aws_cognito_user_pool_domain" "this" {
+  domain       = "${local.name_prefix}-auth"
+  user_pool_id = aws_cognito_user_pool.this.id
+}
+
 # ─────────────────────────────
 # User Pool 本体
 # ─────────────────────────────
@@ -11,6 +16,11 @@ resource "aws_cognito_user_pool" "this" {
   # ★重要: 大文字小文字を区別しない設定（作成後の変更不可）
   username_configuration {
     case_sensitive = false
+  }
+
+  # セルフサインアップを無効化（管理者のみユーザー作成可能）
+  admin_create_user_config {
+    allow_admin_create_user_only = true
   }
 
   # ★重要: 誤削除防止
@@ -70,6 +80,7 @@ resource "aws_cognito_user_pool" "this" {
       max_length = 64
     }
   }
+
 
   # パスキー登録済みかどうかを管理するフラグ (0:未登録, 1:登録済)
   schema {
@@ -156,8 +167,6 @@ resource "aws_cognito_user_pool_client" "web" {
   write_attributes = [
     "email",
     "name",
-    "family_name",
-    "given_name",
     "custom:has_passkey"
   ]
 
@@ -165,19 +174,55 @@ resource "aws_cognito_user_pool_client" "web" {
     "email",
     "email_verified",
     "name",
-    "family_name",
-    "given_name",
     "custom:tenant_id",
     "custom:has_passkey"
   ]
 }
 
-# ─────────────────────────────
-# User Pool ドメイン（Hosted UI 用）
-# ─────────────────────────────
-resource "aws_cognito_user_pool_domain" "this" {
-  domain       = "${local.name_prefix}-auth"
+resource "aws_cognito_risk_configuration" "this" {
   user_pool_id = aws_cognito_user_pool.this.id
+
+  # 侵害された資格情報の検出
+  compromised_credentials_risk_configuration {
+    event_filter = ["SIGN_IN", "SIGN_UP", "PASSWORD_CHANGE"]
+    actions {
+      event_action = "BLOCK"
+    }
+  }
+
+  # アダプティブ認証（リスクベース）
+  account_takeover_risk_configuration {
+    # SES設定後に通知を有効化（ses_source_arnがnullの場合はスキップ）
+    dynamic "notify_configuration" {
+      for_each = var.ses_source_arn != null ? [1] : []
+      content {
+        source_arn             = var.ses_source_arn
+        from_email_address     = var.ses_from_email
+        reply_to_email_address = var.ses_reply_to_email
+      }
+    }
+
+    actions {
+      low_action {
+        event_action = "NO_ACTION"
+        notify       = false
+      }
+      medium_action {
+        event_action = "MFA_IF_CONFIGURED"
+        notify       = var.ses_source_arn != null  # SES未設定時はfalse
+      }
+      high_action {
+        event_action = "MFA_REQUIRED"
+        notify       = var.ses_source_arn != null  # SES未設定時はfalse
+      }
+    }
+  }
+}
+
+
+resource "aws_cloudwatch_log_group" "cognito_user_activity" {
+  name              = "/aws/cognito/${local.name_prefix}-user-pool/user-activity"
+  retention_in_days = 90
 }
 
 

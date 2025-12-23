@@ -80,3 +80,8 @@ variable "is_mfa_enabled" {
   default     = false
 }
 
+variable "ses_source_arn" {
+  description = "SES verified identity ARN for risk notification emails"
+  type        = string
+  default     = null  # SES設定前はnullで
+}

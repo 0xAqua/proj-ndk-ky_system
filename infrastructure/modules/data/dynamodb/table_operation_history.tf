@@ -9,7 +9,7 @@ resource "aws_dynamodb_table" "operation_history" {
   # Key Schema
   # ─────────────────────────────
   hash_key  = "timestamp"
-  range_key = "user_id"
+  range_key = "email"  # ← 変更
 
   # ─────────────────────────────
   # Attribute Definitions
@@ -20,7 +20,7 @@ resource "aws_dynamodb_table" "operation_history" {
   }
 
   attribute {
-    name = "user_id"
+    name = "email"  # ← 変更
     type = "S"
   }
 
@@ -52,8 +52,9 @@ resource "aws_dynamodb_table" "operation_history" {
 # 保存する属性（参考用コメント）
 # ─────────────────────────────
 # timestamp     : N  - いつ（UNIXミリ秒）※PK
-# user_id       : S  - 誰が ※SK
+# email         : S  - 誰が ※SK
+# tenant_id     : S  - テナントID
 # action        : S  - CREATE / UPDATE / DELETE / VIEW / EXECUTE
 # resource_type : S  - user / project / rag / ...
-# message       : S  - "ユーザー 山田太郎 を削除しました"
+# message       : S  - "ユーザー xxx@example.com を削除しました"
 # expires_at    : N  - TTL（90日後）

@@ -20,6 +20,8 @@ export const api = axios.create({
         'Content-Type': 'application/json',
         // CSRF対策: サーバー側でこのヘッダーを検証する
         'X-Requested-With': 'XMLHttpRequest',
+        'Cache-Control': 'no-cache',  // ← 追加
+        'Pragma': 'no-cache',          // ← 追加（IE対策）
     },
     // HttpOnly Cookie送信に必須
     withCredentials: true,

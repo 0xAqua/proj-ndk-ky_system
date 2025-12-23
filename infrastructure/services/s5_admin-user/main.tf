@@ -30,6 +30,8 @@ resource "aws_lambda_function" "admin_user" {
       POWERTOOLS_SERVICE_NAME = "AdminUser"
       LOG_LEVEL               = "INFO"
       COOKIE_SAME_SITE  = "Lax"
+      ORIGIN_VERIFY_SECRET          = var.origin_verify_secret
+
     }
   }
 
@@ -153,14 +155,17 @@ resource "aws_apigatewayv2_route" "list_users" {
   api_id             = var.api_gateway_id
   route_key          = "GET /admin/users"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "NONE" # ★ JWT から変更
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
+
 }
 
 resource "aws_apigatewayv2_route" "create_user" {
   api_id             = var.api_gateway_id
   route_key          = "POST /admin/users"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "NONE" # ★ JWT から変更
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
 # /admin/users/{user_id} リソース
@@ -168,21 +173,24 @@ resource "aws_apigatewayv2_route" "get_user" {
   api_id             = var.api_gateway_id
   route_key          = "GET /admin/users/{user_id}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "NONE" # ★ JWT から変更
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
 resource "aws_apigatewayv2_route" "update_user" {
   api_id             = var.api_gateway_id
   route_key          = "PATCH /admin/users/{user_id}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "NONE" # ★ JWT から変更
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
 resource "aws_apigatewayv2_route" "delete_user" {
   api_id             = var.api_gateway_id
   route_key          = "DELETE /admin/users/{user_id}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "NONE" # ★ JWT から変更
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
 # Lambda Integration

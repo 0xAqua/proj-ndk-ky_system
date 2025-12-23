@@ -42,3 +42,14 @@ variable "allowed_origins" {
   default     = ""
 }
 
+
+variable "authorizer_id" {
+  description = "API Gateway Authorizer ID"
+  type        = string
+}
+
+variable "origin_verify_secret" {
+  description = "Secret to verify CloudFront origin"
+  type        = string
+  sensitive   = true
+}

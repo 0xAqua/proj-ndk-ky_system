@@ -47,7 +47,7 @@ resource "aws_dynamodb_table" "auth_sessions" {
 # 保存する属性（参考用コメント）
 # ─────────────────────────────
 # session_id     : S  - セッションID (ランダム生成) ※PK
-# user_id        : S  - ユーザーID (Cognito sub)
+# email          : S  - ユーザーのメールアドレス（識別子）
 # access_token   : S  - Cognitoアクセストークン
 # id_token       : S  - Cognito IDトークン
 # refresh_token  : S  - Cognitoリフレッシュトークン

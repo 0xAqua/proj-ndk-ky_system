@@ -53,3 +53,9 @@ variable "session_table_arn" {
   description = "ARN of the DynamoDB table for sessions"
   type        = string
 }
+
+variable "origin_verify_secret" {
+  description = "Secret to verify CloudFront origin"
+  type        = string
+  sensitive   = true
+}

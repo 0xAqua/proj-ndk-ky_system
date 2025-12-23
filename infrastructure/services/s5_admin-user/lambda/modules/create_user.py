@@ -23,7 +23,7 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
 def handle(event, ctx):
     """ユーザー新規作成（Cognito + DynamoDB）"""
     tenant_id = ctx["tenant_id"]
-    caller_user_id = ctx["caller_user_id"] # 操作を行っている管理者のID
+    caller_email = ctx["caller_email"]  # ← 変更: 操作を行っている管理者のemail
     origin = ctx.get("origin", "*")
 
     try:
@@ -31,21 +31,19 @@ def handle(event, ctx):
     except json.JSONDecodeError:
         return create_response(400, {"message": "Invalid JSON"}, origin)
 
-    # 必須バリデーション
-    required = ["email", "password", "family_name", "given_name"]
+    # 必須バリデーション（emailとpasswordのみ）
+    required = ["email", "password"]  # ← 変更: family_name, given_name を削除
     missing = [f for f in required if not body.get(f)]
     if missing:
         return create_response(400, {"message": f"Missing fields: {missing}"}, origin)
 
     email = body["email"]
     password = body["password"]
-    family_name = body["family_name"]
-    given_name = body["given_name"]
-    role = body.get("role", "user") # デフォルトをuserに
+    role = body.get("role", "user")
 
     # 部署情報の整形
     departments = body.get("departments", {})
-    departments["COMMON"] = "共通" # 強制付与
+    departments["COMMON"] = "共通"
 
     # タイムスタンプ生成 (ISO8601形式で統一)
     now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
@@ -60,16 +58,10 @@ def handle(event, ctx):
             UserAttributes=[
                 {"Name": "email", "Value": email},
                 {"Name": "email_verified", "Value": "true"},
-                {"Name": "family_name", "Value": family_name},
-                {"Name": "given_name", "Value": given_name},
                 {"Name": "custom:tenant_id", "Value": tenant_id},
-            ],
-            MessageAction="SUPPRESS" # ウェルカムメールを抑制（後で別途送る場合など）
+            ],  # ← 変更: family_name, given_name を削除
+            MessageAction="SUPPRESS"
         )
-
-        # Cognito が発行した一意の ID (sub) を取得
-        attributes = response.get("User", {}).get("Attributes", [])
-        user_id = next(attr["Value"] for attr in attributes if attr["Name"] == "sub")
 
         # 2. パスワードを永続設定
         cognito.admin_set_user_password(
@@ -79,26 +71,23 @@ def handle(event, ctx):
             Permanent=True
         )
 
-        # 3. DynamoDB に登録（監査項目とバージョンを追加）
+        # 3. DynamoDB に登録（キー: tenant_id + email）
         user_item = {
             "tenant_id": tenant_id,
-            "user_id": user_id,
-            "email": email,
-            "family_name": family_name,
-            "given_name": given_name,
+            "email": email,  # ← 変更: user_id を削除、email がキー
             "departments": departments,
             "role": role,
             "status": "ACTIVE",
-            "version": 1,                      # 初期バージョン
+            "version": 1,
             "created_at": now_iso,
             "updated_at": now_iso,
-            "status_changed_at": now_iso,      # ステータス変更日時
-            "status_changed_by": caller_user_id # 作成した管理者のID
+            "status_changed_at": now_iso,
+            "status_changed_by": caller_email  # ← 変更
         }
 
         tenant_user_master_table.put_item(Item=user_item)
 
-        logger.info(f"ユーザー作成完了: {email} ({user_id})", action_category="EXECUTE")
+        logger.info(f"ユーザー作成完了: {email}", action_category="EXECUTE")
         return create_response(201, {
             "message": "User created successfully",
             "user": user_item

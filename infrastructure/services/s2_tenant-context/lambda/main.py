@@ -70,15 +70,15 @@ def validate_session(event: APIGatewayProxyEventV2) -> Optional[dict]:
 
     try:
         table = dynamodb.Table(SESSION_TABLE)
-        response = table.get_item(Key={'session_id': hashed_id})  # ★ 修正
+        response = table.get_item(Key={'session_id': hashed_id})
         session = response.get('Item')
 
         if not session:
-            logger.warning(f"Session not found")
+            logger.warning("Session not found")
             return None
 
         if int(session.get("expires_at", 0)) < int(time.time()):
-            logger.warning(f"Session expired for user: {session.get('user_id')}")
+            logger.warning(f"Session expired for user: {session.get('email')}")  # ← ここだけ変更
             return None
 
         return session
@@ -141,15 +141,22 @@ def build_tree(flat_items: list) -> list:
 @event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
-    # ヘッダー取得（正規化）
-    req_headers = {k.lower(): v for k, v in event.headers.items()}
-    origin = req_headers.get('origin', '')
+    # ✅ 修正1: event.get → event.raw_event.get
+    # ✅ 修正2: headers → raw_headers（変数名統一）
+    raw_headers = {k.lower(): v for k, v in event.raw_event.get("headers", {}).items()}
+    expected = os.environ.get("ORIGIN_VERIFY_SECRET")
+
+    if expected and raw_headers.get("x-origin-verify") != expected:
+        return {"statusCode": 403, "body": "Forbidden"}
+
+    # ✅ 修正3: req_headers → raw_headers に統一
+    origin = raw_headers.get('origin', '')
     cors_headers = get_cors_headers(origin)
 
     try:
-        # 1. CSRF対策: カスタムヘッダーの存在を必須化
-        # ブラウザは他ドメインへのリクエストで勝手にカスタムヘッダーを付与できない
-        x_req = req_headers.get('x-requested-with', '')
+        # 1. CSRF対策
+        # ✅ 修正4: req_headers → raw_headers
+        x_req = raw_headers.get('x-requested-with', '')
         if x_req.lower() != 'xmlhttprequest':
             logger.error(f"CSRF protection: Invalid X-Requested-With header: {x_req}")
             return create_response(403, {"message": "Forbidden"}, cors_headers)

@@ -92,6 +92,8 @@ resource "aws_lambda_function" "this" {
       LOG_LEVEL                      = "INFO"
       SESSION_TABLE            = var.session_table_name
       COOKIE_SAME_SITE  = "Lax"
+      ORIGIN_VERIFY_SECRET          = var.origin_verify_secret
+
     }
   }
 
@@ -117,7 +119,9 @@ resource "aws_apigatewayv2_route" "get_master" {
   api_id    = var.api_gateway_id
   route_key = "GET /construction-master"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "NONE"
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
+
 }
 # ─────────────────────────────
 # 3. 権限設定 (AGWからLambda起動許可)

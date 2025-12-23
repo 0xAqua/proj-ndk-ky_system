@@ -179,10 +179,8 @@ def handle_post(event, session, origin):
         logger.info(f"Generated prompt length: {len(input_message)}")
 
         tenant_id = session.get('tenant_id')
-        user_id = session.get('user_id')
-        family_name = session.get('family_name', '')
-        given_name = session.get('given_name', '')
-        logger.append_keys(tenant_id=tenant_id, user_id=user_id)
+        email = session.get('email')  # ← 変更
+        logger.append_keys(tenant_id=tenant_id, email=email)  # ← 変更
 
         # 1. VQ API 認証
         creds = get_vq_credentials(tenant_id)
@@ -216,14 +214,12 @@ def handle_post(event, session, origin):
         table.put_item(Item={
             'job_id': job_id,
             'tenant_id': tenant_id,
-            'user_id': user_id,
-            'family_name': family_name,
-            'given_name': given_name,
+            'email': email,  # ← 変更（user_id, family_name, given_name を削除）
             'tid': tid,
             'mid': mid,
             'input_message': input_message,
             'type_names': input_data.get('typeNames', []),
-            'process_names': input_data.get('processNames', []),  # ★ 追加
+            'process_names': input_data.get('processNames', []),
             'equipments': input_data.get('equipments', []),
             'environment_items': input_data.get('environmentItems', []),
             'status': 'PENDING',
@@ -275,12 +271,17 @@ def handle_get(event, session, origin):
 @event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
-    origin = event.headers.get('origin', '')
+    raw_headers = {k.lower(): v for k, v in event.raw_event.get("headers", {}).items()}
+    expected = os.environ.get("ORIGIN_VERIFY_SECRET")
+
+    if expected and raw_headers.get("x-origin-verify") != expected:
+        return {"statusCode": 403, "body": "Forbidden"}
+
+    origin = raw_headers.get('origin', '')  # ← raw_headers を使う
 
     # 1. CSRFチェック
-    if (event.headers.get('x-requested-with') or '').lower() != 'xmlhttprequest':
+    if raw_headers.get('x-requested-with', '').lower() != 'xmlhttprequest':
         return create_response(403, {"error": "Forbidden"}, origin)
-
     # 2. セッション認証
     session = get_session(event)
     if not session:

@@ -97,8 +97,7 @@ def filter_and_transform_job(item: dict) -> dict | None:
     return {
         "job_id": item.get("job_id"),
         "created_at": item.get("created_at"),
-        "family_name": item.get("family_name"),
-        "given_name": item.get("given_name"),
+        "email": item.get("email"),  # ← 変更
         "type_names": item.get("type_names", []),
         "fact_incident_count": fact_count,
         "ai_incident_count": ai_count,
@@ -168,7 +167,13 @@ def get_job_reply_only(job_id: str, tenant_id: str) -> dict | None:
 @event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
-    origin = event.headers.get('origin', '')
+    raw_headers = {k.lower(): v for k, v in event.raw_event.get("headers", {}).items()}
+    expected = os.environ.get("ORIGIN_VERIFY_SECRET")
+
+    if expected and raw_headers.get("x-origin-verify") != expected:
+        return {"statusCode": 403, "body": "Forbidden"}
+
+    origin = event.headers.get('origin', '')  # ← これはOK
 
     # 1) CSRF対策チェック
     x_req = (event.headers.get('x-requested-with') or event.headers.get('X-Requested-With') or '').lower()

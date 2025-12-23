@@ -136,6 +136,8 @@ def lambda_handler(event: dict, context: LambdaContext):
     method = event.get('requestContext', {}).get('http', {}).get('method', '')
     path = event.get('rawPath', '')
     headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
+    logger.info(f"DEBUG - Path: {path}, Method: {method}")
+    logger.info(f"DEBUG - All headers: {headers}")
     origin = headers.get('origin', '')
     cors_headers = get_cors_headers(origin)
 
@@ -203,11 +205,9 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
         tokens = resp['AuthenticationResult']
         user_info = decode_id_token(tokens['IdToken'])
 
-        user_id = user_info.get('sub')
-        tenant_id = user_info.get('custom:tenant_id', 'UNKNOWN')
+        # emailをユーザー識別子として使用
         email = user_info.get('email', '')
-        family_name = user_info.get('family_name', '')
-        given_name = user_info.get('given_name', '')
+        tenant_id = user_info.get('custom:tenant_id', 'UNKNOWN')
         source_ip = event.get('requestContext', {}).get('http', {}).get('sourceIp', 'unknown')
 
         # 現在時刻 (ISO8601形式: ユーザーマスタ用)
@@ -215,17 +215,14 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
 
         # ──────────────────────────────────────────────────────────
         # 2. ユーザーマスタの同期 & 最新Role取得
+        #    キー: tenant_id + email
         # ──────────────────────────────────────────────────────────
         try:
-            # ログイン日時、IP、ステータスを更新しつつ、最新のrole属性を取得
             master_resp = user_master_table.update_item(
-                Key={'tenant_id': tenant_id, 'user_id': user_id},
+                Key={'tenant_id': tenant_id, 'email': email},
                 UpdateExpression="""
                     SET last_login_at = :now, 
                         last_login_ip = :ip, 
-                        family_name = :fn, 
-                        given_name = :gn, 
-                        email = :email,
                         #s = :status,
                         updated_at = :now
                 """,
@@ -233,9 +230,6 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
                 ExpressionAttributeValues={
                     ":now": now_iso,
                     ":ip": source_ip,
-                    ":fn": family_name,
-                    ":gn": given_name,
-                    ":email": email,
                     ":status": "ACTIVE"
                 },
                 ReturnValues="ALL_NEW"
@@ -257,22 +251,19 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
 
         session_table.put_item(Item={
             'session_id': hashed_id,
-            'user_id': user_id,
             'tenant_id': tenant_id,
-            'role': user_role,
             'email': email,
-            'family_name': family_name,
-            'given_name': given_name,
+            'role': user_role,
             'id_token': encrypt_token(tokens['IdToken']),
             'access_token': encrypt_token(tokens['AccessToken']),
             'refresh_token': encrypt_token(tokens['RefreshToken']),
             'expires_at': expires_at,
             'created_at': current_time,
-            'ttl': expires_at + 86400, # DynamoDB TTL用 (24時間余裕を持たせる)
+            'ttl': expires_at + 86400,  # DynamoDB TTL用 (24時間余裕を持たせる)
         })
 
         logger.info("Login successful", extra={
-            'user_id': user_id,
+            'email': email,
             'tenant_id': tenant_id,
             'role': user_role,
             'ip': source_ip
@@ -333,12 +324,9 @@ def handle_session_check(event: dict, cors_headers: dict) -> dict:
         return create_response(200, {
             'authenticated': True,
             'user': {
-                'id': session.get('user_id'),
+                'email': session.get('email'),
                 'tenant_id': session.get('tenant_id'),
                 'role': session.get('role'),
-                'email': session.get('email', ''),
-                'family_name': session.get('family_name', ''),
-                'given_name': session.get('given_name', ''),
             }
         }, cors_headers)
 
@@ -373,7 +361,7 @@ def handle_logout(event: dict, cors_headers: dict) -> dict:
         except Exception:
             logger.exception("Logout error")
 
-    cookie = build_cookie('sessionId', '', 0) # Cookieを即時無効化
+    cookie = build_cookie('sessionId', '', 0)  # Cookieを即時無効化
     response = create_response(200, {'success': True}, cors_headers)
     response['headers']['Set-Cookie'] = cookie
     return response

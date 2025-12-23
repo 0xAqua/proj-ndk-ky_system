@@ -6,18 +6,13 @@ resource "aws_dynamodb_table" "tenant_user_master" {
   billing_mode = "PAY_PER_REQUEST"
 
   # パーティションキー: テナントID (隔離用)
-  # ソートキー: ユーザーID (Cognitoの sub/UUID)
+  # ソートキー: メールアドレス (ユーザー識別子)
   hash_key  = "tenant_id"
-  range_key = "user_id"
+  range_key = "email"  # ← 変更
 
   # インデックス（検索軸）に使用する属性のみ定義
   attribute {
     name = "tenant_id"
-    type = "S"
-  }
-
-  attribute {
-    name = "user_id"
     type = "S"
   }
 
@@ -32,8 +27,8 @@ resource "aws_dynamodb_table" "tenant_user_master" {
   }
 
   # -----------------------------------------------------------
-  # GSI 1: メールアドレスでのユーザー特定
-  # 用途: ログイン時の重複チェック、メールアドレス検索
+  # GSI 1: メールアドレスでのユーザー特定（テナント横断検索用）
+  # 用途: 全テナント横断でのメールアドレス重複チェック
   # -----------------------------------------------------------
   global_secondary_index {
     name            = "EmailIndex"

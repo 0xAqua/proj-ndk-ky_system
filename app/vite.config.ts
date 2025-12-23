@@ -12,10 +12,9 @@ export default defineConfig({
     server: {
         proxy: {
             '/api/v1': {
-                target: 'https://ucjr9phbdb.execute-api.ap-northeast-1.amazonaws.com/',
+                target: 'https://dva6z8o3zz0h8.cloudfront.net',
                 changeOrigin: true,
                 secure: true,
-                rewrite: (path) => path.replace(/^\/api\/v1/, ''),
             },
         },
     },

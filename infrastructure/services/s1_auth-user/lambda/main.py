@@ -17,8 +17,8 @@ tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
 TABLE_NAME = os.environ.get("TENANT_USER_MASTER_TABLE_NAME")
-SESSION_TABLE = os.environ.get("SESSION_TABLE")  # ★追加: セッションテーブル
-ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",")  # ★追加: CORS用
+SESSION_TABLE = os.environ.get("SESSION_TABLE")
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",")
 
 
 def create_response(status_code: int, body: dict, cors_headers: dict = None) -> dict:
@@ -66,8 +66,8 @@ def get_session(session_id: str) -> dict | None:
 
     try:
         session_table = dynamodb.Table(SESSION_TABLE)
-        hashed_id = hash_session_id(session_id)  # ← 追加
-        response = session_table.get_item(Key={"session_id": hashed_id})  # ← 修正
+        hashed_id = hash_session_id(session_id)
+        response = session_table.get_item(Key={"session_id": hashed_id})
         item = response.get("Item")
 
         # 期限チェック
@@ -79,27 +79,25 @@ def get_session(session_id: str) -> dict | None:
         return None
 
 
-def decode_id_token(id_token: str) -> dict:
-    """IDトークンからユーザー情報を取得"""
-    try:
-        payload = id_token.split(".")[1]
-        payload += "=" * (4 - len(payload) % 4)
-        decoded = base64.b64decode(payload)
-        return json.loads(decoded)
-    except Exception as e:
-        logger.error("トークンデコードエラー", error=str(e))
-        return {}
-
-
 @tracer.capture_lambda_handler
 @event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
+    # CloudFront経由かチェック
+    raw_headers = {k.lower(): v for k, v in event.raw_event.get("headers", {}).items()}
+    expected = os.environ.get("ORIGIN_VERIFY_SECRET")
 
-    # ★ CORS用ヘッダー取得
-    headers = {k.lower(): v for k, v in event.raw_event.get("headers", {}).items()}
-    origin = headers.get("origin", "")
+    if expected and raw_headers.get("x-origin-verify") != expected:
+        logger.warning("不正なアクセス: Origin Verify失敗")
+        return {"statusCode": 403, "body": "Forbidden"}
+
+    # CORS用ヘッダー取得
+    origin = raw_headers.get("origin", "")
     cors_headers = get_cors_headers(origin)
+
+    x_req = raw_headers.get('x-requested-with', '')
+    if x_req.lower() != 'xmlhttprequest':
+        return create_response(403, {"message": "Forbidden"}, cors_headers)
 
     # 1. 環境変数のチェック
     if not TABLE_NAME:
@@ -110,38 +108,38 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
         logger.error("環境変数 'SESSION_TABLE' が設定されていません")
         return create_response(500, {"message": "Server configuration error"}, cors_headers)
 
-    # 2. ★修正: CookieからセッションIDを取得
+    # 2. CookieからセッションIDを取得
     session_id = get_session_from_cookie(event)
     if not session_id:
         logger.warning("セッションIDがありません")
         return create_response(401, {"message": "認証が必要です"}, cors_headers)
 
-    # 3. ★修正: DynamoDBからセッション情報を取得
+    # 3. DynamoDBからセッション情報を取得
     session = get_session(session_id)
     if not session:
         logger.warning("セッションが無効または期限切れです", session_id=session_id[:8])
         return create_response(401, {"message": "セッションが無効です"}, cors_headers)
 
-    # 4. ★修正: セッションからユーザー情報を取得
+    # 4. セッションからユーザー情報を取得（emailベース）
     tenant_id = session.get("tenant_id")
-    user_id = session.get("user_id")
+    email = session.get("email")
 
     # ログにテナントID等を付与
-    logger.append_keys(tenant_id=tenant_id, user_id=user_id)
+    logger.append_keys(tenant_id=tenant_id, email=email)
 
-    if not tenant_id or not user_id:
-        logger.warning("セッションにtenant_idまたはuser_idがありません")
+    if not tenant_id or not email:
+        logger.warning("セッションにtenant_idまたはemailがありません")
         return create_response(400, {"message": "Invalid session data"}, cors_headers)
 
     logger.info("テナントユーザー情報を取得します", action_category="EXECUTE")
 
-    # 5. DynamoDBからテナントユーザー情報を取得
+    # 5. DynamoDBからテナントユーザー情報を取得（キー: tenant_id + email）
     try:
         table = dynamodb.Table(TABLE_NAME)
         response = table.get_item(
             Key={
                 "tenant_id": tenant_id,
-                "user_id": user_id,
+                "email": email,
             }
         )
     except ClientError:
@@ -156,12 +154,12 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
 
     logger.info("テナントユーザー情報を取得しました", action_category="EXECUTE")
 
-    # 3. レスポンスボディの構築（必要なものだけに絞り込む）
+    # レスポンスボディの構築
     response_body = {
         "tenantId": tenant_id,
-        "userId": user_id,
+        "email": email,
         "tenantUser": {
-            "departments": user_item.get("departments", {}), # 必須データ
+            "departments": user_item.get("departments", {}),
             "role": user_item.get("role"),
             "status": user_item.get("status")
         }

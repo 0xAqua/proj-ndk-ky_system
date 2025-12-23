@@ -20,10 +20,10 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
     }
 
 @tracer.capture_method
-def handle(event, ctx, user_id):
+def handle(event, ctx, email):  # ← 変更
     """ユーザー更新 (Cognito + DynamoDB 同期)"""
     tenant_id = ctx["tenant_id"]
-    caller_user_id = ctx["caller_user_id"] # 操作を行った管理者のID
+    caller_email = ctx["caller_email"]  # ← 変更
     origin = ctx.get("origin", "*")
 
     try:
@@ -36,33 +36,19 @@ def handle(event, ctx, user_id):
 
     # タイムスタンプ生成
     now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-    logger.info(f"ユーザー更新処理開始: {user_id}")
+    logger.info(f"ユーザー更新処理開始: {email}")
 
     try:
-        # 1. 現在のデータを取得（Cognito連携に必要な情報の確認）
+        # 1. 現在のデータを取得
         existing_resp = tenant_user_master_table.get_item(
-            Key={"tenant_id": tenant_id, "user_id": user_id}
+            Key={"tenant_id": tenant_id, "email": email}  # ← 変更
         )
         existing = existing_resp.get("Item")
 
         if not existing:
             return create_response(404, {"message": "User not found"}, origin)
 
-        email = existing["email"]
-
-        # 2. Cognito 属性の更新 (氏名変更がある場合)
-        cognito_attrs = []
-        if "given_name" in body:
-            cognito_attrs.append({"Name": "given_name", "Value": body["given_name"]})
-        if "family_name" in body:
-            cognito_attrs.append({"Name": "family_name", "Value": body["family_name"]})
-
-        if cognito_attrs:
-            cognito.admin_update_user_attributes(
-                UserPoolId=USER_POOL_ID, Username=email, UserAttributes=cognito_attrs
-            )
-
-        # 3. Cognito ステータス制御 (有効化・無効化)
+        # 2. Cognito ステータス制御 (有効化・無効化)
         if "status" in body:
             new_status = body["status"]
             if new_status in ["INACTIVE", "LOCKED"]:
@@ -70,18 +56,17 @@ def handle(event, ctx, user_id):
             elif new_status == "ACTIVE":
                 cognito.admin_enable_user(UserPoolId=USER_POOL_ID, Username=email)
 
-        # 4. DynamoDB 更新クエリの組み立て
-        # versionが未定義の場合を考慮して if_not_exists を使用
+        # 3. DynamoDB 更新クエリの組み立て
         update_expr_parts = ["updated_at = :now", "version = if_not_exists(version, :zero) + :inc"]
         expr_names = {}
         expr_values = {
             ":now": now_iso,
             ":inc": 1,
-            ":zero": 0  # 初期値用
+            ":zero": 0
         }
 
-        # 更新を許可するフィールドのループ
-        allowed_fields = ["family_name", "given_name", "departments", "role", "status"]
+        # 更新を許可するフィールド（family_name, given_name を削除）
+        allowed_fields = ["departments", "role", "status"]  # ← 変更
         for field in allowed_fields:
             if field in body:
                 update_expr_parts.append(f"#{field} = :{field}")
@@ -92,18 +77,18 @@ def handle(event, ctx, user_id):
                 if field == "status":
                     update_expr_parts.append("status_changed_at = :now")
                     update_expr_parts.append("status_changed_by = :by")
-                    expr_values[":by"] = caller_user_id
+                    expr_values[":by"] = caller_email  # ← 変更
 
         # クエリ実行
         tenant_user_master_table.update_item(
-            Key={"tenant_id": tenant_id, "user_id": user_id},
-            UpdateExpression="SET " + ", ".join(update_expr_parts), # SET をここで結合
+            Key={"tenant_id": tenant_id, "email": email},  # ← 変更
+            UpdateExpression="SET " + ", ".join(update_expr_parts),
             ExpressionAttributeNames=expr_names,
             ExpressionAttributeValues=expr_values,
-            ConditionExpression="attribute_exists(user_id)"
+            ConditionExpression="attribute_exists(email)"  # ← 変更
         )
 
-        logger.info(f"ユーザー更新完了: {user_id}")
+        logger.info(f"ユーザー更新完了: {email}")
         return create_response(200, {"message": "User updated successfully"}, origin)
 
     except cognito.exceptions.UserNotFoundException:

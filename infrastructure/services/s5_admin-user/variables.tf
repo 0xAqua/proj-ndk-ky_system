@@ -34,6 +34,13 @@ variable "tenant_user_master_table_name" {
   type        = string
 }
 
+variable "origin_verify_secret" {
+  description = "Secret to verify CloudFront origin"
+  type        = string
+  sensitive   = true
+}
+
+
 variable "tenant_user_master_table_arn" {
   description = "DynamoDB tenant user master table ARN"
   type        = string

@@ -6,7 +6,7 @@ resource "aws_dynamodb_table" "access_history" {
   # Key Schema
   # ─────────────────────────────
   hash_key  = "timestamp"
-  range_key = "user_id"
+  range_key = "email"  # ← 変更
 
   # ─────────────────────────────
   # Attribute Definitions
@@ -17,7 +17,7 @@ resource "aws_dynamodb_table" "access_history" {
   }
 
   attribute {
-    name = "user_id"
+    name = "email"  # ← 変更
     type = "S"
   }
 
@@ -49,7 +49,8 @@ resource "aws_dynamodb_table" "access_history" {
 # 保存する属性（参考用コメント）
 # ─────────────────────────────
 # timestamp   : N  - いつ（UNIXミリ秒）※PK
-# user_id     : S  - 誰が ※SK
+# email       : S  - 誰が ※SK
+# tenant_id   : S  - テナントID
 # action      : S  - LOGIN / LOGOUT / TOKEN_REFRESH / LOGIN_FAILED
 # source_ip   : S  - どこから
 # user_agent  : S  - 何で（ブラウザ/モバイル）

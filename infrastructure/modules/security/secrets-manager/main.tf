@@ -20,6 +20,26 @@ resource "aws_secretsmanager_secret" "vq_credentials" {
 }
 
 # ─────────────────────────────
+# CloudFront Origin Verify シークレット
+# (ここでの定義だけを残します)
+# ─────────────────────────────
+resource "random_password" "origin_verify" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "origin_verify" {
+  name                    = "${var.name_prefix}/cloudfront-origin-verify"
+  description             = "Secret header value to verify requests come from CloudFront"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "origin_verify" {
+  secret_id     = aws_secretsmanager_secret.origin_verify.id
+  secret_string = random_password.origin_verify.result
+}
+
+# ─────────────────────────────
 # 初期値（ダミーJSON）の投入
 # ─────────────────────────────
 resource "aws_secretsmanager_secret_version" "initial_version" {
@@ -41,7 +61,19 @@ resource "aws_secretsmanager_secret_version" "initial_version" {
   }
 }
 
+# ─────────────────────────────
+# Outputs
+# ─────────────────────────────
 output "vq_secret_arn" {
   description = "The ARN of the VQ credentials secret"
   value       = aws_secretsmanager_secret.vq_credentials.arn
+}
+
+output "origin_verify_secret_arn" {
+  value = aws_secretsmanager_secret.origin_verify.arn
+}
+
+output "origin_verify_secret_value" {
+  value     = random_password.origin_verify.result
+  sensitive = true
 }

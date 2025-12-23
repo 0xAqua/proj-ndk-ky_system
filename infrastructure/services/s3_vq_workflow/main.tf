@@ -196,6 +196,8 @@ resource "aws_lambda_function" "producer" {
       CALLBACK_URL     = "${var.api_endpoint}/webhook"
       SESSION_TABLE    = var.session_table_name
       COOKIE_SAME_SITE  = "Lax"
+      ORIGIN_VERIFY_SECRET          = var.origin_verify_secret
+
     }
   }
 
@@ -276,7 +278,8 @@ resource "aws_apigatewayv2_route" "post_job" {
   route_key          = "POST /jobs"
   target             = "integrations/${aws_apigatewayv2_integration.producer.id}"
 
-  authorization_type = "NONE"
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
 # Route: GET /jobs/{jobId}
@@ -285,7 +288,8 @@ resource "aws_apigatewayv2_route" "get_job" {
   route_key          = "GET /jobs/{jobId}"
   target             = "integrations/${aws_apigatewayv2_integration.producer.id}"
 
-  authorization_type = "NONE"
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
 # AGWからProducer起動権限

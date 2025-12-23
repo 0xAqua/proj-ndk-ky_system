@@ -28,6 +28,7 @@ resource "aws_lambda_function" "vq_jobs" {
       LOG_LEVEL               = "INFO"
       SESSION_TABLE      = var.session_table_name
       COOKIE_SAME_SITE  = "Lax"
+
     }
   }
 
@@ -114,7 +115,8 @@ resource "aws_apigatewayv2_route" "list_jobs" {
   api_id             = var.api_gateway_id
   route_key          = "GET /vq-jobs"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "NONE"
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
 # GET /vq-jobs/{jobId}/reply リソース
@@ -122,7 +124,8 @@ resource "aws_apigatewayv2_route" "vq_job_reply" {
   api_id             = var.api_gateway_id
   route_key          = "GET /vq-jobs/{jobId}/reply"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "NONE"
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
 # Lambda Integration

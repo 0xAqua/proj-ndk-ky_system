@@ -98,6 +98,9 @@ module "s1_auth_user" {
 
   # ★追加
   allowed_origins = local.allowed_origins_string
+  origin_verify_secret = module.secrets.origin_verify_secret_value
+
+  authorizer_id = module.api_gateway.authorizer_id
 }
 # ─────────────────────────────
 # 6-2. バックエンドサービス (S2 Tenant Context)
@@ -121,6 +124,11 @@ module "s2_tenant_context" {
 
   session_table_name = module.dynamodb.auth_sessions_table_name
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
+
+  origin_verify_secret = module.secrets.origin_verify_secret_value
+
+
+
 }
 
 # ─────────────────────────────
@@ -151,6 +159,9 @@ module "s5_admin_user" {
 
   session_table_name = module.dynamodb.auth_sessions_table_name
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
+
+  origin_verify_secret = module.secrets.origin_verify_secret_value
+
 }
 
 
@@ -178,6 +189,9 @@ module "s6_vq_jobs" {
 
   session_table_name = module.dynamodb.auth_sessions_table_name
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
+
+  origin_verify_secret = module.secrets.origin_verify_secret_value
+
 }
 
 # ─────────────────────────────
@@ -206,6 +220,9 @@ module "s7_logs" {
 
   session_table_name = module.dynamodb.auth_sessions_table_name
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
+
+  origin_verify_secret = module.secrets.origin_verify_secret_value
+
 }
 
 
@@ -235,6 +252,8 @@ module "cdn" {
   # ★ドメインなし設定
   acm_certificate_arn = ""
   alias_domain        = ""
+
+  origin_verify_secret = module.secrets.origin_verify_secret_value
 }
 
 # ─────────────────────────────
@@ -328,6 +347,9 @@ module "s3_vq_workflow" {
 
   session_table_name = module.dynamodb.auth_sessions_table_name
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
+
+  origin_verify_secret = module.secrets.origin_verify_secret_value
+
 }
 
 # ─────────────────────────────

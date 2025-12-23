@@ -18,43 +18,39 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
     }
 
 @tracer.capture_method
-def handle(event, ctx, user_id):
+def handle(event, ctx, email):  # ← 変更
     """ユーザー詳細取得（DynamoDB参照）"""
     tenant_id = ctx["tenant_id"]
-    caller_user_id = ctx["caller_user_id"] # 操作者のIDもログ用に取得
+    caller_email = ctx["caller_email"]  # ← 変更
     origin = ctx.get("origin", "*")
 
-    # 監査用ログの強化
-    logger.info(f"ユーザー詳細を取得します: {user_id}", extra={
+    logger.info(f"ユーザー詳細を取得します: {email}", extra={
         "action_category": "EXECUTE",
-        "target_user_id": user_id,
-        "requested_by": caller_user_id
+        "target_email": email,  # ← 変更
+        "requested_by": caller_email  # ← 変更
     })
 
     try:
         response = tenant_user_master_table.get_item(
             Key={
                 "tenant_id": tenant_id,
-                "user_id": user_id
+                "email": email  # ← 変更
             }
         )
 
         user = response.get("Item")
         if not user:
-            logger.warning(f"ユーザーが見つかりません: {user_id}", extra={"action_category": "ERROR"})
+            logger.warning(f"ユーザーが見つかりません: {email}", extra={"action_category": "ERROR"})
             return create_response(404, {"message": "User not found"}, origin)
 
-        # ──────────────────────────────────────────────────────────
-        # ★ 整合性チェック: list_users.py とルールを合わせる
-        # ──────────────────────────────────────────────────────────
-        # COMMONを除外（フロントエンドが管理・表示しないシステム用部署のため）
+        # COMMONを除外
         if "departments" in user:
             user["departments"] = {
                 k: v for k, v in user["departments"].items()
                 if k != "COMMON"
             }
 
-        logger.info(f"ユーザー情報取得完了: {user_id}", extra={"action_category": "EXECUTE"})
+        logger.info(f"ユーザー情報取得完了: {email}", extra={"action_category": "EXECUTE"})
 
         return create_response(200, {"user": user}, origin)
 

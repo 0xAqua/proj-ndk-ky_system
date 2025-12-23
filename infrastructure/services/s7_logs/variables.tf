@@ -72,3 +72,8 @@ variable "session_table_arn" {
   type        = string
 }
 
+variable "origin_verify_secret" {
+  description = "Secret to verify CloudFront origin"
+  type        = string
+  sensitive   = true
+}

@@ -31,6 +31,8 @@ resource "aws_lambda_function" "logs" {
       SESSION_TABLE             = var.session_table_name
       POWERTOOLS_SERVICE_NAME   = "LogsService"
       COOKIE_SAME_SITE  = "Lax"
+      ORIGIN_VERIFY_SECRET          = var.origin_verify_secret
+
     }
   }
   kms_key_arn = var.lambda_kms_key_arn
@@ -126,7 +128,8 @@ resource "aws_apigatewayv2_route" "execution_logs" {
   api_id             = var.api_gateway_id
   route_key          = "GET /logs/execution"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "NONE"
+  # authorization_type = "JWT"
+  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
 # GET /logs/operation リソース (後で有効化)
@@ -134,7 +137,8 @@ resource "aws_apigatewayv2_route" "execution_logs" {
 #   api_id             = var.api_gateway_id
 #   route_key          = "GET /logs/operation"
 #   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-#   authorization_type = "NONE"
+# authorization_type = "JWT"
+# authorizer_id      = var.authorizer_id  # ← 追加
 # }
 
 # GET /logs/access リソース (後で有効化)
@@ -142,7 +146,8 @@ resource "aws_apigatewayv2_route" "execution_logs" {
 #   api_id             = var.api_gateway_id
 #   route_key          = "GET /logs/access"
 #   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-#   authorization_type = "NONE"
+# authorization_type = "JWT"
+# authorizer_id      = var.authorizer_id  # ← 追加
 
 # }
 
