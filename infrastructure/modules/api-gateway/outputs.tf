@@ -17,3 +17,8 @@ output "api_endpoint" {
   description = "The API Gateway Endpoint URL"
   value       = aws_apigatewayv2_api.this.api_endpoint
 }
+
+output "origin_verify_authorizer_id" {
+  description = "Origin Verify Lambda Authorizer ID"
+  value       = aws_apigatewayv2_authorizer.origin_verify.id
+}

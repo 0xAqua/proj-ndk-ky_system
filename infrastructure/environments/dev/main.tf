@@ -63,14 +63,13 @@ module "dynamodb" {
 module "api_gateway" {
   source = "../../modules/api-gateway"
 
-  allowed_origins = [
-    "http://localhost:3000"
-  ]
+  allowed_origins = []
 
   name_prefix         = "${local.project}-${local.environment}"
   region              = local.region
   user_pool_id        = module.auth.user_pool_id
   user_pool_client_id = module.auth.user_pool_client_id
+  origin_verify_secret = module.secrets.origin_verify_secret_value  # ← これだけでOK
 }
 
 # ─────────────────────────────
@@ -104,6 +103,9 @@ module "s1_auth_user" {
   construction_master_table_name = module.dynamodb.tenant_construction_master_table_name
   construction_master_table_arn  = module.dynamodb.tenant_construction_master_table_arn
 
+  origin_verify_authorizer_id = module.api_gateway.origin_verify_authorizer_id
+
+
 }
 
 # ─────────────────────────────
@@ -136,6 +138,8 @@ module "s5_admin_user" {
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
 
   origin_verify_secret = module.secrets.origin_verify_secret_value
+  origin_verify_authorizer_id = module.api_gateway.origin_verify_authorizer_id
+
 
 }
 
@@ -166,6 +170,7 @@ module "s6_vq_jobs" {
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
 
   origin_verify_secret = module.secrets.origin_verify_secret_value
+  origin_verify_authorizer_id = module.api_gateway.origin_verify_authorizer_id
 
 }
 
@@ -189,6 +194,7 @@ module "s7_logs" {
   api_gateway_id            = module.api_gateway.api_id
   api_gateway_execution_arn = module.api_gateway.api_execution_arn
   authorizer_id             = module.api_gateway.authorizer_id
+  origin_verify_authorizer_id = module.api_gateway.origin_verify_authorizer_id
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
@@ -308,6 +314,7 @@ module "s3_vq_workflow" {
   api_gateway_id            = module.api_gateway.api_id
   api_gateway_execution_arn = module.api_gateway.api_execution_arn
   authorizer_id             = module.api_gateway.authorizer_id
+  origin_verify_authorizer_id = module.api_gateway.origin_verify_authorizer_id
 
   # ★追加: シークレット情報を渡す
   vq_secret_arn = module.secrets.vq_secret_arn
@@ -465,6 +472,7 @@ module "bff_auth" {
   # API Gateway
   api_gateway_id            = module.api_gateway.api_id
   api_gateway_execution_arn = module.api_gateway.api_execution_arn
+  origin_verify_authorizer_id = module.api_gateway.origin_verify_authorizer_id
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn

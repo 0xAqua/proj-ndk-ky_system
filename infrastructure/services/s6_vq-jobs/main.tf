@@ -115,8 +115,8 @@ resource "aws_apigatewayv2_route" "list_jobs" {
   api_id             = var.api_gateway_id
   route_key          = "GET /vq-jobs"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 # GET /vq-jobs/{jobId}/reply リソース
@@ -124,9 +124,10 @@ resource "aws_apigatewayv2_route" "vq_job_reply" {
   api_id             = var.api_gateway_id
   route_key          = "GET /vq-jobs/{jobId}/reply"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
+
 
 # Lambda Integration
 resource "aws_apigatewayv2_integration" "lambda" {

@@ -57,3 +57,7 @@ variable "kms_key_id" {
   description = "KMS key ID for token encryption"
   type        = string
 }
+
+variable "origin_verify_authorizer_id" {
+  type = string
+}

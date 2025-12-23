@@ -129,6 +129,9 @@ resource "aws_apigatewayv2_route" "get_auth_context" {
   api_id    = var.api_gateway_id
   route_key = "GET /auth-context" # 名前を機能に合わせたものに
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 # ─────────────────────────────

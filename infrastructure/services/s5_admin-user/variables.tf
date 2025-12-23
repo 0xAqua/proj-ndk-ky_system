@@ -81,3 +81,7 @@ variable "session_table_arn" {
   description = "ARN of the DynamoDB table for sessions"
   type        = string
 }
+
+variable "origin_verify_authorizer_id" {
+  type = string
+}

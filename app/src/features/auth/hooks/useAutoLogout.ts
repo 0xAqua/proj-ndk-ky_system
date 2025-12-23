@@ -2,31 +2,38 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 
-const TIMEOUT_MS = 15 * 60 * 1000;
+const TIMEOUT_MS = 15 * 60 * 1000; // 15分
+const CHECK_INTERVAL = 10 * 1000;  // 10秒ごとにチェック
 
 export const useAutoLogout = () => {
     const { logout, isAuthenticated } = useAuth();
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastActivityRef = useRef<number>(Date.now());
 
     const resetTimer = useCallback(() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        // ログインしていない場合はタイマーを回さない
-        if (!isAuthenticated) return;
-
-        timerRef.current = setTimeout(logout, TIMEOUT_MS);
-    }, [logout, isAuthenticated]);
+        lastActivityRef.current = Date.now();
+    }, []);
 
     useEffect(() => {
         if (!isAuthenticated) return;
 
+        // ユーザー操作を検知
         const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
         events.forEach((event) => window.addEventListener(event, resetTimer));
 
+        // 定期的に経過時間をチェック（スリープ復帰対策）
+        const intervalId = setInterval(() => {
+            const elapsed = Date.now() - lastActivityRef.current;
+            if (elapsed > TIMEOUT_MS) {
+                void logout();
+            }
+        }, CHECK_INTERVAL);
+
+        // 初期化
         resetTimer();
 
         return () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
+            clearInterval(intervalId);
             events.forEach((event) => window.removeEventListener(event, resetTimer));
         };
-    }, [resetTimer, isAuthenticated]);
+    }, [resetTimer, isAuthenticated, logout]);
 };

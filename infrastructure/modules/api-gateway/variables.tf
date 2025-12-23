@@ -18,3 +18,8 @@ variable "throttling_rate_limit" {
   default     = 20
 }
 
+variable "origin_verify_secret" {
+  description = "CloudFront Origin Verify Secret"
+  type        = string
+  sensitive   = true
+}

@@ -278,8 +278,8 @@ resource "aws_apigatewayv2_route" "post_job" {
   route_key          = "POST /jobs"
   target             = "integrations/${aws_apigatewayv2_integration.producer.id}"
 
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 # Route: GET /jobs/{jobId}
@@ -288,8 +288,8 @@ resource "aws_apigatewayv2_route" "get_job" {
   route_key          = "GET /jobs/{jobId}"
   target             = "integrations/${aws_apigatewayv2_integration.producer.id}"
 
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 # AGWからProducer起動権限

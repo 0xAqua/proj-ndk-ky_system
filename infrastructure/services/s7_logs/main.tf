@@ -128,8 +128,8 @@ resource "aws_apigatewayv2_route" "execution_logs" {
   api_id             = var.api_gateway_id
   route_key          = "GET /logs/execution"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 # GET /logs/operation リソース (後で有効化)

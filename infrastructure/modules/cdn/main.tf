@@ -158,6 +158,12 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
+  logging_config {
+    include_cookies = false  # ← Cookie は含めない（セキュリティ）
+    bucket          = aws_s3_bucket.cloudfront_logs.bucket_domain_name
+    prefix          = "cloudfront/"
+  }
+
   restrictions {
     geo_restriction {
       restriction_type = "whitelist"  # ← "none" から変更

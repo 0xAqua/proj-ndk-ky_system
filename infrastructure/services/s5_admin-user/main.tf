@@ -155,17 +155,16 @@ resource "aws_apigatewayv2_route" "list_users" {
   api_id             = var.api_gateway_id
   route_key          = "GET /admin/users"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
-
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 resource "aws_apigatewayv2_route" "create_user" {
   api_id             = var.api_gateway_id
   route_key          = "POST /admin/users"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 # /admin/users/{email} リソース
@@ -173,24 +172,24 @@ resource "aws_apigatewayv2_route" "get_user" {
   api_id             = var.api_gateway_id
   route_key          = "GET /admin/users/{email+}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 resource "aws_apigatewayv2_route" "update_user" {
   api_id             = var.api_gateway_id
   route_key          = "PATCH /admin/users/{email+}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 resource "aws_apigatewayv2_route" "delete_user" {
   api_id             = var.api_gateway_id
   route_key          = "DELETE /admin/users/{email+}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 # Lambda Integration

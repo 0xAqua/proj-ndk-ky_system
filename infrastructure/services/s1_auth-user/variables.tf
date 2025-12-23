@@ -64,3 +64,7 @@ variable "construction_master_table_arn" {
   description = "工事マスタのDynamoDBテーブルARN (IAM用)"
   type        = string
 }
+
+variable "origin_verify_authorizer_id" {
+  type = string
+}

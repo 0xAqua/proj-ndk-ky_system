@@ -59,3 +59,7 @@ variable "origin_verify_secret" {
   type        = string
   sensitive   = true
 }
+
+variable "origin_verify_authorizer_id" {
+  type = string
+}

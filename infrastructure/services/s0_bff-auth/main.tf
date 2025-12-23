@@ -127,6 +127,7 @@ resource "aws_lambda_function" "bff_auth" {
       POWERTOOLS_SERVICE_NAME  = "BFFAuth"
       POWERTOOLS_LOG_LEVEL     = "INFO"
       COOKIE_SAME_SITE  = "Lax"
+      SESSION_TTL_SECONDS      = "3600"
     }
   }
 }
@@ -150,6 +151,9 @@ resource "aws_apigatewayv2_route" "routes" {
   api_id    = var.api_gateway_id
   route_key = each.key
   target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"
+
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 resource "aws_lambda_permission" "api_gateway" {
