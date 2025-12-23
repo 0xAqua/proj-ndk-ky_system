@@ -192,13 +192,11 @@ resource "aws_cognito_risk_configuration" "this" {
 
   # アダプティブ認証（リスクベース）
   account_takeover_risk_configuration {
-    # SES設定後に通知を有効化（ses_source_arnがnullの場合はスキップ）
+    # SES設定後に通知を有効化
     dynamic "notify_configuration" {
       for_each = var.ses_source_arn != null ? [1] : []
       content {
-        source_arn             = var.ses_source_arn
-        from_email_address     = var.ses_from_email
-        reply_to_email_address = var.ses_reply_to_email
+        source_arn = var.ses_source_arn
       }
     }
 
@@ -209,16 +207,15 @@ resource "aws_cognito_risk_configuration" "this" {
       }
       medium_action {
         event_action = "MFA_IF_CONFIGURED"
-        notify       = var.ses_source_arn != null  # SES未設定時はfalse
+        notify       = var.ses_source_arn != null
       }
       high_action {
         event_action = "MFA_REQUIRED"
-        notify       = var.ses_source_arn != null  # SES未設定時はfalse
+        notify       = var.ses_source_arn != null
       }
     }
   }
 }
-
 
 resource "aws_cloudwatch_log_group" "cognito_user_activity" {
   name              = "/aws/cognito/${local.name_prefix}-user-pool/user-activity"
