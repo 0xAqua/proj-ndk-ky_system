@@ -5,7 +5,7 @@ export const ENDPOINTS = {
         SESSION: '/bff/auth/session',
         REFRESH: '/bff/auth/refresh',
     },
-    ME: '/me',
+    AUTH_CONTEXT: '/auth-context',
     JOBS: {
         LIST: '/jobs',
         DETAIL: (id: string) => `/jobs/${id}`,

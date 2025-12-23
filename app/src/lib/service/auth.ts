@@ -1,21 +1,22 @@
 import { api } from '@/lib/client';
 import { ENDPOINTS } from '@/lib/endpoints';
 
-// セッション情報の型を定義（セキュリティと開発効率のため）
+// セッション情報の型を定義
 export interface UserInfo {
-    id: string;
-    tenant_id: string; // ログに合わせて修正
-    role: string;      // ログに合わせて修正
-    email: string;
-    family_name?: string;
-    given_name?: string;
-    // 恐らくネスト部分も snake_case になっている可能性が高いです
+    email: string;      // ← 識別子
+    tenant_id: string;
+    role: string;
+    // tenant_user 情報（/me エンドポイントから取得）
     tenant_user?: {
         departments: Record<string, string>;
+        role: string;
+        status: string;
     };
-    // 万が一 camelCase で送られてくる場合の両対応
+    // camelCase 対応（念のため）
     tenantUser?: {
         departments: Record<string, string>;
+        role: string;
+        status: string;
     };
 }
 
@@ -45,8 +46,8 @@ export const authService = {
         return data;
     },
 
-    getMe: async () => {
-        const { data } = await api.get(ENDPOINTS.ME);
-        return data; // { tenantId, tenantUser: { departments... } }
-    }
+    getAuthContext: async () => {
+        const response = await api.get(ENDPOINTS.AUTH_CONTEXT);
+        return response.data;
+    },
 };

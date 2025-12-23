@@ -2,7 +2,6 @@
 # 0. ローカル変数
 # ─────────────────────────────
 locals {
-  # Lambda のソースコードディレクトリ（main.py / requirements.txt が置いてある場所）
   lambda_src_dir = "${path.module}/lambda"
 }
 
@@ -10,7 +9,7 @@ locals {
 # 1. IAM Role & Lambda Function
 # ─────────────────────────────
 
-# Lambda 用 AssumeRole ポリシー
+# AssumeRole 設定
 data "aws_iam_policy_document" "assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -26,7 +25,7 @@ resource "aws_iam_role" "this" {
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
-# 基本ポリシー + X-Ray
+# 基本ポリシー (Logs + X-Ray)
 resource "aws_iam_role_policy_attachment" "basic" {
   role       = aws_iam_role.this.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -37,17 +36,32 @@ resource "aws_iam_role_policy_attachment" "xray" {
   policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
 }
 
-# DynamoDB 読み取り権限
+# ★重要: DynamoDB 読み取り権限 (1つに統合)
 data "aws_iam_policy_document" "dynamodb_read" {
+  # ユーザーマスタ取得用
   statement {
     effect    = "Allow"
     actions   = ["dynamodb:GetItem"]
     resources = [var.tenant_user_master_table_arn]
   }
+
+  # 工事マスタ取得用 (Query必須)
+  statement {
+    effect    = "Allow"
+    actions   = ["dynamodb:Query"]
+    resources = [var.construction_master_table_arn]
+  }
+
+  # セッション取得用 (GetItem)
+  statement {
+    effect    = "Allow"
+    actions   = ["dynamodb:GetItem"]
+    resources = [var.session_table_arn]
+  }
 }
 
 resource "aws_iam_role_policy" "dynamodb_read" {
-  name   = "dynamodb-read-access"
+  name   = "dynamodb-combined-access" # 名前を重複しないものに
   role   = aws_iam_role.this.id
   policy = data.aws_iam_policy_document.dynamodb_read.json
 }
@@ -61,7 +75,6 @@ data "archive_file" "lambda_zip" {
   source_dir  = local.lambda_src_dir
   output_path = "${path.module}/lambda_payload.zip"
   excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
-
 }
 
 resource "aws_lambda_function" "this" {
@@ -85,24 +98,23 @@ resource "aws_lambda_function" "this" {
 
   environment {
     variables = {
-      TENANT_USER_MASTER_TABLE_NAME = var.tenant_user_master_table_name
-      POWERTOOLS_SERVICE_NAME       = "AuthUserContext"
-      LOG_LEVEL                     = "INFO"
-      SESSION_TABLE            = var.session_table_name
-      COOKIE_SAME_SITE  = "Lax"
-      ORIGIN_VERIFY_SECRET          = var.origin_verify_secret
+      TENANT_USER_MASTER_TABLE_NAME  = var.tenant_user_master_table_name
+      CONSTRUCTION_MASTER_TABLE_NAME = var.construction_master_table_name
+      SESSION_TABLE                  = var.session_table_name
+      POWERTOOLS_SERVICE_NAME        = "AuthUserContext"
+      LOG_LEVEL                      = "INFO"
+      COOKIE_SAME_SITE               = "Lax"
+      ORIGIN_VERIFY_SECRET           = var.origin_verify_secret
     }
   }
 
   tracing_config {
     mode = "Active"
   }
-
-  # ★削除: テナント分離モード設定は削除済み
 }
 
 # ─────────────────────────────
-# 2. ルーティング設定 (共通AGWへ追加)
+# 2. ルーティング設定
 # ─────────────────────────────
 resource "aws_apigatewayv2_integration" "lambda" {
   api_id                = var.api_gateway_id
@@ -113,18 +125,14 @@ resource "aws_apigatewayv2_integration" "lambda" {
   payload_format_version = "2.0"
 }
 
-resource "aws_apigatewayv2_route" "get_me" {
+resource "aws_apigatewayv2_route" "get_auth_context" {
   api_id    = var.api_gateway_id
-  route_key = "GET /me" # APIのパス定義
+  route_key = "GET /auth-context" # 名前を機能に合わせたものに
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-
-  # authorization_type = "JWT"
-  # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
-
 # ─────────────────────────────
-# 3. 権限設定 (AGWからLambda起動許可)
+# 3. 権限・ログ設定 (KMSなど)
 # ─────────────────────────────
 resource "aws_lambda_permission" "apigw" {
   statement_id  = "AllowExecutionFromAPIGateway"
@@ -134,15 +142,11 @@ resource "aws_lambda_permission" "apigw" {
   source_arn    = "${var.api_gateway_execution_arn}/*/*"
 }
 
-# ─────────────────────────────
-# 4. CloudWatch Log Group (ログ管理)
-# ─────────────────────────────
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/aws/lambda/${var.name_prefix}"
   retention_in_days = 30
 }
 
-# KMS 復号権限
 data "aws_iam_policy_document" "kms_decrypt" {
   statement {
     effect    = "Allow"
@@ -155,22 +159,4 @@ resource "aws_iam_role_policy" "kms_decrypt" {
   name   = "kms-decrypt-access"
   role   = aws_iam_role.this.id
   policy = data.aws_iam_policy_document.kms_decrypt.json
-}
-
-resource "aws_iam_role_policy" "session_table_access" {
-  name = "${var.name_prefix}-session-access"
-  role = aws_iam_role.this.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "dynamodb:GetItem"
-        ]
-        Effect   = "Allow"
-        Resource = var.session_table_arn
-      }
-    ]
-  })
 }

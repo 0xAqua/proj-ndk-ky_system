@@ -1,6 +1,43 @@
 #!/bin/bash
+#
+# ./deploy_frontend.sh sandbox
+# ./deploy_frontend.sh dev
+#
+set -e  # エラーが出たら即終了
 
-set -e  # エラーが出たら即終了（安全）
+# ─────────────────────────────
+# 引数チェック
+# ─────────────────────────────
+if [ -z "$1" ]; then
+    echo "Usage: $0 <env>"
+    echo "  env: dev | sandbox"
+    exit 1
+fi
+
+ENV=$1
+
+# ─────────────────────────────
+# 環境別設定
+# ─────────────────────────────
+case "$ENV" in
+    dev)
+        S3_BUCKET="ndk-ky-system-dev-frontend"
+        CLOUDFRONT_DISTRIBUTION_ID="E1BDOGL14486L1"
+        BUILD_MODE="dev"
+        ;;
+    sandbox)
+        S3_BUCKET="ndk-ky-system-sandbox-frontend"
+        CLOUDFRONT_DISTRIBUTION_ID="E3B1F00C3MN2SE"
+        BUILD_MODE="sandbox"
+        ;;
+    *)
+        echo "Error: Unknown environment '$ENV'"
+        echo "  Available: dev | sandbox"
+        exit 1
+        ;;
+esac
+
+PROFILE="proj-ndk-ky"
 
 # ─────────────────────────────
 # パス設定
@@ -11,18 +48,21 @@ APP_DIR="$PROJECT_ROOT/app"
 BUILD_DIR="$APP_DIR/dist"
 
 # ─────────────────────────────
-# 設定（必要ならここだけ変えればOK）
+# 確認表示
 # ─────────────────────────────
-S3_BUCKET="ndk-ky-system-dev-frontend"
-CLOUDFRONT_DISTRIBUTION_ID="E1BDOGL14486L1"
-PROFILE="proj-ndk-ky"
+echo "=== Deploy Frontend ==="
+echo "Environment: $ENV"
+echo "S3 Bucket: $S3_BUCKET"
+echo "CloudFront: $CLOUDFRONT_DISTRIBUTION_ID"
+echo "Build Mode: $BUILD_MODE"
+echo ""
 
 # ─────────────────────────────
 # ビルド
 # ─────────────────────────────
-echo "=== Building React app ==="
+echo "=== Building React app (mode: $BUILD_MODE) ==="
 cd "$APP_DIR"
-npm run build
+npm run build:$BUILD_MODE
 echo "✓ Build complete"
 
 # ─────────────────────────────
@@ -47,9 +87,8 @@ echo "✓ Cache invalidation started"
 # ─────────────────────────────
 # 完了表示
 # ─────────────────────────────
-CLOUDFRONT_DOMAIN="${CLOUDFRONT_DISTRIBUTION_ID}.cloudfront.net"
 echo ""
-echo "Done!  🚀"
-echo "Frontend deployed to:"
-echo "👉 https://${CLOUDFRONT_DOMAIN}"
+echo "Done! 🚀"
+echo "Environment: $ENV"
+echo "Frontend deployed to S3: $S3_BUCKET"
 echo ""

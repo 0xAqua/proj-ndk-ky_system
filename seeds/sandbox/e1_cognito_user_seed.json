@@ -1,0 +1,26 @@
+[
+  {
+    "email": "yazama.takako@ndisol.com",
+    "password": "Ky#Yzm_8472!",
+    "tenant_id": "tenant-001"
+
+  },
+  {
+    "email": "suzuki.kousuke@ndisol.com",
+    "password": "Ky#Szk_3691!",
+    "tenant_id": "tenant-001"
+
+  },
+  {
+    "email": "ogura.ayaka@ndisol.com",
+    "password": "Ky#Ogr_5284!",
+    "tenant_id": "tenant-001"
+
+  },
+  {
+    "email": "tsuji.kodai@ndisol.com",
+    "password": "Ky#Tsj_7139!",
+    "tenant_id": "tenant-001"
+
+  }
+]

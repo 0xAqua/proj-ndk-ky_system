@@ -53,3 +53,14 @@ variable "origin_verify_secret" {
   type        = string
   sensitive   = true
 }
+
+# --- 追加分: 工事マスタ関連 ---
+variable "construction_master_table_name" {
+  description = "工事マスタのDynamoDBテーブル名"
+  type        = string
+}
+
+variable "construction_master_table_arn" {
+  description = "工事マスタのDynamoDBテーブルARN (IAM用)"
+  type        = string
+}

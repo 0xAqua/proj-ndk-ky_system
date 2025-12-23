@@ -1,3 +1,4 @@
+// src/components/layout/Header.tsx
 import { Box, Flex, Text, Image, HStack, Separator } from "@chakra-ui/react";
 import { LuLogOut, LuChevronDown } from "react-icons/lu";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -12,12 +13,12 @@ import {
 } from "@/components/ui/menu.tsx";
 
 export const Header = () => {
-    // 1. useAuthから必要な情報をすべて取り出す（APIリクエストはキャッシュから返される）
-    const { logout, user } = useAuth();
+    // 1. useAuthから直接 email や role を取り出す
+    // Storeを介さず、キャッシュから最新のユーザー情報が取得されます
+    const { logout, email, role } = useAuth();
 
-    // 2. 表示名の判定ロジック
-    const displayEmail = user?.email || "";
-    const displayName = user?.name || user?.family_name || user?.given_name || user?.email || "ユーザー";
+    // 2. 表示名の判定（emailを優先し、なければ「ユーザー」）
+    const displayName = email || "ユーザー";
 
     return (
         <Box
@@ -36,7 +37,7 @@ export const Header = () => {
             zIndex="sticky"
         >
             <Flex justify="space-between" align="center" position="relative" h="32px">
-                <Box /> {/* 左側のスペース保持 */}
+                <Box />
 
                 {/* 中央：ロゴとタイトル */}
                 <HStack align="center" gap={3} flex="1" justify="center" overflow="hidden">
@@ -72,19 +73,24 @@ export const Header = () => {
                         <Box px={3} py={2}>
                             <Text fontSize="xs" color="gray.500">ログイン中</Text>
                             <Text fontSize="sm" fontWeight="medium" truncate>
-                                {displayEmail || "---"}
+                                {email || "---"}
                             </Text>
+                            {/* 必要に応じてロールも表示可能 */}
+                            {role && (
+                                <Text fontSize="10px" color="blue.600" fontWeight="bold">
+                                    {role.toUpperCase()}
+                                </Text>
+                            )}
                         </Box>
 
                         <Separator />
 
-                        {/* 先ほどuseAuthで定義したセキュアなlogout関数を呼び出す */}
                         <MenuItem
                             value="logout"
                             color="red.600"
                             _hover={{ bg: "red.50", color: "red.700" }}
                             onClick={(e) => {
-                                e.preventDefault(); // 明示的に止める
+                                e.preventDefault();
                                 void logout();
                             }}
                             gap={2}

@@ -1,7 +1,6 @@
+// src/hooks/useConstructionMaster.ts
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/features/auth/hooks/useAuth"; // useUserStoreではなくuseAuthを使う
-import { constructionService } from "@/lib/service/construction";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
 export type ConstructionTask = { id: string; title: string; };
 export type SafetyEquipment = { id: string; title: string; is_high_risk: boolean; };
@@ -18,89 +17,74 @@ export type ProcessCategory = {
     children?: ProcessCategory[];
 };
 
+/**
+ * 統合版初期化APIから返された工事マスタデータを、
+ * アプリケーションのUI構造（ProcessCategory型）に整形するフック
+ */
 export const useConstructionMaster = () => {
-    const { user } = useAuth();
+    // 1. 統合されたマスタデータを useAuth から直接取得
+    // すでにバックエンドで部署フィルタリング済みのツリーが降ってきます
+    const { constructionMaster, isLoading, error } = useAuth();
 
-    const myDeptNames = useMemo(() => {
-        // snake_case と camelCase 両方をチェックする安全なアクセス
-        const depts = user?.tenant_user?.departments || user?.tenantUser?.departments;
-
-        if (!depts) {return [];
-        }
-
-        const values = Object.values(depts);
-        return values;
-    }, [user]);
-
-    const { data: rawTree, isLoading, isError, error } = useQuery({
-        queryKey: ['constructionMaster'],
-        queryFn: constructionService.getMaster,
-        staleTime: 1000 * 60 * 60,
-        placeholderData: (previousData) => previousData,
-    });
-
-    // 4. データ整形ロジック
+    // 2. データ整形ロジック
     const { constructions, environments } = useMemo(() => {
-        // 部署名が取得できていない、またはマスタデータがない場合は空を返す
-        if (!rawTree || myDeptNames.length === 0) {
-            return { constructions: [], environments: [] };
-        }
-
         const tempConstructions: ProcessCategory[] = [];
         const tempEnvironments: ProcessCategory[] = [];
 
-        rawTree.forEach((rootNode: any) => {
-            // A. 環境系データ (IDが ENV で始まる)
-            if (rootNode.id.startsWith("ENV")) {
-                const envCategory: ProcessCategory = {
-                    id: rootNode.id,
-                    name: rootNode.title,
+        if (!constructionMaster || constructionMaster.length === 0) {
+            return { constructions: [], environments: [] };
+        }
+
+        constructionMaster.forEach((node: any) => {
+            // A. 環境系データ (IDが ENV で始まる場合)
+            if (node.id.startsWith("ENV")) {
+                tempEnvironments.push({
+                    id: node.id,
+                    name: node.title,
                     processes: [],
-                    children: rootNode.children?.map((mid: any) => ({
+                    children: node.children?.map((mid: any) => ({
                         id: mid.id,
                         name: mid.title,
                         processes: mid.children?.map((item: any) => ({
                             id: item.id,
                             label: item.title,
-                            tasks: [],
-                            safety_equipments: []
+                            tasks: item.tasks || [],
+                            safety_equipments: item.safety_equipments || []
                         })) || []
                     })) || []
-                };
-                tempEnvironments.push(envCategory);
+                });
                 return;
             }
 
-            // B. 工事系データ：APIの rootNode.title (例: 'ネットワーク') が
-            // 自分の所属部署名 (myDeptNames) に含まれているかチェック
-            if (myDeptNames.includes(rootNode.title)) {
-                rootNode.children?.forEach((typeNode: any) => {
-                    const processes = typeNode.children?.map((projNode: any) => ({
-                        id: projNode.id,
-                        label: projNode.title,
-                        tasks: projNode.tasks || [],
-                        safety_equipments: projNode.safety_equipments || []
-                    })) || [];
+            // B. 工事系データ
+            // バックエンドで部署ごとにツリー化されているため、
+            // ルートノード（部署名）の直下にある「工種(typeNode)」をカテゴリとして扱う
+            node.children?.forEach((typeNode: any) => {
+                const processes = typeNode.children?.map((projNode: any) => ({
+                    id: projNode.id,
+                    label: projNode.title,
+                    tasks: projNode.tasks || [],
+                    safety_equipments: projNode.safety_equipments || []
+                })) || [];
 
-                    if (processes.length > 0) {
-                        tempConstructions.push({
-                            id: typeNode.id,
-                            name: typeNode.title,
-                            processes: processes
-                        });
-                    }
-                });
-            }
+                if (processes.length > 0) {
+                    tempConstructions.push({
+                        id: typeNode.id,
+                        name: typeNode.title,
+                        processes: processes
+                    });
+                }
+            });
         });
 
         return { constructions: tempConstructions, environments: tempEnvironments };
 
-    }, [rawTree, myDeptNames]); // 依存配列に myDeptNames を指定
+    }, [constructionMaster]);
 
     return {
         constructions,
         environments,
         isLoading,
-        error: isError ? (error as Error).message : null,
+        error,
     };
 };

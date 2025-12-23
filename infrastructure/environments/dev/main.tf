@@ -101,33 +101,8 @@ module "s1_auth_user" {
   origin_verify_secret = module.secrets.origin_verify_secret_value
 
   authorizer_id = module.api_gateway.authorizer_id
-}
-# ─────────────────────────────
-# 6-2. バックエンドサービス (S2 Tenant Context)
-# ─────────────────────────────
-module "s2_tenant_context" {
-  source = "../../services/s2_tenant-context"
-
-  name_prefix = "${local.project}-${local.environment}-s2-context"
-
-  # DB情報 (DynamoDBモジュールのoutputsに追加されている前提)
   construction_master_table_name = module.dynamodb.tenant_construction_master_table_name
   construction_master_table_arn  = module.dynamodb.tenant_construction_master_table_arn
-
-  # AGW情報 (共通)
-  api_gateway_id            = module.api_gateway.api_id
-  api_gateway_execution_arn = module.api_gateway.api_execution_arn
-  authorizer_id             = module.api_gateway.authorizer_id
-
-  # KMS
-  lambda_kms_key_arn = module.kms.lambda_key_arn
-
-  session_table_name = module.dynamodb.auth_sessions_table_name
-  session_table_arn  = module.dynamodb.auth_sessions_table_arn
-
-  origin_verify_secret = module.secrets.origin_verify_secret_value
-
-
 
 }
 
