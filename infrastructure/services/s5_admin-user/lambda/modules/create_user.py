@@ -43,7 +43,7 @@ def handle(event, ctx):
 
     # 部署情報の整形
     departments = body.get("departments", {})
-    departments["COMMON"] = "共通"
+    departments["DEPT#1"] = "共通"
 
     # タイムスタンプ生成 (ISO8601形式で統一)
     now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')

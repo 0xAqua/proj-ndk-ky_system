@@ -4,7 +4,6 @@ import {
     Button,
     Field,
     HStack,
-    Input,
     Stack,
     Text,
     Badge,
@@ -20,7 +19,7 @@ import {
     DialogHeader,
     DialogRoot,
     DialogTitle,
-} from "@/components/ui/dialog"; // Chakra v3 Snippets
+} from "@/components/ui/dialog";
 import type { User } from "../types/types";
 
 type Props = {
@@ -34,12 +33,10 @@ export const UserEditModal = ({ user, open, onOpenChange, onSave }: Props) => {
     const [formData, setFormData] = useState<Partial<User>>({});
     const [loading, setLoading] = useState(false);
 
-    // モーダルが開いた時に初期値をセット
+    // モーダルが開いた時に初期値をセット（名前関連を削除）
     useEffect(() => {
         if (user) {
             setFormData({
-                family_name: user.family_name,
-                given_name: user.given_name,
                 role: user.role,
                 status: user.status,
                 departments: { ...user.departments },
@@ -51,9 +48,12 @@ export const UserEditModal = ({ user, open, onOpenChange, onSave }: Props) => {
 
     const handleSave = async () => {
         setLoading(true);
-        await onSave(user.user_id, formData);
-        setLoading(false);
-        onOpenChange(false);
+        try {
+            await onSave(user.email, formData);
+            onOpenChange(false);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -66,44 +66,31 @@ export const UserEditModal = ({ user, open, onOpenChange, onSave }: Props) => {
             <Portal>
                 <DialogContent borderRadius="xl" boxShadow="2xl">
                     <DialogHeader borderBottomWidth="1px" borderColor="gray.100" pb={4}>
-                        <DialogTitle fontSize="lg">ユーザー情報の編集</DialogTitle>
+                        <DialogTitle fontSize="lg">ユーザー権限・状態の編集</DialogTitle>
                         <Text fontSize="xs" color="gray.500" mt={1}>
-                            ID: {user.user_id}
+                            ID: {user.email}
                         </Text>
                     </DialogHeader>
 
                     <DialogBody py={6}>
                         <Stack gap={6}>
-                            {/* 基本情報（編集不可のコンテキスト） */}
-                            <Box p={3} bg="gray.50" borderRadius="md" borderLeft="4px solid" borderColor="blue.400">
+                            {/* 基本情報（表示のみ） */}
+                            <Box p={4} bg="gray.50" borderRadius="md" borderLeft="4px solid" borderColor="purple.500">
                                 <Text fontSize="xs" color="gray.500" fontWeight="bold" mb={1}>対象アカウント</Text>
-                                <Text fontWeight="bold" fontSize="md">{user.family_name} {user.given_name}</Text>
-                                <Text fontSize="sm" color="gray.600">{user.email}</Text>
+                                <Text fontWeight="bold" fontSize="md" color="gray.800">
+                                    {user.email}
+                                </Text>
                             </Box>
 
-                            {/* 名前編集 */}
-                            <HStack gap={4}>
-                                <Field.Root>
-                                    <Field.Label fontSize="sm">姓</Field.Label>
-                                    <Input
-                                        value={formData.family_name || ""}
-                                        onChange={(e) => setFormData({ ...formData, family_name: e.target.value })}
-                                    />
-                                </Field.Root>
-                                <Field.Root>
-                                    <Field.Label fontSize="sm">名</Field.Label>
-                                    <Input
-                                        value={formData.given_name || ""}
-                                        onChange={(e) => setFormData({ ...formData, given_name: e.target.value })}
-                                    />
-                                </Field.Root>
-                            </HStack>
+                            {/* 名前編集フィールドは完全に削除しました */}
 
-                            {/* 権限設定（現在の設定を表示） */}
+                            {/* 権限設定 */}
                             <Field.Root>
                                 <HStack justify="space-between" mb={1}>
                                     <Field.Label fontSize="sm" mb={0}>権限ロール</Field.Label>
-                                    <Badge size="sm" variant="subtle">現在: {user.role === "admin" ? "管理者" : "一般"}</Badge>
+                                    <Badge size="sm" variant="subtle" colorPalette="purple">
+                                        現在: {user.role === "admin" ? "管理者" : "一般"}
+                                    </Badge>
                                 </HStack>
                                 <NativeSelect.Root>
                                     <NativeSelect.Field
@@ -116,7 +103,7 @@ export const UserEditModal = ({ user, open, onOpenChange, onSave }: Props) => {
                                 </NativeSelect.Root>
                             </Field.Root>
 
-                            {/* ステータス設定（現在の設定を表示） */}
+                            {/* ステータス設定 */}
                             <Field.Root>
                                 <HStack justify="space-between" mb={1}>
                                     <Field.Label fontSize="sm" mb={0}>アカウント状態</Field.Label>
@@ -137,7 +124,9 @@ export const UserEditModal = ({ user, open, onOpenChange, onSave }: Props) => {
                                         <option value="LOCKED">ロック (Locked)</option>
                                     </NativeSelect.Field>
                                 </NativeSelect.Root>
-                                <Field.HelperText fontSize="xs">無効にするとBFF経由の全アクセスが遮断されます</Field.HelperText>
+                                <Field.HelperText fontSize="xs">
+                                    無効にするとシステムへのログインができなくなります
+                                </Field.HelperText>
                             </Field.Root>
                         </Stack>
                     </DialogBody>

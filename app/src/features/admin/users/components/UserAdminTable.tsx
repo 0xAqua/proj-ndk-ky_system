@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import {
-    Box,
     Flex,
     Text,
     Table,
@@ -20,10 +19,10 @@ import {
 import { Avatar } from "@/components/ui/avatar";
 import type { User } from "@/features/admin/users/types/types";
 import { UserEditModal } from "@/features/admin/users/components/UserEditModal";
+import { DeleteConfirmDialog } from "@/features/admin/users/components/DeleteConfirmDialog"; // ★追加
 import { useUpdateUser, useDeleteUser } from "@/features/admin/users/hooks/useAdminUsers";
 
 // --- サブコンポーネント ---
-
 const StatusBadge = ({ status }: { status: string }) => {
     const config: Record<string, { color: string; label: string }> = {
         ACTIVE: { color: "green", label: "有効" },
@@ -44,9 +43,7 @@ const RoleBadge = ({ role }: { role: string }) => {
 };
 
 const LastLoginDisplay = ({ date }: { date?: string }) => {
-    if (!date) {
-        return <Badge variant="subtle" colorPalette="orange" size="sm">未ログイン</Badge>;
-    }
+    if (!date) return <Badge variant="subtle" colorPalette="orange" size="sm">未ログイン</Badge>;
     return (
         <Text fontSize="sm" color="gray.600">
             {new Date(date).toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" })}
@@ -54,29 +51,31 @@ const LastLoginDisplay = ({ date }: { date?: string }) => {
     );
 };
 
-type Props = {
-    users: User[];
-    onDeleteClick: (userId: string, email: string) => void;
-};
-
 const ITEMS_PER_PAGE = 20;
 
-export const UserAdminTable = ({ users }: Props) => {
-    const [currentPage, setCurrentPage] = useState(1);
+type UserAdminTableProps = {
+    users: User[];
+    onEditClick?: (user: User) => void;   // 親で何か処理したい場合（任意）
+    onDeleteClick?: (email: string) => void; // 親で何か処理したい場合（任意）
+};
 
-    // --- 追加: モーダル・更新・削除用の状態管理 ---
+// 引数に onDeleteClick を追加
+export const UserAdminTable = ({ users, onEditClick, onDeleteClick }: UserAdminTableProps) => {
+
+   const [currentPage, setCurrentPage] = useState(1);
+
+    // モーダル・ダイアログの状態管理
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
     const updateMutation = useUpdateUser();
     const deleteMutation = useDeleteUser();
 
-    // ページネーション制御
+    // ページネーション計算
     const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
     useEffect(() => {
-        if (currentPage > totalPages && totalPages > 0) {
-            setCurrentPage(1);
-        }
+        if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
     }, [users.length, totalPages, currentPage]);
 
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -84,34 +83,39 @@ export const UserAdminTable = ({ users }: Props) => {
     const rangeStart = users.length === 0 ? 0 : startIndex + 1;
     const rangeEnd = Math.min(startIndex + ITEMS_PER_PAGE, users.length);
 
-    // --- ハンドラー ---
     const handlePrev = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
     const handleNext = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages));
 
+    // --- 各操作のハンドラー ---
     const handleEditClick = (user: User) => {
         setSelectedUser(user);
         setIsEditOpen(true);
+        onEditClick?.(user);
     };
 
-    const handleDeleteClick = async (user: User) => {
-        if (window.confirm(`${user.family_name} ${user.given_name} (${user.email}) を削除しますか？`)) {
-            await deleteMutation.mutateAsync(user.user_id);
+    const handleDeleteClick = (user: User) => {
+        setSelectedUser(user); // 削除対象をセット
+        setIsDeleteOpen(true); // ダイアログを開く
+        onDeleteClick?.(user.email);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (selectedUser) {
+            await deleteMutation.mutateAsync(selectedUser.email);
+            setIsDeleteOpen(false);
         }
     };
 
-    const handleSave = async (userId: string, data: Partial<User>) => {
-        // 更新APIを呼び出し。成功すると自動的に一覧が再取得されます。
-        await updateMutation.mutateAsync({ userId, data });
+    const handleSave = async (email: string, data: Partial<User>) => {
+        await updateMutation.mutateAsync({ email: email, data });
     };
-
-    const getFullName = (user: User) => `${user.family_name} ${user.given_name}`;
 
     return (
         <>
             <Table.Root size="md" interactive>
                 <Table.Header bg="gray.50">
                     <Table.Row>
-                        <Table.ColumnHeader py={4}>名前 / メール</Table.ColumnHeader>
+                        <Table.ColumnHeader py={4}>メールアドレス</Table.ColumnHeader>
                         <Table.ColumnHeader>所属部署</Table.ColumnHeader>
                         <Table.ColumnHeader textAlign="center">権限</Table.ColumnHeader>
                         <Table.ColumnHeader textAlign="center">ステータス</Table.ColumnHeader>
@@ -128,20 +132,18 @@ export const UserAdminTable = ({ users }: Props) => {
                         </Table.Row>
                     ) : (
                         currentUsers.map((user) => (
-                            <Table.Row key={user.user_id} _hover={{ bg: "gray.50/50" }}>
+                            // ★ key を email に変更 (Warning 対策)
+                            <Table.Row key={user.email} _hover={{ bg: "gray.50/50" }}>
                                 <Table.Cell>
                                     <HStack gap={3}>
-                                        <Avatar size="sm" name={getFullName(user)} />
-                                        <Box>
-                                            <Text fontWeight="bold" fontSize="sm">{getFullName(user)}</Text>
-                                            <Text fontSize="xs" color="gray.500">{user.email}</Text>
-                                        </Box>
+                                        <Avatar size="sm" name={user.email} />
+                                        <Text fontWeight="bold" fontSize="sm">{user.email}</Text>
                                     </HStack>
                                 </Table.Cell>
 
                                 <Table.Cell>
                                     <Flex gap={2} wrap="wrap">
-                                        {Object.values(user.departments).length > 0 ? (
+                                        {user.departments && Object.values(user.departments).length > 0 ? (
                                             Object.values(user.departments).map((name) => (
                                                 <Badge key={name} colorPalette="gray" variant="surface" size="xs">
                                                     {name}
@@ -166,7 +168,6 @@ export const UserAdminTable = ({ users }: Props) => {
                                         </Menu.Trigger>
                                         <Menu.Positioner>
                                             <Menu.Content minW="140px">
-                                                {/* 編集ハンドラーを紐付け */}
                                                 <Menu.Item value="edit" onClick={() => handleEditClick(user)}>
                                                     <PiPencilSimple /> 編集
                                                 </Menu.Item>
@@ -203,12 +204,20 @@ export const UserAdminTable = ({ users }: Props) => {
                 )}
             </Flex>
 
-            {/* --- 編集モーダルの呼び出し --- */}
+            {/* 編集モーダル */}
             <UserEditModal
                 user={selectedUser}
                 open={isEditOpen}
                 onOpenChange={setIsEditOpen}
                 onSave={handleSave}
+            />
+
+            {/* ★削除確認ダイアログ */}
+            <DeleteConfirmDialog
+                isOpen={isDeleteOpen}
+                onClose={() => setIsDeleteOpen(false)}
+                onConfirm={handleConfirmDelete}
+                email={selectedUser?.email || ""}
             />
         </>
     );

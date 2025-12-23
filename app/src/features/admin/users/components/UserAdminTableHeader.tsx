@@ -80,7 +80,7 @@ export const UserAdminTableHeader = ({ onSearch, onFilterChange }: UserAdminFilt
                             <PiMagnifyingGlass color="#A0AEC0" size={20} />
                         </Box>
                         <Input
-                            placeholder="名前やメールで検索..."
+                            placeholder="メールで検索..."
                             pl={10}
                             size="md"
                             variant="subtle"

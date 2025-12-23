@@ -20,14 +20,14 @@ export const useUsers = () => {
 };
 
 // ユーザー詳細取得
-export const useUser = (userId: string) => {
+export const useUser = (email: string) => {
     return useQuery({
-        queryKey: ["admin", "users", userId],
+        queryKey: ["admin", "users", email],
         queryFn: async () => {
-            const res = await api.get<{ user: User }>(ENDPOINTS.ADMIN.USERS.DETAIL(userId));
+            const res = await api.get<{ user: User }>(ENDPOINTS.ADMIN.USERS.DETAIL(email));
             return res.data.user;
         },
-        enabled: !!userId,
+        enabled: !!email,
     });
 };
 
@@ -46,13 +46,14 @@ export const useCreateUser = () => {
     });
 };
 
+
 // ユーザー更新
+// useAdminUsers.ts 内
 export const useUpdateUser = () => {
     const queryClient = useQueryClient();
-
     return useMutation({
-        mutationFn: async ({ userId, data }: { userId: string; data: UpdateUserInput }) => {
-            const res = await api.patch(ENDPOINTS.ADMIN.USERS.DETAIL(userId), data);
+        mutationFn: async ({ email, data }: { email: string; data: UpdateUserInput }) => {
+            const res = await api.patch(ENDPOINTS.ADMIN.USERS.DETAIL(encodeURIComponent(email)), data);
             return res.data;
         },
         onSuccess: () => {
@@ -66,8 +67,9 @@ export const useDeleteUser = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (userId: string) => {
-            const res = await api.delete(ENDPOINTS.ADMIN.USERS.DETAIL(userId));
+        mutationFn: async (email: string) => {
+            // ★ ここを encodeURIComponent で囲む
+            const res = await api.delete(ENDPOINTS.ADMIN.USERS.DETAIL(encodeURIComponent(email)));
             return res.data;
         },
         onSuccess: () => {

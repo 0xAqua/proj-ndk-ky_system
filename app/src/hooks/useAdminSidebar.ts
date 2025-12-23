@@ -1,81 +1,69 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { authService } from "@/lib/service/auth";
+// src/hooks/useAdminSidebar.ts
+import { useState } from "react";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
-const SESSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const SIDEBAR_EXPANDED_KEY = "ui_sidebar_expanded";
 
+/**
+ * 管理画面サイドバー用フック
+ * 認証状態やユーザー情報は useAuth (TanStack Query) に集約されました。
+ */
 export const useAdminSidebar = () => {
-    const navigate = useNavigate();
-    const [authState, setAuthState] = useState<"checking" | "authenticated" | "unauthenticated">("checking");
+    // 1. 統合された認証フックから情報を取得
+    // 定期的なチェックやウィンドウフォーカス時の再取得は TanStack Query が自動で行います
+    const {
+        user,
+        isAuthenticated,
+        isLoading,
+        logout: authLogout
+    } = useAuth();
+
     const [isLoggingOut, setIsLoggingOut] = useState(false);
-    const [userInfo, setUserInfo] = useState({ name: "", email: "" });
-    const [isExpanded, setIsExpanded] = useState(() => localStorage.getItem(SIDEBAR_EXPANDED_KEY) === "true");
 
-    const handleAuthFailure = useCallback(() => {
-        setAuthState("unauthenticated");
-        const returnUrl = encodeURIComponent(window.location.pathname);
-        navigate(`/login?returnUrl=${returnUrl}`, { replace: true });
-    }, [navigate]);
+    // UI状態（サイドバーの開閉）のみ自前で管理
+    const [isExpanded, setIsExpanded] = useState(() =>
+        localStorage.getItem(SIDEBAR_EXPANDED_KEY) === "true"
+    );
 
-    const verifySession = useCallback(async () => {
-        try {
-            const session = await authService.checkSession();
-            if (!session.authenticated || !session.user) return false;
-
-            const user = session.user;
-            setUserInfo({
-                name: `${user?.family_name || ""}${user?.given_name || ""}`.trim() || user?.email || "ユーザー",
-                email: user.email || "",
-            });
-            return true;
-        } catch (error) {
-            return false;
-        }
-    }, []);
-
+    // サイドバーの開閉切り替え
     const toggleExpanded = () => {
         setIsExpanded(prev => {
-            localStorage.setItem(SIDEBAR_EXPANDED_KEY, String(!prev));
-            return !prev;
+            const newState = !prev;
+            localStorage.setItem(SIDEBAR_EXPANDED_KEY, String(newState));
+            return newState;
         });
     };
 
+    // ログアウト処理
     const handleLogout = async () => {
         if (isLoggingOut) return;
         setIsLoggingOut(true);
         try {
-            await authService.logout();
+            await authLogout();
         } finally {
-            setAuthState("unauthenticated");
-            navigate("/login", { replace: true });
+            setIsLoggingOut(false);
         }
     };
 
-    // 初回・定期・可視性チェックのEffect
-    useEffect(() => {
-        const init = async () => {
-            (await verifySession()) ? setAuthState("authenticated") : handleAuthFailure();
-        };
-        void init();
-    }, [verifySession, handleAuthFailure]);
+    // 表示用ユーザー情報の整形
+    const userInfo = {
+        name: `${user?.family_name || ""}${user?.given_name || ""}`.trim() || user?.email || "ユーザー",
+        email: user?.email || "",
+    };
 
-    useEffect(() => {
-        if (authState !== "authenticated") return;
-        const interval = setInterval(async () => {
-            if (!(await verifySession())) handleAuthFailure();
-        }, SESSION_CHECK_INTERVAL_MS);
+    // 既存のUIとの互換性のためのステートマッピング
+    const authState = isLoading
+        ? "checking"
+        : isAuthenticated
+            ? "authenticated"
+            : "unauthenticated";
 
-        const handleVisibility = async () => {
-            if (document.visibilityState === "visible" && !(await verifySession())) handleAuthFailure();
-        };
-
-        document.addEventListener("visibilitychange", handleVisibility);
-        return () => {
-            clearInterval(interval);
-            document.removeEventListener("visibilitychange", handleVisibility);
-        };
-    }, [authState, verifySession, handleAuthFailure]);
-
-    return { authState, userInfo, isExpanded, isLoggingOut, toggleExpanded, handleLogout };
+    return {
+        authState,
+        userInfo,
+        isExpanded,
+        isLoggingOut,
+        toggleExpanded,
+        handleLogout
+    };
 };

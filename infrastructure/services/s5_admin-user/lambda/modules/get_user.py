@@ -43,11 +43,11 @@ def handle(event, ctx, email):  # ← 変更
             logger.warning(f"ユーザーが見つかりません: {email}", extra={"action_category": "ERROR"})
             return create_response(404, {"message": "User not found"}, origin)
 
-        # COMMONを除外
+        # 共通を除外
         if "departments" in user:
             user["departments"] = {
                 k: v for k, v in user["departments"].items()
-                if k != "COMMON"
+                if k != "DEPT#1"
             }
 
         logger.info(f"ユーザー情報取得完了: {email}", extra={"action_category": "EXECUTE"})

@@ -24,12 +24,12 @@ export const AdminSidebar = () => {
                 <SidebarHeader isExpanded={isExpanded} onToggle={toggleExpanded} />
 
                 <VStack gap={0} flex={1} w="full" align="flex-start" overflowX="hidden" mt={4}>
-                    <NavItem to="/sample" icon={PiSquaresFour} label="ダッシュボード" isExpanded={isExpanded} />
-                    <NavItem to="/users" icon={PiUsers} label="ユーザー管理" isExpanded={isExpanded} />
-                    <NavItem to="/results" icon={PiListChecks} label="結果一覧" isExpanded={isExpanded} />
-                    <NavItem to="/master" icon={PiDatabase} label="工事マスタ管理" isExpanded={isExpanded} />
-                    <NavItem to="/advanced-settings" icon={PiSparkle} label="高度な設定" isExpanded={isExpanded} />
-                    <NavItem to="/logs" icon={PiFileText} label="ログ管理" isExpanded={isExpanded} />
+                    <NavItem to="/admin/sample" icon={PiSquaresFour} label="ダッシュボード" isExpanded={isExpanded} />
+                    <NavItem to="/admin/users" icon={PiUsers} label="ユーザー管理" isExpanded={isExpanded} />
+                    <NavItem to="/admin/results" icon={PiListChecks} label="結果一覧" isExpanded={isExpanded} />
+                    <NavItem to="/admin/master" icon={PiDatabase} label="工事マスタ管理" isExpanded={isExpanded} />
+                    <NavItem to="/admin/advanced-settings" icon={PiSparkle} label="高度な設定" isExpanded={isExpanded} />
+                    <NavItem to="/admin/logs" icon={PiFileText} label="ログ管理" isExpanded={isExpanded} />
                 </VStack>
 
                 <VStack gap={0} mb={4} w="full" align="flex-start" overflowX="hidden">

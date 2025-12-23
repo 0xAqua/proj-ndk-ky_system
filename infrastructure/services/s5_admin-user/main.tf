@@ -168,10 +168,10 @@ resource "aws_apigatewayv2_route" "create_user" {
   # authorizer_id      = var.authorizer_id  # ← 追加
 }
 
-# /admin/users/{user_id} リソース
+# /admin/users/{email} リソース
 resource "aws_apigatewayv2_route" "get_user" {
   api_id             = var.api_gateway_id
-  route_key          = "GET /admin/users/{user_id}"
+  route_key          = "GET /admin/users/{email+}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
   # authorization_type = "JWT"
   # authorizer_id      = var.authorizer_id  # ← 追加
@@ -179,7 +179,7 @@ resource "aws_apigatewayv2_route" "get_user" {
 
 resource "aws_apigatewayv2_route" "update_user" {
   api_id             = var.api_gateway_id
-  route_key          = "PATCH /admin/users/{user_id}"
+  route_key          = "PATCH /admin/users/{email+}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
   # authorization_type = "JWT"
   # authorizer_id      = var.authorizer_id  # ← 追加
@@ -187,7 +187,7 @@ resource "aws_apigatewayv2_route" "update_user" {
 
 resource "aws_apigatewayv2_route" "delete_user" {
   api_id             = var.api_gateway_id
-  route_key          = "DELETE /admin/users/{user_id}"
+  route_key          = "DELETE /admin/users/{email+}"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
   # authorization_type = "JWT"
   # authorizer_id      = var.authorizer_id  # ← 追加

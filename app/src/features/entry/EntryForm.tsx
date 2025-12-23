@@ -149,9 +149,12 @@ export const EntryForm = () => {
 
     // エラー発生時
     if (error) {
+        const errorMessage = error.message;
         return (
             <Box p={10} textAlign="center">
-                <Text color="red.500" fontWeight="bold">エラーが発生しました: {error}</Text>
+                <Text color="red.500" fontWeight="bold">
+                    エラーが発生しました: {errorMessage}
+                </Text>
             </Box>
         );
     }

@@ -40,8 +40,8 @@ def handle(event, ctx):
         # 2. フロントエンドの User 型に必要な項目だけに絞り込む
         filtered_users = []
         for u in raw_users:
-            # 部署から COMMON を除外
-            deps = {k: v for k, v in u.get("departments", {}).items() if k != "COMMON"}
+            # 部署から 共通 を除外
+            deps = {k: v for k, v in u.get("departments", {}).items() if k != "DEPT#1"}
 
             # emailベースに変更
             filtered_user = {

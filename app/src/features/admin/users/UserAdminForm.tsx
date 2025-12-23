@@ -1,12 +1,10 @@
 import { useState, useMemo } from "react";
 import { Box, Container, Text } from "@chakra-ui/react";
-import { useUsers, useDeleteUser } from "@/features/admin/users/hooks/useAdminUsers";
+import { useUsers} from "@/features/admin/users/hooks/useAdminUsers";
 import { UserAdminHeader } from "@/features/admin/users/components/UserAdminHeader";
 import { UserAdminTableHeader } from "@/features/admin/users/components/UserAdminTableHeader.tsx";
 import { UserAdminTable } from "@/features/admin/users/components/UserAdminTable";
 import { UserAdminTableSkeleton } from "@/features/admin/users/components/UserAdminTableSkeleton";
-import { DeleteConfirmDialog } from "@/features/admin/users/components/DeleteConfirmDialog";
-import { useNotification } from "@/hooks/useNotification";
 import type { FilterConditions } from "@/features/admin/users/components/UserAdminFilterModal";
 import { filterAndSortUsers } from "@/features/admin/users/utils/userFilters";
 
@@ -19,18 +17,8 @@ export const UserAdminForm = () => {
         sortBy: undefined,
         sortOrder: undefined,
     });
-    const [deleteTarget, setDeleteTarget] = useState<{ id: string; email: string } | null>(null);
 
     const { data, isLoading: isQueryLoading, isError, error } = useUsers();
-    const { mutate: deleteUser } = useDeleteUser();
-    const notify = useNotification();
-
-    const handleDeleteConfirm = () => {
-        if (!deleteTarget) return;
-        deleteUser(deleteTarget.id);
-        notify.success("ユーザーを削除しました");
-        setDeleteTarget(null);
-    };
 
     const users = data?.users ?? [];
 
@@ -72,18 +60,9 @@ export const UserAdminForm = () => {
                     <UserAdminTableSkeleton />
                 ) : (
                     <UserAdminTable
-                        users={filteredAndSortedUsers}
-                        onDeleteClick={(id, email) => setDeleteTarget({ id, email })}
-                    />
+                        users={filteredAndSortedUsers}/>
                 )}
             </Box>
-
-            <DeleteConfirmDialog
-                isOpen={!!deleteTarget}
-                onClose={() => setDeleteTarget(null)}
-                onConfirm={handleDeleteConfirm}
-                email={deleteTarget?.email || ""}
-            />
         </Container>
     );
 };

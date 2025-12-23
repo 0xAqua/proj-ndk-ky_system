@@ -1,7 +1,8 @@
-import { VStack, Text, Image, Center, Spinner } from "@chakra-ui/react";
+import {VStack, Text, Image, Center, Spinner, Link} from "@chakra-ui/react";
 import logo from '@/assets/logo.jpg';
 import { useLoginForm } from "./hooks/useLoginForm.ts";
 import { CredentialsForm } from "./components/CredentialsForm.tsx";
+import { EnvBadge } from "@/components/elements/EnvBadge";
 
 // 将来使うかもしれないのでimportだけ残してコメントアウトするか、完全に消してもOKです
 // import { PasskeyPromotionModal } from "./components/PasskeyPromotionModal.tsx";
@@ -31,6 +32,8 @@ export const LoginForm = () => {
         // resendMessage        // 未使用
     } = useLoginForm();
 
+
+
     if (isCheckingSession) {
         return (
             <Center h="100vh">
@@ -46,9 +49,12 @@ export const LoginForm = () => {
 
             <VStack gap={6}>
                 <Image src={logo} alt="KY System logo" width="78px" mt="4" />
-                <Text fontSize="2xl" fontWeight="bold" mb="2" mt="2">
-                    ログイン
-                </Text>
+                <VStack>
+                    <Text fontSize="2xl" fontWeight="bold" mb="2" mt="2">
+                        ログイン
+                    </Text>
+                    <EnvBadge />
+                </VStack>
 
                 <VStack gap={1} mb="4">
                     <Text fontSize="sm" color="gray.600">
@@ -86,11 +92,11 @@ export const LoginForm = () => {
 
 
                 {/* パスワード忘れリンク */}
-                {/*<Text textAlign="left" mt={2} fontSize="sm">*/}
-                {/*    <Link color="blue.500" href="#">*/}
-                {/*        パスワードをお忘れですか？*/}
-                {/*    </Link>*/}
-                {/*</Text>*/}
+                <Text textAlign="left" mt={2} fontSize="sm">
+                    <Link color="blue.500" href="#">
+                        パスワードをお忘れですか？
+                    </Link>
+                </Text>
             </VStack>
         </>
     );

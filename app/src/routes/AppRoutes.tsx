@@ -24,11 +24,11 @@ export const AppRoutes = () => {
 
             {/* 3. 管理者(admin)専用の保護ルート */}
             <Route element={<AuthGuard allowedRoles={['admin']}><Outlet /></AuthGuard>}>
-                <Route path="/sample" element={<SamplePage />} />
-                <Route path="/advanced-settings" element={<SettingsPage />} />
-                <Route path="/users" element={<UserAdminPage />} />
-                <Route path="/results" element={<ResultListPage />} />
-                <Route path="/logs" element={<LogsPage />} />
+                <Route path="/admin/sample" element={<SamplePage />} />
+                <Route path="/admin/advanced-settings" element={<SettingsPage />} />
+                <Route path="/admin/users" element={<UserAdminPage />} />
+                <Route path="/admin/results" element={<ResultListPage />} />
+                <Route path="/admin/logs" element={<LogsPage />} />
             </Route>
 
             {/* 4. 404対策 */}
