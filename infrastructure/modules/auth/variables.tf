@@ -85,3 +85,15 @@ variable "ses_source_arn" {
   type        = string
   default     = null  # SES設定前はnullで
 }
+
+variable "ses_from_email" {
+  description = "From email address for risk notifications"
+  type        = string
+  default     = "no-reply@example.com"
+}
+
+variable "ses_reply_to_email" {
+  description = "Reply-to email address for risk notifications"
+  type        = string
+  default     = "support@example.com"
+}
