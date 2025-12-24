@@ -172,16 +172,12 @@ resource "aws_cloudfront_distribution" "this" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn      = var.acm_certificate_arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
-  # viewer_certificate {
-  #   acm_certificate_arn      = aws_acm_certificate.your_cert.arn
-  #   ssl_support_method       = "sni-only"
-  #   minimum_protocol_version = "TLSv1.2_2021"
-  # }
-  #
-  # aliases = ["your-domain.com"]
 
+  aliases = [var.alias_domain]
 }
 
 resource "aws_s3_bucket_policy" "frontend" {

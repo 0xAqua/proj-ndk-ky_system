@@ -13,15 +13,12 @@ export const filterAndSortUsers = (
 ): User[] => {
     // 1. フィルタリング
     let result = users.filter((user) => {
-        // テキスト検索
+        // テキスト検索（emailのみ）
         if (searchText) {
             const search = searchText.toLowerCase();
-            const fullName = `${user.family_name}${user.given_name}`;
-            const matchesText =
-                fullName.includes(searchText) ||
-                user.email.toLowerCase().includes(search);
-
-            if (!matchesText) return false;
+            if (!user.email.toLowerCase().includes(search)) {
+                return false;
+            }
         }
 
         // ステータスフィルター
@@ -61,21 +58,13 @@ export const filterAndSortUsers = (
  * ソート用の比較関数
  */
 const compareUsers = (a: User, b: User, sortBy: string): number => {
-    let aValue: any;
-    let bValue: any;
+    let aValue: string;
+    let bValue: string;
 
     switch (sortBy) {
-        case "name":
-            aValue = `${a.family_name}${a.given_name}`.toLowerCase();
-            bValue = `${b.family_name}${b.given_name}`.toLowerCase();
-            break;
         case "email":
             aValue = a.email.toLowerCase();
             bValue = b.email.toLowerCase();
-            break;
-        case "createdAt":
-            // aValue = new Date(a.last_login_at).getTime();
-            // bValue = new Date(b.last_login_at).getTime();
             break;
         default:
             return 0;

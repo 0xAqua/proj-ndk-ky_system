@@ -1,26 +1,4 @@
 # ─────────────────────────────
-# 1. ネットワーク・DNS基盤 (Route53)
-# ★一時的に無効化 (ドメイン未取得のため)
-# ─────────────────────────────
-# module "dns" {
-#   source           = "../../modules/dns"
-#   root_domain_name = var.root_domain
-# }
-
-# ─────────────────────────────
-# 2. SSL証明書 (ACM)
-# ★一時的に無効化
-# ─────────────────────────────
-# module "acm" {
-#   source      = "../../modules/security/acm"
-#   domain_name = var.root_domain
-#   zone_id     = module.dns.zone_id
-#   providers = {
-#     aws = aws.virginia
-#   }
-# }
-
-# ─────────────────────────────
 # 3. 認証 (Cognito)
 # ─────────────────────────────
 module "auth" {
@@ -30,12 +8,14 @@ module "auth" {
 
   callback_urls = [
     "http://localhost:3000/callback",
-    "https://${module.cdn.cloudfront_domain_name}/callback"
+    "https://${module.cdn.cloudfront_domain_name}/callback",
+    "https://kytest.weeeef.com/callback"
   ]
 
   logout_urls = [
     "http://localhost:3000",
-    "https://${module.cdn.cloudfront_domain_name}"
+    "https://${module.cdn.cloudfront_domain_name}",
+    "https://kytest.weeeef.com/callback"
   ]
 
   # Passkeyの有無
@@ -222,6 +202,15 @@ module "waf" {
 # ─────────────────────────────
 # 8. CDN (CloudFront)
 # ─────────────────────────────
+# ─────────────────────────────
+# ACM証明書（片井さんが作成したもの）を参照
+# ─────────────────────────────
+data "aws_acm_certificate" "main" {
+  provider = aws.virginia
+  domain   = "kytest.weeeef.com"
+  statuses = ["ISSUED"]
+}
+
 module "cdn" {
   source = "../../modules/cdn"
 
@@ -230,9 +219,8 @@ module "cdn" {
   api_gateway_domain = replace(module.api_gateway.api_endpoint, "/^https?://([^/]*).*/", "$1")
   web_acl_arn        = module.waf.web_acl_arn
 
-  # ★ドメインなし設定
-  acm_certificate_arn = ""
-  alias_domain        = ""
+  acm_certificate_arn  = data.aws_acm_certificate.main.arn
+  alias_domain         = "kytest.weeeef.com"
 
   origin_verify_secret = module.secrets.origin_verify_secret_value
 }
@@ -481,6 +469,7 @@ module "bff_auth" {
   # CORS設定
   allowed_origins = [
     "http://localhost:3000",
-    "https://${module.cdn.cloudfront_domain_name}"
+    "https://${module.cdn.cloudfront_domain_name}",
+    "https://kytest.weeeef.com/callback"
   ]
 }

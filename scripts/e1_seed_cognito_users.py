@@ -17,9 +17,9 @@ from botocore.exceptions import ClientError
 # ============================================
 ENV_CONFIG = {
     "dev": {
-        "user_pool_id": "ap-northeast-1_xxxxxxxxx",  # ← dev の User Pool ID
+        "user_pool_id": "ap-northeast-1_lNjGJ9BBD",  # ← dev の User Pool ID
         "profile": "proj-ndk-ky",
-        "seed_file": "seeds/dev/e1_cognito_user_seed.json",
+        "seed_file": "../seeds/dev/e1_cognito_user_seed.json",
     },
     "sandbox": {
         "user_pool_id": "ap-northeast-1_LOVQFDLSp",  # ← sandbox の User Pool ID

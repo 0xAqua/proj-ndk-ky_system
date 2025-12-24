@@ -21,13 +21,13 @@
               ],
               "equipments": [],
               "safety_equipments": [
-                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#1", "title": "絶縁用保護具", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#1", "title": "絶縁用保護具", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#2", "title": "穴掘建柱車", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#3", "title": "高所作業車", "is_high_risk": true },
-                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#4", "title": "輪止め・ジャッキベース", "is_high_risk": false },
-                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#5", "title": "梯子", "is_high_risk": false },
-                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#6", "title": "玉掛け用ワイヤ", "is_high_risk": false },
-                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#7", "title": "削岩機", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#4", "title": "輪止め・ジャッキベース", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#5", "title": "梯子", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#6", "title": "玉掛け用ワイヤ", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#7", "title": "削岩機", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#1#SEQ#8", "title": "ディスクグラインダー", "is_high_risk": true }
               ]
             },
@@ -43,14 +43,14 @@
               ],
               "equipments": [],
               "safety_equipments": [
-                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#1", "title": "絶縁用保護具", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#1", "title": "絶縁用保護具", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#2", "title": "穴掘建柱車", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#3", "title": "高所作業車", "is_high_risk": true },
-                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#4", "title": "輪止め・ジャッキベース", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#4", "title": "輪止め・ジャッキベース", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#5", "title": "抜柱機", "is_high_risk": true },
-                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#6", "title": "梯子", "is_high_risk": false },
-                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#7", "title": "玉掛け用ワイヤ", "is_high_risk": false },
-                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#8", "title": "削岩機", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#6", "title": "梯子", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#7", "title": "玉掛け用ワイヤ", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#8", "title": "削岩機", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#2#SEQ#9", "title": "ディスクグラインダー", "is_high_risk": true }
               ]
             },
@@ -63,10 +63,10 @@
               ],
               "equipments": [],
               "safety_equipments": [
-                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#1", "title": "絶縁用保護具", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#1", "title": "絶縁用保護具", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#2", "title": "高所作業車", "is_high_risk": true },
-                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#3", "title": "車輪止め・ジャッキベース", "is_high_risk": false },
-                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#4", "title": "梯子", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#3", "title": "車輪止め・ジャッキベース", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#4", "title": "梯子", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#3#SEQ#5", "title": "張線器（シメラー）", "is_high_risk": true }
               ]
             },
@@ -84,10 +84,10 @@
               ],
               "equipments": [],
               "safety_equipments": [
-                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#1", "title": "絶縁用保護具", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#1", "title": "絶縁用保護具", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#2", "title": "高所作業車", "is_high_risk": true },
-                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#3", "title": "輪止め・ジャッキベース", "is_high_risk": false },
-                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#4", "title": "梯子", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#3", "title": "輪止め・ジャッキベース", "is_high_risk": true },
+                { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#4", "title": "梯子", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#4#SEQ#5", "title": "張線器（シメラー）", "is_high_risk": true }
               ]
             },
@@ -101,7 +101,7 @@
               ],
               "equipments": [],
               "safety_equipments": [
-                { "id": "DEPT#1#TYPE#1#PROJ#5#SEQ#1", "title": "削岩機", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#5#SEQ#1", "title": "削岩機", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#5#SEQ#2", "title": "ディスクグラインダー", "is_high_risk": true }
               ]
             },
@@ -115,7 +115,7 @@
               ],
               "equipments": [],
               "safety_equipments": [
-                { "id": "DEPT#1#TYPE#1#PROJ#6#SEQ#1", "title": "削岩機", "is_high_risk": false },
+                { "id": "DEPT#1#TYPE#1#PROJ#6#SEQ#1", "title": "削岩機", "is_high_risk": true },
                 { "id": "DEPT#1#TYPE#1#PROJ#6#SEQ#2", "title": "ディスクグラインダー", "is_high_risk": true }
               ]
             },
@@ -129,7 +129,7 @@
               "equipments": [],
               "safety_equipments": [
                 { "id": "DEPT#1#TYPE#1#PROJ#7#SEQ#1", "title": "ディスクグラインダー", "is_high_risk": true },
-                { "id": "DEPT#1#TYPE#1#PROJ#7#SEQ#2", "title": "ランマー", "is_high_risk": false }
+                { "id": "DEPT#1#TYPE#1#PROJ#7#SEQ#2", "title": "ランマー", "is_high_risk": true }
               ]
             }
           ]
