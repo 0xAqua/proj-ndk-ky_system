@@ -1,6 +1,6 @@
 import { Box, Flex, Stack, Text, Separator, Button, HStack } from "@chakra-ui/react";
 import { Switch } from "@/components/ui/switch";
-import { PiListNumbers, PiSparkle, PiInfo, PiFiles, PiShieldCheck } from "react-icons/pi";
+import { PiListNumbers, PiSparkle, PiWarning, PiFiles, PiShieldCheck } from "react-icons/pi";
 import type { PromptConfig } from "@/lib/service/tenantConfig";
 import { AIOutputSettingsSkeleton } from "@/features/admin/settings/components/AIOutputSettingsSkeleton.tsx";
 
@@ -89,9 +89,9 @@ export const AIOutputSettings = ({ config, onChange, isLoading }: AIOutputSettin
                         </Box>
                     </Flex>
 
-                    <Flex mt={4} p={3} bg="orange.50" borderLeftWidth="4px" borderLeftColor="orange.400" gap={2} align="start" borderRadius="sm">
+                    <Flex mt={4} p={3} bg="orange.50" gap={2} align="start" borderRadius="sm">
                         <Box color="orange.500" mt={0.5}>
-                            <PiInfo size={16} />
+                            <PiWarning size={16} />
                         </Box>
                         <Text fontSize="xs" color="orange.700">
                             出力件数が多いと、生成時間が長くなる場合があります（最大: {MAX_INCIDENT_COUNT}件 / 推奨: 3件）
@@ -154,9 +154,9 @@ export const AIOutputSettings = ({ config, onChange, isLoading }: AIOutputSettin
                             />
                         </Box>
                     </Flex>
-                    <Flex mt={4} p={3} bg="orange.50" borderLeftWidth="4px" borderLeftColor="orange.400" gap={2} align="start" borderRadius="sm">
+                    <Flex mt={4} p={3} bg="orange.50" borderLeftColor="orange.400" gap={2} align="start" borderRadius="sm">
                         <Box color="orange.500" mt={0.5}>
-                            <PiInfo size={16} />
+                            <PiWarning size={16} />
                         </Box>
                         <Text fontSize="xs" color="orange.700">
                             対応策が多いと、生成時間が長くなる場合があります（最大: {MAX_COUNTERMEASURES}件 / 推奨: 3件）
