@@ -1,101 +1,65 @@
-import React, { useState, useEffect } from "react";
-import { Box, Flex, Input, Stack, Text, Separator } from "@chakra-ui/react";
+import { Box, Flex, Stack, Text, Separator, Button, HStack } from "@chakra-ui/react";
 import { Switch } from "@/components/ui/switch";
 import { PiListNumbers, PiSparkle, PiInfo, PiFiles, PiShieldCheck } from "react-icons/pi";
 import type { PromptConfig } from "@/lib/service/tenantConfig";
-import {AIOutputSettingsSkeleton} from "@/features/admin/settings/components/AIOutputSettingsSkeleton.tsx";
+import { AIOutputSettingsSkeleton } from "@/features/admin/settings/components/AIOutputSettingsSkeleton.tsx";
 
 const MAX_INCIDENT_COUNT = 5;
 const MAX_COUNTERMEASURES = 5;
 
 interface AIOutputSettingsProps {
-    // PromptConfig または null を受け取れるように変更
     config: PromptConfig | null;
     onChange: (config: PromptConfig) => void;
     isLoading: boolean;
 }
 
 export const AIOutputSettings = ({ config, onChange, isLoading }: AIOutputSettingsProps) => {
-    // useState の初期値で config?. を使って安全にアクセスする
-    const [localValues, setLocalValues] = useState({
-        total_incidents: String(config?.total_incidents ?? "3"),
-        fact_incidents: String(config?.fact_incidents ?? "0"),
-        countermeasures_per_case: String(config?.countermeasures_per_case ?? "3"),
-    });
 
-    // configがnullから値が入ったタイミングで同期
-    useEffect(() => {
-        if (config) {
-            setLocalValues({
-                total_incidents: String(config.total_incidents),
-                fact_incidents: String(config.fact_incidents),
-                countermeasures_per_case: String(config.countermeasures_per_case),
-            });
-        }
-    }, [config]);
-
-    // 入力中のハンドラー（バリデーションせず文字として受け入れる）
-    const handleInputChange = (key: keyof typeof localValues, value: string) => {
-        setLocalValues((prev) => ({ ...prev, [key]: value }));
-    };
-
-    // フォーカスが外れたとき、またはEnter時に数値を確定・補正する
-    const handleConfirm = (key: keyof typeof localValues) => {
-        // 1. まず「config」が null でないことを保証する（Type Guard）
-        // これにより、これ以降の行では config が PromptConfig 型として確定します
+    // 数値確定用のロジック
+    const handleValueSelect = (key: keyof PromptConfig, value: number) => {
         if (!config) return;
 
-        let num = parseInt(localValues[key], 10);
+        const nextConfig = { ...config, [key]: value };
 
-        // 不正な入力値のデフォルト補正
-        if (isNaN(num)) num = (key === "fact_incidents") ? 0 : 1;
-
-        // 2. nextConfig に型を明示し、config をスプレッドする
-        // 上の if 文により、config は null ではないことが確実なので安全です
-        const nextConfig: PromptConfig = { ...config };
-
+        // 依存関係：出力総数を減らした時に、引用数がそれを上回らないよう自動調整
         if (key === "total_incidents") {
-            if (num > MAX_INCIDENT_COUNT) num = MAX_INCIDENT_COUNT;
-            if (num < 1) num = 1;
-            nextConfig.total_incidents = num;
-
-            // 依存関係：総件数を減らした時に引用件数が上回らないよう調整
-            if (nextConfig.fact_incidents > num) {
-                nextConfig.fact_incidents = num;
+            if (nextConfig.fact_incidents > value) {
+                nextConfig.fact_incidents = value;
             }
-        } else if (key === "fact_incidents") {
-            // config.total_incidents へのアクセスが安全になります
-            const limit = config.total_incidents;
-            if (num > limit) num = limit;
-            if (num < 0) num = 0;
-            nextConfig.fact_incidents = num;
-        } else if (key === "countermeasures_per_case") {
-            if (num > MAX_COUNTERMEASURES) num = MAX_COUNTERMEASURES;
-            if (num < 1) num = 1;
-            nextConfig.countermeasures_per_case = num;
         }
 
-        // 3. ここで onChange に渡す際、nextConfig は完全に PromptConfig 型を満たしています
         onChange(nextConfig);
-
-        // ローカルStateへの反映
-        setLocalValues({
-            total_incidents: String(nextConfig.total_incidents),
-            fact_incidents: String(nextConfig.fact_incidents),
-            countermeasures_per_case: String(nextConfig.countermeasures_per_case),
-        });
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent, key: keyof typeof localValues) => {
-        if (e.key === "Enter") {
-            handleConfirm(key);
-            (e.target as HTMLInputElement).blur();
-        }
     };
 
     if (isLoading || !config) {
         return <AIOutputSettingsSkeleton />;
     }
+
+    // 選択ボタンのグループコンポーネント
+    const NumberSelector = ({
+                                currentValue,
+                                min = 1,
+                                max = 5,
+                                onSelect
+                            }: { currentValue: number, min?: number, max?: number, onSelect: (v: number) => void }) => (
+        <HStack gap={1}>
+            {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((num) => (
+                <Button
+                    key={num}
+                    size="sm"
+                    variant={currentValue === num ? "solid" : "outline"}
+                    colorPalette={currentValue === num ? "blue" : "gray"}
+                    onClick={() => onSelect(num)}
+                    minW="42px"
+                    fontWeight={currentValue === num ? "bold" : "normal"}
+                    _hover={{ transform: "translateY(-1px)", shadow: "sm" }}
+                    transition="all 0.2s"
+                >
+                    {num}
+                </Button>
+            ))}
+        </HStack>
+    );
 
     return (
         <Box>
@@ -116,21 +80,16 @@ export const AIOutputSettings = ({ config, onChange, isLoading }: AIOutputSettin
                                 </Text>
                             </Box>
                         </Flex>
-                        <Box w="100px" ml={4}>
-                            <Input
-                                type="number"
-                                value={localValues.total_incidents}
-                                onChange={(e) => handleInputChange("total_incidents", e.target.value)}
-                                onBlur={() => handleConfirm("total_incidents")}
-                                onKeyDown={(e) => handleKeyDown(e, "total_incidents")}
-                                textAlign="right"
-                                borderColor="gray.300"
-                                _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px var(--chakra-colors-blue-500)" }}
+                        <Box ml={4}>
+                            <NumberSelector
+                                currentValue={config.total_incidents}
+                                max={MAX_INCIDENT_COUNT}
+                                onSelect={(v) => handleValueSelect("total_incidents", v)}
                             />
                         </Box>
                     </Flex>
 
-                    <Flex mt={3} p={3} bg="orange.50" borderLeftColor="orange.400" gap={2} align="start">
+                    <Flex mt={4} p={3} bg="orange.50" borderLeftWidth="4px" borderLeftColor="orange.400" gap={2} align="start" borderRadius="sm">
                         <Box color="orange.500" mt={0.5}>
                             <PiInfo size={16} />
                         </Box>
@@ -154,20 +113,16 @@ export const AIOutputSettings = ({ config, onChange, isLoading }: AIOutputSettin
                                     同様のインシデント数
                                 </Text>
                                 <Text fontSize="sm" color="gray.500" mt={1}>
-                                    過去の事例から引用する件数（出力件数以下）
+                                    過去の事例から引用する件数
                                 </Text>
                             </Box>
                         </Flex>
-                        <Box w="100px" ml={4}>
-                            <Input
-                                type="number"
-                                value={localValues.fact_incidents}
-                                onChange={(e) => handleInputChange("fact_incidents", e.target.value)}
-                                onBlur={() => handleConfirm("fact_incidents")}
-                                onKeyDown={(e) => handleKeyDown(e, "fact_incidents")}
-                                textAlign="right"
-                                borderColor="gray.300"
-                                _focus={{ borderColor: "teal.500", boxShadow: "0 0 0 1px var(--chakra-colors-teal-500)" }}
+                        <Box ml={4}>
+                            <NumberSelector
+                                currentValue={config.fact_incidents}
+                                min={0}
+                                max={config.total_incidents} // 出力件数を超えないように動的に制限
+                                onSelect={(v) => handleValueSelect("fact_incidents", v)}
                             />
                         </Box>
                     </Flex>
@@ -191,25 +146,20 @@ export const AIOutputSettings = ({ config, onChange, isLoading }: AIOutputSettin
                                 </Text>
                             </Box>
                         </Flex>
-                        <Box w="100px" ml={4}>
-                            <Input
-                                type="number"
-                                value={localValues.countermeasures_per_case}
-                                onChange={(e) => handleInputChange("countermeasures_per_case", e.target.value)}
-                                onBlur={() => handleConfirm("countermeasures_per_case")}
-                                onKeyDown={(e) => handleKeyDown(e, "countermeasures_per_case")}
-                                textAlign="right"
-                                borderColor="gray.300"
-                                _focus={{ borderColor: "green.500", boxShadow: "0 0 0 1px var(--chakra-colors-green-500)" }}
+                        <Box ml={4}>
+                            <NumberSelector
+                                currentValue={config.countermeasures_per_case}
+                                max={MAX_COUNTERMEASURES}
+                                onSelect={(v) => handleValueSelect("countermeasures_per_case", v)}
                             />
                         </Box>
                     </Flex>
-                    <Flex mt={3} p={3} bg="orange.50" borderLeftColor="orange.400" gap={2} align="start">
+                    <Flex mt={4} p={3} bg="orange.50" borderLeftWidth="4px" borderLeftColor="orange.400" gap={2} align="start" borderRadius="sm">
                         <Box color="orange.500" mt={0.5}>
                             <PiInfo size={16} />
                         </Box>
                         <Text fontSize="xs" color="orange.700">
-                            対応策が多いと、生成時間が長くなる場合があります（最大: {MAX_INCIDENT_COUNT}件 / 推奨: 3件）
+                            対応策が多いと、生成時間が長くなる場合があります（最大: {MAX_COUNTERMEASURES}件 / 推奨: 3件）
                         </Text>
                     </Flex>
                 </Box>
