@@ -67,6 +67,7 @@ resource "aws_cognito_user_pool" "this" {
     require_numbers   = true
     require_symbols   = true
     require_uppercase = true
+    temporary_password_validity_days = 90
   }
 
   # tenant_id カスタム属性
@@ -120,6 +121,14 @@ resource "aws_cognito_user_pool" "this" {
     }
   }
 }
+
+# ★追加: ログ配信設定
+resource "aws_cloudwatch_log_group" "cognito_user_activity" {
+  name              = "/aws/cognito/${local.name_prefix}-user-pool/user-activity"
+  retention_in_days = 90
+}
+
+
 
 # ─────────────────────────────
 # User Pool クライアント（React / SPA 用）
@@ -217,9 +226,37 @@ resource "aws_cognito_risk_configuration" "this" {
   }
 }
 
-resource "aws_cloudwatch_log_group" "cognito_user_activity" {
-  name              = "/aws/cognito/${local.name_prefix}-user-pool/user-activity"
-  retention_in_days = 90
+
+resource "aws_cognito_log_delivery_configuration" "this" {
+  user_pool_id = aws_cognito_user_pool.this.id
+
+  log_configurations {
+    cloud_watch_logs_configuration {
+      log_group_arn = aws_cloudwatch_log_group.cognito_user_activity.arn
+    }
+    event_source = "userAuthEvents"
+    log_level    = "INFO"
+  }
 }
 
+resource "aws_cloudwatch_log_resource_policy" "cognito_logging" {
+  policy_name = "${local.name_prefix}-cognito-logging"
+
+  policy_document = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "cognito-idp.amazonaws.com"
+        }
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "${aws_cloudwatch_log_group.cognito_user_activity.arn}:*"
+      }
+    ]
+  })
+}
 
