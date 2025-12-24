@@ -1,11 +1,5 @@
-import {EntryForm} from "@/features/entry/EntryForm.tsx";
-import {MainLayout} from "@/components/layout/MainLayout.tsx";
+import {EntryForm} from "@/features/entry/EntryForm";
 
 export const EntryPage = () => {
-
-    return (
-        <MainLayout>
-            <EntryForm />
-        </MainLayout>
-    );
+    return <EntryForm />;
 };

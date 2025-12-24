@@ -8,13 +8,11 @@ module "auth" {
 
   callback_urls = [
     "http://localhost:3000/callback",
-    "https://${module.cdn.cloudfront_domain_name}/callback",
     "https://kytest.weeeef.com/callback"
   ]
 
   logout_urls = [
     "http://localhost:3000",
-    "https://${module.cdn.cloudfront_domain_name}",
     "https://kytest.weeeef.com/callback"
   ]
 
@@ -469,7 +467,6 @@ module "bff_auth" {
   # CORS設定
   allowed_origins = [
     "http://localhost:3000",
-    "https://${module.cdn.cloudfront_domain_name}",
     "https://kytest.weeeef.com/callback"
   ]
 }

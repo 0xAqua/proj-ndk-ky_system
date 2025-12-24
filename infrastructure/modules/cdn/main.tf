@@ -46,6 +46,7 @@ EOF
 }
 
 # SPA用: 拡張子なしパスはindex.htmlへ
+# SPA用: リダイレクト + ルーティング（統合版）
 resource "aws_cloudfront_function" "spa_routing" {
   name    = "${var.name_prefix}-spa-routing"
   runtime = "cloudfront-js-2.0"
@@ -53,7 +54,19 @@ resource "aws_cloudfront_function" "spa_routing" {
   code    = <<EOF
 function handler(event) {
     var request = event.request;
+    var host = request.headers.host.value;
     var uri = request.uri;
+
+    // CloudFrontデフォルトドメインならリダイレクト
+    if (host.endsWith('.cloudfront.net')) {
+        return {
+            statusCode: 301,
+            statusDescription: 'Moved Permanently',
+            headers: {
+                'location': { value: 'https://${var.alias_domain}' + uri }
+            }
+        };
+    }
 
     // 拡張子がない && ルート以外 → index.html
     if (uri !== '/' && !uri.includes('.')) {
@@ -230,4 +243,5 @@ resource "aws_s3_bucket_acl" "cloudfront_logs" {
   bucket     = aws_s3_bucket.cloudfront_logs.id
   acl        = "private"
 }
+
 

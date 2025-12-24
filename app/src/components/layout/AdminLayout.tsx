@@ -1,23 +1,15 @@
-import type {ReactNode} from 'react';
 import { Box } from '@chakra-ui/react';
 import { AdminSidebar } from "../elements/AdminSidebar";
+import {Outlet} from "react-router-dom";
 
-type AdminLayoutProps = {
-    children: ReactNode;
-};
 
-export const AdminLayout = ({ children }: AdminLayoutProps) => {
+export const AdminLayout = () => { // childrenプロップスは不要になります
     return (
-        // 1. flexDirectionを "row"（横並び）に変更
         <Box minH="100vh" display="flex" flexDirection="row">
-
-            {/* サイドバー（左側） */}
             <AdminSidebar />
-
             <Box flex="1" p={8} overflowY="auto">
-                {children}
+                <Outlet /> {/* ここに子ルートが表示される */}
             </Box>
-
         </Box>
     );
 };

@@ -1,28 +1,11 @@
-import type {ReactNode} from "react";
 import { Flex, Box } from "@chakra-ui/react";
+import {Outlet} from "react-router-dom";
 
-type Props = {
-    children: ReactNode;
-};
-
-export const AuthLayout = ({ children }: Props) => {
+export const AuthLayout = () => {
     return (
-        <Flex
-            minH="100vh"
-            align="center"
-            justify="center"
-            px="4"
-        >
-            <Box
-                bg="white"
-                p={6}
-                borderRadius="lg"
-                w="full"
-                maxW="400px"
-                mx="auto"
-                boxShadow="md"
-            >
-                {children}
+        <Flex minH="100vh" align="center" justify="center" px="4">
+            <Box bg="white" p={6} borderRadius="lg" w="full" maxW="400px" mx="auto" boxShadow="md">
+                <Outlet /> {/* ここに表示 */}
             </Box>
         </Flex>
     );

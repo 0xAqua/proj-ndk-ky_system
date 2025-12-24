@@ -1,9 +1,4 @@
-import {AdminSidebar} from "@/components/elements/AdminSidebar.tsx";
 
 export const SamplePage = () => {
-    return (
-        <>
-            <AdminSidebar/>
-        </>
-    );
+    return <h1>Hello World</h1>;
 };
