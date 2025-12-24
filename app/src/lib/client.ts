@@ -5,7 +5,10 @@ import { ENDPOINTS } from '@/lib/endpoints';
 // 設定
 // ================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const isDev = window.location.hostname === 'localhost';
+const API_BASE_URL = isDev
+    ? '/api/v1'  // ローカル（Vite proxyを使う場合）
+    : `https://${window.location.hostname}/api/v1`;
 
 // リフレッシュ試行を除外するパス（ENDPOINTSから生成）
 const AUTH_PATHS = Object.values(ENDPOINTS.AUTH);

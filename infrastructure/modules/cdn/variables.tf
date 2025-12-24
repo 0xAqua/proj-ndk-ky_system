@@ -18,14 +18,14 @@ variable "acm_certificate_arn" {
   type        = string
 }
 
-variable "alias_domain" {
-  description = "Custom domain alias (e.g. api.ndk-ky.com)"
-  type        = string
-}
-
 variable "origin_verify_secret" {
   description = "Secret value to verify CloudFront origin"
   type        = string
   sensitive   = true
 }
 
+
+variable "alias_domains" {
+  description = "Custom domain aliases for CloudFront"
+  type        = list(string)
+}

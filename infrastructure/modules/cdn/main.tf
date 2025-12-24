@@ -6,11 +6,6 @@ data "aws_cloudfront_cache_policy" "caching_disabled" {
   name = "Managed-CachingDisabled"
 }
 
-# --- オリジンリクエストポリシー (追加) ---
-data "aws_cloudfront_origin_request_policy" "all_viewer" {
-  name = "Managed-AllViewerExceptHostHeader"
-}
-
 # --- レスポンスヘッダーポリシー (追加) ---
 data "aws_cloudfront_response_headers_policy" "security_headers" {
   name = "Managed-SecurityHeadersPolicy"
@@ -63,7 +58,7 @@ function handler(event) {
             statusCode: 301,
             statusDescription: 'Moved Permanently',
             headers: {
-                'location': { value: 'https://${var.alias_domain}' + uri }
+                'location': { value: 'https://${var.alias_domains[0]}' + uri }
             }
         };
     }
@@ -190,7 +185,7 @@ resource "aws_cloudfront_distribution" "this" {
     minimum_protocol_version = "TLSv1.2_2021"
   }
 
-  aliases = [var.alias_domain]
+  aliases = var.alias_domains
 }
 
 resource "aws_s3_bucket_policy" "frontend" {

@@ -1,4 +1,4 @@
-import { Box, Flex, Text } from "@chakra-ui/react";
+import { Box, Flex} from "@chakra-ui/react";
 import { useState } from "react";
 import type { VQJobListItem } from "../hooks/useVQJobs";
 import { JobRow } from "./JobRow";
@@ -6,25 +6,34 @@ import { JobDetailPane } from "./JobDetailPane";
 
 type Props = {
     jobs: VQJobListItem[];
-    isLoading?: boolean;
 };
 
-export const JobMasterDetail = ({ jobs, isLoading = false }: Props) => {
+export const JobMasterDetail = ({ jobs }: Props) => {
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
     return (
-        <Flex gap={4} align="stretch" direction={{ base: "column", md: "row" }} w="full">
-            {/* Left: list */}
+        <Flex
+            gap={4}
+            direction={{ base: "column", md: "row" }}
+            w="full"
+            maxH={{ base: "auto", md: "100vh" }}
+            overflow="hidden"
+            align="start"
+        >
+            {/* Left: スクロール可能なリスト */}
             <Box
-                w={{ base: "full", md: "420px" }}
+                // 選択されていない時は横幅をフルにする、などの調整も可能です
+                w={{ base: "full", md: selectedJobId ? "420px" : "full" }}
+                transition="width 0.2s" // スムーズに動かしたい場合
                 flexShrink={0}
                 borderWidth="1px"
                 borderColor="gray.200"
                 borderRadius="lg"
-                overflow="hidden"
                 bg="white"
+                overflow="hidden"
+                maxH={{ base: "auto", md: "100vh" }}
             >
-                <Box maxH={{ base: "auto", md: "calc(100vh - 200px)" }} overflow="auto">
+                <Box overflowY="auto" maxH="inherit">
                     {jobs.map((job) => (
                         <JobRow
                             key={job.job_id}
@@ -33,29 +42,28 @@ export const JobMasterDetail = ({ jobs, isLoading = false }: Props) => {
                             onClick={(id) => setSelectedJobId(id)}
                         />
                     ))}
-
-                    {!isLoading && jobs.length === 0 && (
-                        <Box p={4}>
-                            <Text fontSize="sm" color="gray.500">
-                                ジョブがありません
-                            </Text>
-                        </Box>
-                    )}
+                    {/* ... (jobs.length === 0 の処理) */}
                 </Box>
             </Box>
 
-            {/* Right: detail */}
-            <Box
-                flex="1"
-                borderWidth="1px"
-                borderColor="gray.200"
-                borderRadius="lg"
-                bg="white"
-                overflow="hidden"
-            >
-                {/* ✅ job ではなく jobId を渡す */}
-                <JobDetailPane jobId={selectedJobId} />
-            </Box>
+            {/* Right: 詳細ペイン (selectedJobId がある時だけ表示) */}
+            {selectedJobId && (
+                <Box
+                    flex="1"
+                    borderWidth="1px"
+                    borderColor="gray.200"
+                    borderRadius="lg"
+                    bg="white"
+                    overflow="hidden"
+                    // アニメーションなどを入れるとよりスムーズです
+                >
+                    <JobDetailPane
+                        jobId={selectedJobId}
+                        // 必要であれば「閉じる」ボタン用に渡す
+                        // onClose={() => setSelectedJobId(null)}
+                    />
+                </Box>
+            )}
         </Flex>
     );
 };

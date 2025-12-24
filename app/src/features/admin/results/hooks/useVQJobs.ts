@@ -5,9 +5,7 @@ import { ENDPOINTS } from "@/lib/endpoints";
 export interface VQJobListItem {
     job_id: string;
     created_at: number;
-
-    family_name?: string;
-    given_name?: string;
+    email: string;
 
     type_names: string[];
 

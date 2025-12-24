@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Box, Flex } from '@chakra-ui/react';
-import { LogsSidebar } from '@/features/admin/logs/components/LogsSidebar';
+import { LogsSidebar } from '@/features/admin/logs/components/elements/LogsSidebar.tsx';
 import { AccessLogsTable } from '@/features/admin/logs/components/access/AccessLogsTable';
 import { OperationLogsTable } from '@/features/admin/logs/components/operation/OperationLogsTable';
-import { ExecutionLogsTable } from '@/features/admin/logs/components/execution/ExecutionLogsTable';
+import { ExecutionLogsFrom } from '@/features/admin/logs/ExecutionLogsForm';
 
 import type {AccessLogFilterConditions} from '@/features/admin/logs/components/access/AccessLogsFilterModal';
 import type { OperationLogFilterConditions } from '@/features/admin/logs/components/operation/OperationLogsFilterModal';
-import type {ExecutionLogFilterConditions} from '@/features/admin/logs/components/execution/ExecutionLogsFilterModal';
 
 type LogType = 'access' | 'operation' | 'execution';
 
@@ -82,16 +81,7 @@ export const LogsForm = () => {
 
                 {/* 実行履歴 */}
                 {selectedLog === 'execution' && (
-                    <ExecutionLogsTable
-                        data={[]}
-                        totalItems={0}
-                        currentPage={currentPage}
-                        itemsPerPage={itemsPerPage}
-                        onPageChange={handlePageChange}
-                        onItemsPerPageChange={handleItemsPerPageChange}
-                        onSearch={handleSearch}
-                        onFilterApply={(f: ExecutionLogFilterConditions) => handleFilterApply(f)}
-                    />
+                    <ExecutionLogsFrom />
                 )}
             </Box>
         </Flex>

@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Box, Flex, Table, Input, Button, HStack, Badge } from "@chakra-ui/react";
 import { PiMagnifyingGlass, PiFunnel, PiArrowCounterClockwise, PiDownloadSimple } from "react-icons/pi";
 import { Tooltip } from "@/components/ui/tooltip";
-import { LogsPagination } from "@/features/admin/logs/components/LogsPagination";
+import { LogsPagination } from "@/features/admin/logs/components/elements/LogsPagination.tsx";
 import { OperationLogsFilterModal, type OperationLogFilterConditions } from "@/features/admin/logs/components/operation/OperationLogsFilterModal";
-import { ItemsPerPageSelect } from "@/features/admin/logs/components/ItemsPerPageSelect";
+import { ItemsPerPageSelect } from "@/features/admin/logs/components/elements/ItemsPerPageSelect.tsx";
 
 export type OperationLog = {
     id: string;

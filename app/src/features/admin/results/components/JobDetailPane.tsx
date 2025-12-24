@@ -8,9 +8,9 @@ import {
     Text,
     VStack,
     Badge,
+    Flex,
 } from "@chakra-ui/react";
-import {type Incident, useVQJobReply} from "@/features/admin/results/hooks/useFetchVQJobReply.ts";
-
+import { type Incident, useVQJobReply } from "@/features/admin/results/hooks/useFetchVQJobReply.ts";
 
 type Props = {
     jobId: string | null;
@@ -41,93 +41,87 @@ export const JobDetailPane = ({ jobId }: Props) => {
         return all.find((i) => i.id === id) ?? null;
     }, [all, selectedId]);
 
-    // jobId が変わったら選択リセット（最低限）
+    // jobId が変わったら選択リセット
     useMemo(() => {
         setSelectedId(null);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [jobId]);
 
+    // 空状態・ローディング・エラー
     if (!jobId) {
         return (
-            <Box p={6}>
-                <Heading size="sm" mb={2}>
-                    詳細
-                </Heading>
+            <Flex h="full" align="center" justify="center" p={6}>
                 <Text fontSize="sm" color="gray.500">
                     左の一覧からジョブを選択してください
                 </Text>
-            </Box>
+            </Flex>
         );
     }
 
     if (loading) {
         return (
-            <Box p={6}>
-                <Heading size="sm" mb={2}>
-                    詳細
-                </Heading>
+            <Flex h="full" align="center" justify="center" p={6}>
                 <Text fontSize="sm" color="gray.500">
                     読み込み中...
                 </Text>
-            </Box>
+            </Flex>
         );
     }
 
     if (error) {
         return (
-            <Box p={6}>
-                <Heading size="sm" mb={2}>
-                    詳細
-                </Heading>
-                <Text fontSize="sm" color="red.500" mb={3}>
+            <Flex h="full" align="center" justify="center" direction="column" gap={3} p={6}>
+                <Text fontSize="sm" color="red.500">
                     {error}
                 </Text>
                 <Button size="sm" onClick={refetch}>
                     再取得
                 </Button>
-            </Box>
+            </Flex>
         );
     }
 
-    if (!reply) {
+    if (!reply || all.length === 0) {
         return (
-            <Box p={6}>
-                <Heading size="sm" mb={2}>
-                    詳細
-                </Heading>
+            <Flex h="full" align="center" justify="center" p={6}>
                 <Text fontSize="sm" color="gray.500">
-                    データがありません
+                    インシデントがありません
                 </Text>
-            </Box>
+            </Flex>
         );
     }
 
     return (
-        <Box p={6}>
-            <VStack align="stretch" gap={4}>
-                {/* Header */}
-                <Box>
-                    <Heading size="sm" mb={1}>
-                        インシデント
-                    </Heading>
-                    <HStack gap={2} wrap="wrap">
-                        <Badge colorPalette="orange" variant="subtle">
-                            過去 {fact.length}
-                        </Badge>
-                        <Badge colorPalette="pink" variant="subtle">
-                            AI {ai.length}
-                        </Badge>
-                        <Badge colorPalette="gray" variant="subtle">
-                            合計 {all.length}
-                        </Badge>
-                    </HStack>
-                </Box>
+        <Flex direction="column" h="full">
+            {/* Header（固定） */}
+            <Box p={4} borderBottom="1px solid" borderColor="gray.100" flexShrink={0}>
+                <Heading size="sm" mb={2}>
+                    インシデント
+                </Heading>
+                <HStack gap={2} wrap="wrap">
+                    <Badge colorPalette="orange" variant="subtle">
+                        過去 {fact.length}
+                    </Badge>
+                    <Badge colorPalette="pink" variant="subtle">
+                        AI {ai.length}
+                    </Badge>
+                    <Badge colorPalette="gray" variant="subtle">
+                        合計 {all.length}
+                    </Badge>
+                </HStack>
+            </Box>
 
-                {/* 2カラム：左=一覧 / 右=詳細（最小限） */}
-                <HStack align="start" gap={4}>
-                    {/* Left list */}
-                    <Box w="42%" minW="240px">
-                        <Text fontSize="xs" color="gray.500" mb={2}>
+            {/* 2カラム：左=一覧 / 右=詳細 */}
+            <Flex flex="1" minH={0} overflow="hidden">
+                {/* Left: インシデント一覧（スクロール可） */}
+                <Box
+                    w="280px"
+                    flexShrink={0}
+                    borderRight="1px solid"
+                    borderColor="gray.100"
+                    overflowY="auto"
+                >
+                    <Box p={3}>
+                        <Text fontSize="xs" color="gray.500" mb={2} fontWeight="medium">
                             一覧
                         </Text>
 
@@ -140,12 +134,13 @@ export const JobDetailPane = ({ jobId }: Props) => {
                                         key={i.id}
                                         p={3}
                                         borderWidth="1px"
-                                        borderColor={active ? "blue.200" : "gray.200"}
+                                        borderColor={active ? "blue.300" : "gray.200"}
                                         bg={active ? "blue.50" : "white"}
                                         borderRadius="md"
                                         cursor="pointer"
                                         onClick={() => setSelectedId(i.id)}
                                         _hover={{ bg: active ? "blue.50" : "gray.50" }}
+                                        transition="all 0.12s"
                                     >
                                         <HStack justify="space-between" gap={2} mb={1}>
                                             <Badge
@@ -155,95 +150,90 @@ export const JobDetailPane = ({ jobId }: Props) => {
                                             >
                                                 {factLike ? "過去" : "AI"}
                                             </Badge>
-                                            <Text fontSize="xs" color="gray.500" flexShrink={0}>
+                                            <Text fontSize="xs" color="gray.400">
                                                 #{i.id}
                                             </Text>
                                         </HStack>
-
-                                        <Text fontSize="sm" fontWeight="semibold" lineClamp={2}>
+                                        <Text fontSize="sm" fontWeight="medium" lineClamp={2}>
                                             {i.title}
                                         </Text>
                                     </Box>
                                 );
                             })}
-
-                            {all.length === 0 && (
-                                <Text fontSize="sm" color="gray.500">
-                                    インシデントがありません
-                                </Text>
-                            )}
                         </VStack>
                     </Box>
+                </Box>
 
-                    {/* Right detail */}
-                    <Box flex="1" minW={0}>
-                        <Text fontSize="xs" color="gray.500" mb={2}>
-                            詳細
-                        </Text>
-
+                {/* Right: 詳細（スクロール可） */}
+                <Box flex="1" overflowY="auto" minW={0}>
+                    <Box p={4}>
                         {!selected ? (
                             <Text fontSize="sm" color="gray.500">
-                                選択されたインシデントがありません
+                                インシデントを選択してください
                             </Text>
                         ) : (
-                            <VStack align="stretch" gap={3}>
+                            <VStack align="stretch" gap={5}>
+                                {/* タイトル */}
                                 <Box>
-                                    <HStack gap={2} mb={1} wrap="wrap">
+                                    <HStack gap={2} mb={2} wrap="wrap">
                                         <Badge
                                             variant="subtle"
                                             colorPalette={isFactIncident(selected.classification) ? "orange" : "pink"}
                                         >
                                             {selected.classification}
                                         </Badge>
-                                        <Text fontSize="xs" color="gray.500">
-                                            id: {selected.id}
+                                        <Text fontSize="xs" color="gray.400">
+                                            #{selected.id}
                                         </Text>
                                     </HStack>
-                                    <Heading size="sm">{selected.title}</Heading>
+                                    <Heading size="md">{selected.title}</Heading>
                                 </Box>
 
+                                {/* 概要 */}
                                 <Box>
-                                    <Text fontSize="sm" fontWeight="semibold" mb={1}>
+                                    <Text fontSize="xs" color="gray.500" fontWeight="medium" mb={1}>
                                         概要
                                     </Text>
-                                    <Text fontSize="sm" color="gray.700">
+                                    <Text fontSize="sm" color="gray.700" lineHeight="tall">
                                         {selected.summary}
                                     </Text>
                                 </Box>
 
+                                {/* 原因 */}
                                 <Box>
-                                    <Text fontSize="sm" fontWeight="semibold" mb={1}>
+                                    <Text fontSize="xs" color="gray.500" fontWeight="medium" mb={1}>
                                         原因
                                     </Text>
-                                    <Text fontSize="sm" color="gray.700">
+                                    <Text fontSize="sm" color="gray.700" lineHeight="tall">
                                         {selected.cause}
                                     </Text>
                                 </Box>
 
+                                {/* 対策 */}
                                 <Box>
-                                    <Text fontSize="sm" fontWeight="semibold" mb={1}>
-                                        対策（{selected.countermeasures?.length ?? 0}）
+                                    <Text fontSize="xs" color="gray.500" fontWeight="medium" mb={2}>
+                                        対策（{selected.countermeasures?.length ?? 0}件）
                                     </Text>
 
-                                    <VStack align="stretch" gap={2}>
+                                    <VStack align="stretch" gap={3}>
                                         {(selected.countermeasures ?? []).map((c) => (
                                             <Box
                                                 key={c.no}
-                                                p={3}
+                                                p={4}
                                                 borderWidth="1px"
                                                 borderColor="gray.200"
                                                 borderRadius="md"
                                                 bg="gray.50"
                                             >
-                                                <HStack justify="space-between" gap={2} mb={1}>
-                                                    <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
+                                                <HStack justify="space-between" gap={2} mb={2}>
+                                                    <Text fontSize="sm" fontWeight="semibold">
                                                         {c.no}. {c.title}
                                                     </Text>
-                                                    <Badge variant="subtle" colorPalette="gray">
+                                                    <Badge variant="subtle" colorPalette="blue" flexShrink={0}>
                                                         {c.responsible}
                                                     </Badge>
                                                 </HStack>
-                                                <Text fontSize="sm" color="gray.700">
+                                                <Text fontSize="sm" color="gray.600" lineHeight="tall">
                                                     {c.description}
                                                 </Text>
                                             </Box>
@@ -259,8 +249,8 @@ export const JobDetailPane = ({ jobId }: Props) => {
                             </VStack>
                         )}
                     </Box>
-                </HStack>
-            </VStack>
-        </Box>
+                </Box>
+            </Flex>
+        </Flex>
     );
 };

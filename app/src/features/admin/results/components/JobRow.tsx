@@ -11,8 +11,7 @@ type Props = {
 };
 
 export const JobRow = ({ job, onClick, isSelected = false }: Props) => {
-    const displayName =
-        [job.family_name, job.given_name].filter(Boolean).join(" ") || "（氏名未設定）";
+    const displayName = job.email
 
     const typeSummary = summarizeList(job.type_names, 1);
     const fact = job.fact_incident_count ?? 0;

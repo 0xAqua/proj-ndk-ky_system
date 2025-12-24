@@ -86,3 +86,13 @@ variable "origin_verify_secret" {
 variable "origin_verify_authorizer_id" {
   type = string
 }
+
+variable "tenant_config_table_name" {
+  description = "Tenant config master table name"
+  type        = string
+}
+
+variable "tenant_config_table_arn" {
+  description = "Tenant config master table ARN"
+  type        = string
+}

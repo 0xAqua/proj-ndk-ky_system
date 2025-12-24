@@ -8,12 +8,16 @@ module "auth" {
 
   callback_urls = [
     "http://localhost:3000/callback",
+    "https://ndknet.kytest.weeeef.com/callback",
+    "https://ndisol.kytest.weeeef.com/callback",
     "https://kytest.weeeef.com/callback"
   ]
 
   logout_urls = [
     "http://localhost:3000",
-    "https://kytest.weeeef.com/callback"
+    "https://ndknet.kytest.weeeef.com",
+    "https://ndisol.kytest.weeeef.com",
+    "https://kytest.weeeef.com"
   ]
 
   # Passkeyの有無
@@ -205,7 +209,7 @@ module "waf" {
 # ─────────────────────────────
 data "aws_acm_certificate" "main" {
   provider = aws.virginia
-  domain   = "kytest.weeeef.com"
+  domain   = "*.kytest.weeeef.com"
   statuses = ["ISSUED"]
 }
 
@@ -218,7 +222,12 @@ module "cdn" {
   web_acl_arn        = module.waf.web_acl_arn
 
   acm_certificate_arn  = data.aws_acm_certificate.main.arn
-  alias_domain         = "kytest.weeeef.com"
+
+  alias_domains = [
+    "ndknet.kytest.weeeef.com",
+    "ndisol.kytest.weeeef.com",
+    "kytest.weeeef.com"
+  ]
 
   origin_verify_secret = module.secrets.origin_verify_secret_value
 }
@@ -317,6 +326,9 @@ module "s3_vq_workflow" {
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
 
   origin_verify_secret = module.secrets.origin_verify_secret_value
+
+  tenant_config_table_name = module.dynamodb.tenant_config_master_table_name
+  tenant_config_table_arn  = module.dynamodb.tenant_config_master_table_arn
 
 }
 
@@ -467,6 +479,8 @@ module "bff_auth" {
   # CORS設定
   allowed_origins = [
     "http://localhost:3000",
-    "https://kytest.weeeef.com/callback"
+    "https://ndknet.kytest.weeeef.com",
+    "https://ndisol.kytest.weeeef.com",
+    "https://kytest.weeeef.com"
   ]
 }

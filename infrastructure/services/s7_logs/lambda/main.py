@@ -63,7 +63,7 @@ def get_session(event):
         print(f"Session check failed: {str(e)}")
         return None
 @logger.inject_lambda_context
-def handler(event: dict, context: LambdaContext) -> dict:
+def lambda_handler(event: dict, context: LambdaContext) -> dict:
     headers = {k.lower(): v for k, v in event.get("headers", {}).items()}
     expected = os.environ.get("ORIGIN_VERIFY_SECRET")
 

@@ -22,6 +22,7 @@ MESSAGE_API_URL = os.environ.get('MESSAGE_API_URL')
 CALLBACK_URL = os.environ.get('CALLBACK_URL')
 VQ_SECRET_ARN = os.environ.get('VQ_SECRET_ARN')
 ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', '').split(',')
+TENANT_CONFIG_TABLE = os.environ.get('TENANT_CONFIG_TABLE')
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(JOB_TABLE_NAME)
@@ -41,18 +42,18 @@ PROMPT_CONFIG = {
 }
 
 
-def build_ky_prompt(input_data: dict) -> str:
+def build_ky_prompt(input_data: dict, tenant_id: str) -> str:
     """KY活動用プロンプトを構築"""
-    cfg = PROMPT_CONFIG
+    cfg = get_prompt_config(tenant_id)
 
     type_names = input_data.get("typeNames", [])
-    process_names = input_data.get("processNames", [])  # ★ 追加
+    process_names = input_data.get("processNames", [])
     equipments = input_data.get("equipments", [])
     environment_items = input_data.get("environmentItems", [])
 
     # 入力データの整形
     type_names_str = "\n".join(type_names) if type_names else "(指定なし)"
-    process_names_str = "\n".join(process_names) if process_names else "(指定なし)"  # ★ 追加
+    process_names_str = "\n".join(process_names) if process_names else "(指定なし)"
     equipments_str = "\n".join(f"-{e}" for e in equipments) if equipments else "(指定なし)"
     env_str = "\n".join(f"-{e}" for e in environment_items) if environment_items else "(特記事項なし)"
 
@@ -61,6 +62,17 @@ def build_ky_prompt(input_data: dict) -> str:
         f'{{"no": {i+1}, "title": "", "description": "", "responsible": ""}}'
         for i in range(cfg["countermeasures_per_case"])
     ])
+
+    # include_predicted_incidents による分岐
+    if cfg.get("include_predicted_incidents", True):
+        incident_instruction = f"""・類似状況のインシデントがない場合、推測できるインシデントとその対応策を記載
+・登録されているドキュメントと同様インシデントについては（過去に起きたインシデント）と記載
+・インシデントは合計{cfg["total_incidents"]}つ出力を行う
+・出力するインシデントの中で同様のインシデントは{cfg["fact_incidents"]}つ"""
+    else:
+        incident_instruction = f"""・登録されているドキュメントに基づく過去事例のみを記載
+・インシデントは合計{cfg["total_incidents"]}つ出力を行う
+・全て過去に起きたインシデントとして記載"""
 
     return f"""以下の条件をもとに、類似状況で起こった過去のインシデントとその対応策を教えてください。
 ###条件
@@ -78,10 +90,7 @@ def build_ky_prompt(input_data: dict) -> str:
 
 ###出力形式
 ##内容
-・類似状況のインシデントがない場合、推測できるインシデントとその対応策を記載
-・登録されているドキュメントと同様インシデントについては（過去に起きたインシデント）と記載
-・インシデントは合計{cfg["total_incidents"]}つ出力を行う
-・出力するインシデントの中で同様のインシデントは{cfg["fact_incidents"]}つ
+{incident_instruction}
 ・１つのインシデントに対して対応策を{cfg["countermeasures_per_case"]}つ記載
 ・対応策は誰が実施すべきか、を明確にする
 ・対応策は実際の作業でどのように実施するかを具体的に記載
@@ -107,6 +116,23 @@ def build_ky_prompt(input_data: dict) -> str:
     }}
   ]
 }}"""
+
+def get_prompt_config(tenant_id: str) -> dict:
+    """テナント別のプロンプト設定を取得"""
+    config_table = dynamodb.Table(TENANT_CONFIG_TABLE)
+    resp = config_table.get_item(Key={'tenant_id': tenant_id})
+    item = resp.get('Item')
+
+    if not item or 'prompt_config' not in item:
+        raise Exception(f"Tenant config not found: {tenant_id}")
+
+    config = {}
+    for k, v in item['prompt_config'].items():
+        if isinstance(v, Decimal):
+            config[k] = int(v)
+        else:
+            config[k] = v
+    return config
 
 # --- 共通ユーティリティ ---
 
@@ -173,10 +199,15 @@ def handle_post(event, session, origin):
         body = json.loads(event.body or '{}')
         input_data = body.get('input', {})
 
+        tenant_id = session.get('tenant_id')
+        email = session.get('email')
+        logger.append_keys(tenant_id=tenant_id, email=email)
+
         logger.info(f"Received input_data: {json.dumps(input_data, ensure_ascii=False)}")
 
-        input_message = build_ky_prompt(input_data)
+        input_message = build_ky_prompt(input_data, tenant_id)
         logger.info(f"Generated prompt length: {len(input_message)}")
+
 
         tenant_id = session.get('tenant_id')
         email = session.get('email')  # ← 変更

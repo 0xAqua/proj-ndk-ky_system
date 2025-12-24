@@ -97,7 +97,7 @@ data "aws_iam_policy_document" "producer_policy" {
   statement { # DynamoDB Put/Get
     effect    = "Allow"
     actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"]
-    resources = [var.job_table_arn, var.session_table_arn]
+    resources = [var.job_table_arn, var.session_table_arn, var.tenant_config_table_arn]  # ← 追加
   }
   statement { # SQS Send
     effect    = "Allow"
@@ -197,7 +197,7 @@ resource "aws_lambda_function" "producer" {
       SESSION_TABLE    = var.session_table_name
       COOKIE_SAME_SITE  = "Lax"
       ORIGIN_VERIFY_SECRET          = var.origin_verify_secret
-
+      TENANT_CONFIG_TABLE    = var.tenant_config_table_name
     }
   }
 

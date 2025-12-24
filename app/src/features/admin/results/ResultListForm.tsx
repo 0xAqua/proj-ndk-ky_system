@@ -1,6 +1,6 @@
 import { Box, Spinner, Text, VStack, Button, HStack } from "@chakra-ui/react";
 import { useVQJobs } from "./hooks/useVQJobs";
-import { JobMasterDetail } from "./components/JobMasterDetail";
+// import { JobMasterDetail } from "./components/JobMasterDetail";
 
 export const ResultListForm = () => {
     const { jobs, loading, hasMore, error, loadMore, refresh } = useVQJobs();
@@ -74,7 +74,7 @@ export const ResultListForm = () => {
             </HStack>
 
             {/* ✅ master-detail */}
-            <JobMasterDetail jobs={jobs} isLoading={loading} />
+            {/*<JobMasterDetail jobs={jobs} isLoading={loading} />*/}
 
             {/* load more */}
             <Box textAlign="center" mt={6}>

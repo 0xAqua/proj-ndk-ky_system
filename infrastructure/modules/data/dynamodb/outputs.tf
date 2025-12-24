@@ -67,3 +67,14 @@ output "auth_sessions_table_arn" {
   description = "Auth sessions table ARN"
   value       = aws_dynamodb_table.auth_sessions.arn
 }
+
+# Tenant Config Master
+output "tenant_config_master_table_name" {
+  description = "Tenant config master table name"
+  value       = aws_dynamodb_table.tenant_config_master.name
+}
+
+output "tenant_config_master_table_arn" {
+  description = "Tenant config master table ARN"
+  value       = aws_dynamodb_table.tenant_config_master.arn
+}
