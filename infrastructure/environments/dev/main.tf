@@ -484,3 +484,30 @@ module "bff_auth" {
     "https://kytest.weeeef.com"
   ]
 }
+
+# ─────────────────────────────
+# 6-8. バックエンドサービス (S8 Tenant Config)
+# ─────────────────────────────
+module "s8_tenant_config" {
+  source = "../../services/s8_tenant-config"
+
+  project     = local.project
+  environment = local.environment
+  name_prefix = "${local.project}-${local.environment}-s8-tenant-config"
+
+  # API Gateway
+  api_gateway_id            = module.api_gateway.api_id
+  api_gateway_execution_arn = module.api_gateway.api_execution_arn
+  origin_verify_authorizer_id = module.api_gateway.origin_verify_authorizer_id
+
+  # DynamoDB
+  tenant_config_table_name = module.dynamodb.tenant_config_master_table_name
+  tenant_config_table_arn  = module.dynamodb.tenant_config_master_table_arn
+
+  # Session
+  session_table_name = module.dynamodb.auth_sessions_table_name
+  session_table_arn  = module.dynamodb.auth_sessions_table_arn
+
+  # KMS
+  lambda_kms_key_arn = module.kms.lambda_key_arn
+}
