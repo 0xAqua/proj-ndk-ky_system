@@ -9,16 +9,12 @@ const SIDEBAR_EXPANDED_KEY = "ui_sidebar_expanded";
  * 認証状態やユーザー情報は useAuth (TanStack Query) に集約されました。
  */
 export const useAdminSidebar = () => {
-    // 1. 統合された認証フックから情報を取得
-    // 定期的なチェックやウィンドウフォーカス時の再取得は TanStack Query が自動で行います
     const {
         user,
         isAuthenticated,
         isLoading,
-        logout: authLogout
+        logout,  // ← 直接使う
     } = useAuth();
-
-    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     // UI状態（サイドバーの開閉）のみ自前で管理
     const [isExpanded, setIsExpanded] = useState(() =>
@@ -32,17 +28,6 @@ export const useAdminSidebar = () => {
             localStorage.setItem(SIDEBAR_EXPANDED_KEY, String(newState));
             return newState;
         });
-    };
-
-    // ログアウト処理
-    const handleLogout = async () => {
-        if (isLoggingOut) return;
-        setIsLoggingOut(true);
-        try {
-            await authLogout();
-        } finally {
-            setIsLoggingOut(false);
-        }
     };
 
     // 表示用ユーザー情報の整形
@@ -62,8 +47,7 @@ export const useAdminSidebar = () => {
         authState,
         userInfo,
         isExpanded,
-        isLoggingOut,
         toggleExpanded,
-        handleLogout
+        handleLogout: logout,  // ← そのまま渡す
     };
 };

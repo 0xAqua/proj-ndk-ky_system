@@ -1,4 +1,4 @@
-import {VStack, Text, Image, Center, Spinner, Link} from "@chakra-ui/react";
+import {VStack, Text, Image, Link} from "@chakra-ui/react";
 import logo from '@/assets/logo.jpg';
 import { useLoginForm } from "./hooks/useLoginForm.ts";
 import { CredentialsForm } from "./components/CredentialsForm.tsx";
@@ -22,7 +22,6 @@ export const LoginForm = () => {
         // handleVerifyOtp,     // 未使用
         isLoading,
         error,
-        isCheckingSession,
         // showPasskeyModal,    // 未使用
         // setShowPasskeyModal, // 未使用
         // handlePasskeyLogin,  // 未使用
@@ -34,13 +33,6 @@ export const LoginForm = () => {
 
 
 
-    if (isCheckingSession) {
-        return (
-            <Center h="100vh">
-                <Spinner size="xl" color="blue.500" />
-            </Center>
-        );
-    }
 
     return (
         <>

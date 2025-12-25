@@ -12,31 +12,37 @@ export const useLoginForm = () => {
 
     const [isNavigating, setIsNavigating] = useState(false);
 
-    const { data: session, isLoading: isCheckingSession } = useQuery({
+    const { data: session } = useQuery({
         queryKey: ['session'],
         queryFn: authService.checkSession,
         staleTime: 5 * 60 * 1000,
         retry: false,
     });
 
-    const navigateByRole = useCallback(() => {
+    // ★ authContext も取得する
+    const { data: authContext } = useQuery({
+        queryKey: ['authContext'],
+        queryFn: authService.getAuthContext,
+        enabled: !!session?.authenticated,
+        staleTime: 60 * 60 * 1000,
+    });
+
+    const navigateByRole = useCallback((role: string | undefined) => {
         setIsNavigating(true);
 
-        const authContext = queryClient.getQueryData<any>(['authContext']);
-        const userRole = authContext?.user?.role;
-
-        if (userRole === "admin") {
+        if (role === "admin") {
             navigate("/admin/sample", { replace: true });
         } else {
             navigate("/entry", { replace: true });
         }
-    }, [navigate, queryClient]);
+    }, [navigate]);
 
+    // ★ session と authContext の両方が揃ったら遷移
     useEffect(() => {
-        if (session?.authenticated) {
-            navigateByRole();
+        if (session?.authenticated && authContext?.user?.role) {
+            navigateByRole(authContext.user.role);
         }
-    }, [session?.authenticated, navigateByRole]);
+    }, [session?.authenticated, authContext?.user?.role, navigateByRole]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,20 +50,11 @@ export const useLoginForm = () => {
         const result = await credentialsAuth.handleLogin();
 
         if (result?.success) {
-            // ★ ログイン成功直後に authContext を先行取得開始
-            void queryClient.prefetchQuery({
-                queryKey: ['authContext'],
-                queryFn: authService.getAuthContext,
-            });
-
-            void queryClient.invalidateQueries({ queryKey: ['session'] });
-
-            navigateByRole();
+            await queryClient.invalidateQueries({ queryKey: ['session'] });
         }
     };
 
     return {
-        isCheckingSession,
         username: credentialsAuth.username,
         setUsername: credentialsAuth.setUsername,
         password: credentialsAuth.password,

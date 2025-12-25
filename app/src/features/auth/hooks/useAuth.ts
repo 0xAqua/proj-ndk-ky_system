@@ -1,4 +1,4 @@
-// src/features/auth/hooks/useAuth.ts
+// src/features/auth/hooks/useAuth.ts - 元に戻す + デバッグ追加
 import { useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,9 +33,21 @@ export const useAuth = () => {
         staleTime: 60 * 60 * 1000,
     });
 
-    // ★ ローディング状態を正確に計算
     const isLoading = isSessionLoading ||
         (isAuthenticated && (isContextLoading || !authContext));
+
+    const user = authContext?.user;
+
+    // ★ デバッグログ追加
+    console.log('[useAuth]', {
+        isSessionLoading,
+        isContextLoading,
+        isLoading,
+        isAuthenticated,
+        sessionUser: session?.user,
+        authContextUser: user,
+        role: user?.role ?? session?.user?.role,
+    });
 
     const logout = useCallback(async () => {
         if (isLoggingOut.current) return;
@@ -45,11 +57,15 @@ export const useAuth = () => {
         } catch (error) {
             console.error("Logout API failed", error);
         } finally {
-            navigate('/login', { replace: true });
-            queryClient.clear();
+            // ★ clear() ではなく、未認証状態をセット
+            queryClient.setQueryData(['session'], { authenticated: false });
+            queryClient.removeQueries({ queryKey: ['authContext'] });
+
             sessionStorage.clear();
             localStorage.setItem('logout_event', Date.now().toString());
             localStorage.removeItem('logout_event');
+
+            navigate('/login', { replace: true });
             isLoggingOut.current = false;
         }
     }, [queryClient, navigate]);
@@ -65,7 +81,6 @@ export const useAuth = () => {
         return () => window.removeEventListener('storage', handleStorageChange);
     }, [queryClient, navigate]);
 
-    const user = authContext?.user;
     const departments = Object.entries(user?.departments ?? {}).map(([key, value]) => ({
         id: key,
         name: String(value)

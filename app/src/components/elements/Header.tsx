@@ -13,11 +13,8 @@ import {
 } from "@/components/ui/menu.tsx";
 
 export const Header = () => {
-    // 1. useAuthから直接 email や role を取り出す
-    // Storeを介さず、キャッシュから最新のユーザー情報が取得されます
-    const { logout, email, role } = useAuth();
+    const { logout, email, role, isLoggingOut } = useAuth();  // ← 追加
 
-    // 2. 表示名の判定（emailを優先し、なければ「ユーザー」）
     const displayName = email || "ユーザー";
 
     return (
@@ -75,7 +72,6 @@ export const Header = () => {
                             <Text fontSize="sm" fontWeight="medium" truncate>
                                 {email || "---"}
                             </Text>
-                            {/* 必要に応じてロールも表示可能 */}
                             {role && (
                                 <Text fontSize="10px" color="blue.600" fontWeight="bold">
                                     {role.toUpperCase()}
@@ -89,15 +85,15 @@ export const Header = () => {
                             value="logout"
                             color="red.600"
                             _hover={{ bg: "red.50", color: "red.700" }}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                void logout();
-                            }}
+                            onClick={logout}  // ← シンプルに
+                            disabled={isLoggingOut}  // ← 二重クリック防止
                             gap={2}
-                            cursor="pointer"
+                            cursor={isLoggingOut ? "not-allowed" : "pointer"}
                         >
                             <LuLogOut />
-                            <Text fontWeight="bold">ログアウト</Text>
+                            <Text fontWeight="bold">
+                                {isLoggingOut ? "ログアウト中..." : "ログアウト"}
+                            </Text>
                         </MenuItem>
                     </MenuContent>
                 </MenuRoot>
