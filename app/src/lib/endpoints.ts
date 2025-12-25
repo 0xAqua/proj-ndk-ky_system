@@ -28,5 +28,8 @@ export const ENDPOINTS = {
         ACCESS: '/logs/access',
         OPERATION: '/logs/operation',
     },
-    TENANT_CONFIG: '/tenant-config',
+    TENANT_CONFIG: {
+        PROMPT: '/tenant-config/prompt',
+        SECURITY: '/tenant-config/security',
+    },
 } as const;

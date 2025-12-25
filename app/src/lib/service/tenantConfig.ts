@@ -1,7 +1,9 @@
 import { api } from '@/lib/client';
 import { ENDPOINTS } from '@/lib/endpoints';
 
-// プロンプト設定の型
+// ─────────────────────────────
+// プロンプト設定
+// ─────────────────────────────
 export interface PromptConfig {
     total_incidents: number;
     fact_incidents: number;
@@ -9,31 +11,69 @@ export interface PromptConfig {
     include_predicted_incidents: boolean;
 }
 
-// テナント設定レスポンスの型
-export interface TenantConfigResponse {
+export interface PromptConfigResponse {
     tenant_id: string;
     prompt_config: PromptConfig;
 }
 
-// 更新リクエストの型
-export interface TenantConfigUpdateRequest {
+export interface PromptConfigUpdateRequest {
     prompt_config: PromptConfig;
 }
 
+// ─────────────────────────────
+// セキュリティ設定
+// ─────────────────────────────
+export interface SecurityConfig {
+    otp_enabled: boolean;
+    passkey_enabled: boolean;
+}
+
+export interface SecurityConfigResponse {
+    tenant_id: string;
+    security_config: SecurityConfig;
+}
+
+export interface SecurityConfigUpdateRequest {
+    security_config: SecurityConfig;
+}
+
+// ─────────────────────────────
+// Service
+// ─────────────────────────────
 export const tenantConfigService = {
-    /**
-     * テナント設定を取得
-     */
-    get: async (): Promise<TenantConfigResponse> => {
-        const { data } = await api.get<TenantConfigResponse>(ENDPOINTS.TENANT_CONFIG);
-        return data;
+    prompt: {
+        /**
+         * プロンプト設定を取得
+         */
+        get: async (): Promise<PromptConfigResponse> => {
+            const { data } = await api.get<PromptConfigResponse>(ENDPOINTS.TENANT_CONFIG.PROMPT);
+            return data;
+        },
+
+        /**
+         * プロンプト設定を更新
+         */
+        update: async (config: PromptConfigUpdateRequest): Promise<PromptConfigResponse> => {
+            const { data } = await api.put<PromptConfigResponse>(ENDPOINTS.TENANT_CONFIG.PROMPT, config);
+            return data;
+        },
     },
 
-    /**
-     * テナント設定を更新
-     */
-    update: async (config: TenantConfigUpdateRequest): Promise<TenantConfigResponse> => {
-        const { data } = await api.put<TenantConfigResponse>(ENDPOINTS.TENANT_CONFIG, config);
-        return data;
+    security: {
+        /**
+         * セキュリティ設定を取得
+         */
+        get: async (): Promise<SecurityConfigResponse> => {
+            const { data } = await api.get<SecurityConfigResponse>(ENDPOINTS.TENANT_CONFIG.SECURITY);
+            return data;
+        },
+
+        /**
+         * セキュリティ設定を更新
+         */
+        update: async (config: SecurityConfigUpdateRequest): Promise<SecurityConfigResponse> => {
+            const { data } = await api.put<SecurityConfigResponse>(ENDPOINTS.TENANT_CONFIG.SECURITY, config);
+            return data;
+        },
     },
 };

@@ -22,7 +22,7 @@ export const useAIOutputSettings = (): UseAIOutputSettingsReturn => {
         setIsLoading(true);
         setError(null);
         try {
-            const data = await tenantConfigService.get();
+            const data = await tenantConfigService.prompt.get();
             setConfig(data.prompt_config);
         } catch (err) {
             notify.error("設定のに失敗しました");
@@ -35,7 +35,7 @@ export const useAIOutputSettings = (): UseAIOutputSettingsReturn => {
         setIsSaving(true);
         setError(null);
         try {
-            await tenantConfigService.update({ prompt_config: newConfig });
+            await tenantConfigService.prompt.update({ prompt_config: newConfig });
             setConfig(newConfig);
             notify.success("設定を保存しました");
             return true;
