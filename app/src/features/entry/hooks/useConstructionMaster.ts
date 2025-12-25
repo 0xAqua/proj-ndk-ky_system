@@ -24,20 +24,19 @@ export type ProcessCategory = {
 export const useConstructionMaster = () => {
     // 1. 統合されたマスタデータを useAuth から直接取得
     // すでにバックエンドで部署フィルタリング済みのツリーが降ってきます
-    const { constructionMaster, isLoading, error } = useAuth();
+    const { constructionMaster, isLoading: isAuthLoading, error } = useAuth();
 
-    // 2. データ整形ロジック
+    // データ整形ロジック
     const { constructions, environments } = useMemo(() => {
-        if (!constructionMaster) {
+        // ★ undefined または空の場合は空を返す
+        if (!constructionMaster || constructionMaster.length === 0) {
             return { constructions: [], environments: [] };
         }
 
         const tempConstructions: ProcessCategory[] = [];
         const tempEnvironments: ProcessCategory[] = [];
 
-
         constructionMaster.forEach((node: any) => {
-            // A. 環境系データ (IDが ENV で始まる場合)
             if (node.id.startsWith("ENV")) {
                 tempEnvironments.push({
                     id: node.id,
@@ -57,9 +56,6 @@ export const useConstructionMaster = () => {
                 return;
             }
 
-            // B. 工事系データ
-            // バックエンドで部署ごとにツリー化されているため、
-            // ルートノード（部署名）の直下にある「工種(typeNode)」をカテゴリとして扱う
             node.children?.forEach((typeNode: any) => {
                 const processes = typeNode.children?.map((projNode: any) => ({
                     id: projNode.id,
@@ -79,13 +75,12 @@ export const useConstructionMaster = () => {
         });
 
         return { constructions: tempConstructions, environments: tempEnvironments };
-
     }, [constructionMaster]);
 
     return {
         constructions,
         environments,
-        isLoading,
+        isLoading: isAuthLoading,
         error,
     };
 };

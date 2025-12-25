@@ -10,7 +10,6 @@ export const useLoginForm = () => {
     const queryClient = useQueryClient();
     const credentialsAuth = useCredentialsAuth();
 
-    // 【重要】遷移開始から画面が消えるまでの「繋ぎ」の状態
     const [isNavigating, setIsNavigating] = useState(false);
 
     const { data: session, isLoading: isCheckingSession } = useQuery({
@@ -20,12 +19,9 @@ export const useLoginForm = () => {
         retry: false,
     });
 
-    // 【重要】async/await を削除し、即座に navigate するように変更
     const navigateByRole = useCallback(() => {
-        setIsNavigating(true); // 遷移開始を宣言
+        setIsNavigating(true);
 
-        // ロール判定は遷移先の EntryForm 内で行うため、ここでは即座に /entry へ飛ばす
-        // キャッシュに admin 情報がある場合のみ admin へ飛ばす（同期的なチェック）
         const authContext = queryClient.getQueryData<any>(['authContext']);
         const userRole = authContext?.user?.role;
 
@@ -45,14 +41,17 @@ export const useLoginForm = () => {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // 1. ログイン認証の通信（ここは待つ必要がある）
         const result = await credentialsAuth.handleLogin();
 
         if (result?.success) {
-            // 2. セッションの無効化（await しない：バックグラウンドで実行）
+            // ★ ログイン成功直後に authContext を先行取得開始
+            void queryClient.prefetchQuery({
+                queryKey: ['authContext'],
+                queryFn: authService.getAuthContext,
+            });
+
             void queryClient.invalidateQueries({ queryKey: ['session'] });
 
-            // 3. 即座に遷移
             navigateByRole();
         }
     };

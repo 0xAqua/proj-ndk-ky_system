@@ -9,7 +9,6 @@ export const useAuth = () => {
     const queryClient = useQueryClient();
     const isLoggingOut = useRef(false);
 
-    // 1. セッション状態の取得
     const {
         data: session,
         isLoading: isSessionLoading,
@@ -21,7 +20,8 @@ export const useAuth = () => {
         retry: false,
     });
 
-    // 2. ユーザー情報と工事マスタの一括取得
+    const isAuthenticated = !!session?.authenticated;
+
     const {
         data: authContext,
         isLoading: isContextLoading,
@@ -29,11 +29,14 @@ export const useAuth = () => {
     } = useQuery({
         queryKey: ["authContext"],
         queryFn: authService.getAuthContext,
-        enabled: !!session?.authenticated,
+        enabled: isAuthenticated,
         staleTime: 60 * 60 * 1000,
     });
 
-    // 3. ログアウト処理
+    // ★ ローディング状態を正確に計算
+    const isLoading = isSessionLoading ||
+        (isAuthenticated && (isContextLoading || !authContext));
+
     const logout = useCallback(async () => {
         if (isLoggingOut.current) return;
         isLoggingOut.current = true;
@@ -43,7 +46,6 @@ export const useAuth = () => {
             console.error("Logout API failed", error);
         } finally {
             navigate('/login', { replace: true });
-
             queryClient.clear();
             sessionStorage.clear();
             localStorage.setItem('logout_event', Date.now().toString());
@@ -70,16 +72,14 @@ export const useAuth = () => {
     }));
 
     return {
-        isAuthenticated: !!session?.authenticated,
+        isAuthenticated,
         user: user ? { ...session?.user, ...user } : session?.user,
         tenantId: user?.tenantId ?? null,
         email: user?.email ?? null,
         role: user?.role ?? session?.user?.role ?? null,
         departments,
-        constructionMaster: authContext?.constructionMaster ?? [],
-        // ローディング状態の統合
-        isLoading: isSessionLoading || isContextLoading,
-        // ★ エラー状態の統合 (どちらかでエラーが出ればエラーとする)
+        constructionMaster: authContext?.constructionMaster,
+        isLoading,
         error: sessionError || contextError || null,
         logout,
     };

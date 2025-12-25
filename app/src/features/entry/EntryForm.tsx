@@ -29,10 +29,10 @@ export const EntryForm = () => {
     const notify = useNotification();
     const { open, onOpen, onClose } = useDisclosure();
 
-    // 1. 認証と詳細プロフィール情報をキャッシュから取得
+    // 1. 認証情報を取得
     const { user, isLoading: isAuthLoading } = useAuth();
 
-    // 2. 部署名に基づいてフィルタリングされたマスタデータを取得
+    // 2. マスタデータを取得
     const {
         constructions,
         environments,
@@ -40,7 +40,9 @@ export const EntryForm = () => {
         error
     } = useConstructionMaster();
 
-    const isLoading = isAuthLoading || isMasterLoading;
+    // 通信が終わっており、かつデータが1件以上ある状態を「Ready」とする
+    const isDataReady = !isAuthLoading && !isMasterLoading && constructions.length > 0;
+    const showSkeleton = !isDataReady;
 
     // 状態管理 (ユーザー入力)
     const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -161,8 +163,9 @@ export const EntryForm = () => {
         <VStack gap={8} align="stretch">
             <ConstructionDate value={date} onChange={setDate} />
 
-            {isLoading ? (
-                <Skeleton h="120px" w="full" borderRadius="md" />
+            {/* 工事種別: データが空の間はスケルトンを出し続ける */}
+            {showSkeleton ? (
+                <Skeleton h="110px" w="full" borderRadius="xl" />
             ) : (
                 <ConstructionProject
                     masterCategories={constructions}
@@ -174,9 +177,9 @@ export const EntryForm = () => {
                 />
             )}
 
-            {/* 3. 工事工程 */}
-            {isLoading ? (
-                <Skeleton h="200px" w="full" borderRadius="md" />
+            {/* 工事工程: 高さを確保してガタつきを防ぐ */}
+            {showSkeleton ? (
+                <Skeleton h="200px" w="full" borderRadius="xl" />
             ) : (
                 <ConstructionProcess
                     masterCategories={constructions}
@@ -186,7 +189,8 @@ export const EntryForm = () => {
                 />
             )}
 
-            {isLoading ? (
+            {/* 3. 注意が必要な機材 (isLoading を showSkeleton に統一) */}
+            {showSkeleton ? (
                 <Skeleton h="200px" w="full" borderRadius="md" />
             ) : (
                 <ImportantEquipment
@@ -195,7 +199,8 @@ export const EntryForm = () => {
                 />
             )}
 
-            {isLoading ? (
+            {/* 4. 現場状況 (isLoading を showSkeleton に統一) */}
+            {showSkeleton ? (
                 <Skeleton h="200px" w="full" borderRadius="md" />
             ) : (
                 <SiteCondition
@@ -205,8 +210,9 @@ export const EntryForm = () => {
                 />
             )}
 
-            {isLoading ? (
-                <Skeleton h="200px" w="full" borderRadius="md" />
+            {/* 5. 送信ボタン (isLoading を showSkeleton に統一) */}
+            {showSkeleton ? (
+                <Skeleton h="56px" w="full" borderRadius="md" />
             ) : (
                 <SubmitButton
                     onClick={handlePreSubmitCheck}
