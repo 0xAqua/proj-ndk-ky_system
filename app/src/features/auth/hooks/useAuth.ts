@@ -42,11 +42,12 @@ export const useAuth = () => {
         } catch (error) {
             console.error("Logout API failed", error);
         } finally {
+            navigate('/login', { replace: true });
+
             queryClient.clear();
             sessionStorage.clear();
             localStorage.setItem('logout_event', Date.now().toString());
             localStorage.removeItem('logout_event');
-            navigate('/login', { replace: true });
             isLoggingOut.current = false;
         }
     }, [queryClient, navigate]);

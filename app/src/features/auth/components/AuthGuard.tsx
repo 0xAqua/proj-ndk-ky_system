@@ -46,13 +46,19 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
     }
 
     // 3. 権限（ロール）のチェック
-    if (allowedRoles && user) {
+    if (allowedRoles) {
+        // ユーザー情報がまだ取得できていない場合は、中身を出さずに待機（チラつき防止）
+        if (!user) {
+            return null;
+        }
+
         const currentRole = (user.tenantUser?.role || user.role) as UserRole;
+
         if (!allowedRoles.includes(currentRole)) {
+            // ログアウト処理中でないことを確認してからリダイレクトするのが安全
             return <Navigate to="/entry" replace />;
         }
     }
 
-    // すべての条件をクリアした場合のみ children を表示
     return <>{children}</>;
 };

@@ -1,19 +1,24 @@
-import {useEffect, useRef} from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { authService } from '@/lib/service/auth';
 
-// 14分ごとにリフレッシュ（トークン寿命15分より少し短くする）
-const REFRESH_INTERVAL = 14 * 60 * 1000;
+const REFRESH_INTERVAL = 14 * 60 * 1000;        // 14分
+const ACTIVITY_THRESHOLD = 5 * 60 * 1000;       // 5分以内に操作があればリフレッシュ
+const MAX_SESSION_DURATION = 3 * 60 * 60 * 1000; // 最大3時間
 
-// 改善案: 操作があった時だけリフレッシュタイマーをリセット
 export const useTokenRefresh = () => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, logout } = useAuth();
     const lastActivityRef = useRef(Date.now());
+    const sessionStartRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        // 操作を検知してタイムスタンプ更新
+        // セッション開始時刻を記録（初回のみ）
+        if (sessionStartRef.current === null) {
+            sessionStartRef.current = Date.now();
+        }
+
         const updateActivity = () => {
             lastActivityRef.current = Date.now();
         };
@@ -22,12 +27,19 @@ export const useTokenRefresh = () => {
         events.forEach(e => window.addEventListener(e, updateActivity));
 
         const intervalId = setInterval(async () => {
+            // 最大3時間チェック
+            if (sessionStartRef.current &&
+                Date.now() - sessionStartRef.current > MAX_SESSION_DURATION) {
+                void logout();
+                return;
+            }
+
             // 最後の操作から5分以内ならリフレッシュ
-            if (Date.now() - lastActivityRef.current < 5 * 60 * 1000) {
+            if (Date.now() - lastActivityRef.current < ACTIVITY_THRESHOLD) {
                 try {
                     await authService.refresh();
-                } catch (error) {
-                    // handle error
+                } catch {
+                    void logout();
                 }
             }
         }, REFRESH_INTERVAL);
@@ -36,5 +48,5 @@ export const useTokenRefresh = () => {
             clearInterval(intervalId);
             events.forEach(e => window.removeEventListener(e, updateActivity));
         };
-    }, [isAuthenticated]);
+    }, [isAuthenticated, logout]);
 };

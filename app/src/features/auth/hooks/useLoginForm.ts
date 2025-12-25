@@ -1,5 +1,4 @@
-// src/features/auth/hooks/useLoginForm.ts
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 
@@ -11,9 +10,9 @@ export const useLoginForm = () => {
     const queryClient = useQueryClient();
     const credentialsAuth = useCredentialsAuth();
 
-    /**
-     * 1. セッションチェックを Query 化
-     */
+    // 【重要】遷移開始から画面が消えるまでの「繋ぎ」の状態
+    const [isNavigating, setIsNavigating] = useState(false);
+
     const { data: session, isLoading: isCheckingSession } = useQuery({
         queryKey: ['session'],
         queryFn: authService.checkSession,
@@ -21,58 +20,40 @@ export const useLoginForm = () => {
         retry: false,
     });
 
-    /**
-     * 2. プリフェッチロジック（統合版）
-     * ログイン後に必要な「ユーザー情報」と「工事マスタ」を一括で事前に読み込みます。
-     */
-    const prefetchAuthContext = useCallback(async () => {
-        await queryClient.prefetchQuery({
-            queryKey: ['authContext'],
-            queryFn: authService.getAuthContext,
-            staleTime: 1000 * 60 * 60, // 1時間
-        });
-    }, [queryClient]);
+    // 【重要】async/await を削除し、即座に navigate するように変更
+    const navigateByRole = useCallback(() => {
+        setIsNavigating(true); // 遷移開始を宣言
 
-    /**
-     * 3. ログイン済みの場合の自動リダイレクト
-     */
-    useEffect(() => {
-        if (session?.authenticated) {
-            // セッションがあればコンテキストをプリフェッチして遷移
-            void prefetchAuthContext();
+        // ロール判定は遷移先の EntryForm 内で行うため、ここでは即座に /entry へ飛ばす
+        // キャッシュに admin 情報がある場合のみ admin へ飛ばす（同期的なチェック）
+        const authContext = queryClient.getQueryData<any>(['authContext']);
+        const userRole = authContext?.user?.role;
+
+        if (userRole === "admin") {
+            navigate("/admin/sample", { replace: true });
+        } else {
             navigate("/entry", { replace: true });
         }
-    }, [session, navigate, prefetchAuthContext]);
+    }, [navigate, queryClient]);
 
-    /**
-     * 4. ログイン実行
-     */
+    useEffect(() => {
+        if (session?.authenticated) {
+            navigateByRole();
+        }
+    }, [session?.authenticated, navigateByRole]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // 1. ログイン認証の通信（ここは待つ必要がある）
         const result = await credentialsAuth.handleLogin();
 
         if (result?.success) {
-            // 1. セッション情報のキャッシュを無効化
-            await queryClient.invalidateQueries({ queryKey: ['session'] });
+            // 2. セッションの無効化（await しない：バックグラウンドで実行）
+            void queryClient.invalidateQueries({ queryKey: ['session'] });
 
-            // 2. 統合されたデータを取得（prefetchではなくfetchQueryを使って結果を受け取る）
-            // これにより、遷移前に role を確認できます
-            const authContext = await queryClient.fetchQuery({
-                queryKey: ['authContext'],
-                queryFn: authService.getAuthContext,
-                staleTime: 60 * 60 * 1000,
-            });
-
-            // 3. role に応じて遷移先を分岐
-            const userRole = authContext?.user?.role;
-
-            if (userRole === "admin") {
-                // 管理者の場合
-                navigate("/admin/sample", { replace: true });
-            } else {
-                // 一般ユーザー（またはrole未設定）の場合
-                navigate("/entry", { replace: true });
-            }
+            // 3. 即座に遷移
+            navigateByRole();
         }
     };
 
@@ -83,7 +64,7 @@ export const useLoginForm = () => {
         password: credentialsAuth.password,
         setPassword: credentialsAuth.setPassword,
         handleLogin,
-        isLoading: credentialsAuth.isLoading,
+        isLoading: credentialsAuth.isLoading || isNavigating,
         error: credentialsAuth.error,
     };
 };

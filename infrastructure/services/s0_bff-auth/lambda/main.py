@@ -34,6 +34,7 @@ KMS_KEY_ID = os.environ['KMS_KEY_ID']
 session_table = dynamodb.Table(SESSION_TABLE)
 user_master_table = dynamodb.Table(TENANT_USER_MASTER_TABLE)
 
+MAX_SESSION_DURATION = 3 * 60 * 60  # 3時間
 
 # ============================================
 # 共通ユーティリティ
@@ -378,12 +379,32 @@ def handle_refresh(event: dict, cors_headers: dict) -> dict:
     hashed_id = hash_session_id(session_id)
 
     try:
+        # ★ まずセッションを取得
         resp = session_table.get_item(Key={'session_id': hashed_id})
         session = resp.get('Item')
 
         if not session:
             return create_response(401, {'error': 'InvalidSession'}, cors_headers)
 
+        current_time = int(time.time())
+
+        # ① 無操作15分チェック（expires_at が過去なら拒否）
+        if session.get('expires_at', 0) < current_time:
+            session_table.delete_item(Key={'session_id': hashed_id})
+            cookie = build_cookie('sessionId', '', 0)
+            response = create_response(401, {'error': 'SessionExpired'}, cors_headers)
+            response['headers']['Set-Cookie'] = cookie
+            return response
+
+        # ② 最大3時間チェック
+        if session.get('created_at', 0) + MAX_SESSION_DURATION < current_time:
+            session_table.delete_item(Key={'session_id': hashed_id})
+            cookie = build_cookie('sessionId', '', 0)
+            response = create_response(401, {'error': 'MaxSessionDurationExceeded'}, cors_headers)
+            response['headers']['Set-Cookie'] = cookie
+            return response
+
+        # ③ リフレッシュトークン取得
         encrypted_refresh_token = session.get('refresh_token')
         if not encrypted_refresh_token:
             return create_response(401, {'error': 'RefreshTokenMissing'}, cors_headers)

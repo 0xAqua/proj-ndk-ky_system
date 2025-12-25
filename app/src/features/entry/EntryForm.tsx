@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, VStack, Text, useDisclosure } from "@chakra-ui/react";
+import {Box, VStack, Text, useDisclosure, Skeleton} from "@chakra-ui/react";
 
 // ★ カスタムクライアントとエンドポイント
 import { api } from "@/lib/client";
@@ -15,8 +15,6 @@ import { SiteCondition } from "@/features/entry/components/elements/SiteConditio
 import { SubmitButton } from "@/features/entry/components/elements/SubmitButton";
 import { SiteConditionConfirmModal } from "@/features/entry/components/elements/SiteConditionConfirmModal";
 
-// ★ スケルトンとフック
-import { EntryFormSkeleton } from "@/features/entry/components/elements/EntryFormSkeleton";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useConstructionMaster } from "@/features/entry/hooks/useConstructionMaster";
 import {useNotification} from "@/hooks/useNotification.ts";
@@ -41,6 +39,8 @@ export const EntryForm = () => {
         isLoading: isMasterLoading,
         error
     } = useConstructionMaster();
+
+    const isLoading = isAuthLoading || isMasterLoading;
 
     // 状態管理 (ユーザー入力)
     const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -139,13 +139,8 @@ export const EntryForm = () => {
 
 
     // ──────────────────────────────────────────
-    // UIガード (スケルトン・エラー表示)
+    // UIガード (早期リターン）
     // ──────────────────────────────────────────
-
-    // 読み込み中：作成したスケルトンコンポーネントを表示
-    if (isAuthLoading || isMasterLoading) {
-        return <EntryFormSkeleton />;
-    }
 
     // エラー発生時
     if (error) {
@@ -166,39 +161,60 @@ export const EntryForm = () => {
         <VStack gap={8} align="stretch">
             <ConstructionDate value={date} onChange={setDate} />
 
-            <ConstructionProject
-                masterCategories={constructions}
-                selectedTypeIds={selectedTypeIds}
-                onChange={(newTypeIds) => {
-                    setSelectedTypeIds(newTypeIds);
-                    setSelectedProcessIds([]); // 工事種別変更時に工程をリセット
-                }}
-            />
+            {isLoading ? (
+                <Skeleton h="120px" w="full" borderRadius="md" />
+            ) : (
+                <ConstructionProject
+                    masterCategories={constructions}
+                    selectedTypeIds={selectedTypeIds}
+                    onChange={(newTypeIds) => {
+                        setSelectedTypeIds(newTypeIds);
+                        setSelectedProcessIds([]);
+                    }}
+                />
+            )}
 
-            <ConstructionProcess
-                masterCategories={constructions}
-                targetTypeIds={selectedTypeIds}
-                value={selectedProcessIds}
-                onChange={setSelectedProcessIds}
-            />
+            {/* 3. 工事工程 */}
+            {isLoading ? (
+                <Skeleton h="200px" w="full" borderRadius="md" />
+            ) : (
+                <ConstructionProcess
+                    masterCategories={constructions}
+                    targetTypeIds={selectedTypeIds}
+                    value={selectedProcessIds}
+                    onChange={setSelectedProcessIds}
+                />
+            )}
 
-            <ImportantEquipment
-                masterCategories={constructions}
-                selectedProcessIds={selectedProcessIds}
-            />
+            {isLoading ? (
+                <Skeleton h="200px" w="full" borderRadius="md" />
+            ) : (
+                <ImportantEquipment
+                    masterCategories={constructions}
+                    selectedProcessIds={selectedProcessIds}
+                />
+            )}
 
-            <SiteCondition
-                masterEnvironments={environments}
-                value={selectedEnvIds}
-                onChange={setSelectedEnvIds}
-            />
+            {isLoading ? (
+                <Skeleton h="200px" w="full" borderRadius="md" />
+            ) : (
+                <SiteCondition
+                    masterEnvironments={environments}
+                    value={selectedEnvIds}
+                    onChange={setSelectedEnvIds}
+                />
+            )}
 
-            <SubmitButton
-                onClick={handlePreSubmitCheck}
-                loading={isSubmitting}
-            >
-                入力内容の確認
-            </SubmitButton>
+            {isLoading ? (
+                <Skeleton h="200px" w="full" borderRadius="md" />
+            ) : (
+                <SubmitButton
+                    onClick={handlePreSubmitCheck}
+                    loading={isSubmitting}
+                >
+                    入力内容の確認
+                </SubmitButton>
+            )}
 
             {/* 確認用モーダル */}
             <SiteConditionConfirmModal

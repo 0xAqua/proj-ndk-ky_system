@@ -28,12 +28,13 @@ export const useConstructionMaster = () => {
 
     // 2. データ整形ロジック
     const { constructions, environments } = useMemo(() => {
+        if (!constructionMaster) {
+            return { constructions: [], environments: [] };
+        }
+
         const tempConstructions: ProcessCategory[] = [];
         const tempEnvironments: ProcessCategory[] = [];
 
-        if (!constructionMaster || constructionMaster.length === 0) {
-            return { constructions: [], environments: [] };
-        }
 
         constructionMaster.forEach((node: any) => {
             // A. 環境系データ (IDが ENV で始まる場合)
