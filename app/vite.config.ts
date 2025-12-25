@@ -21,8 +21,6 @@ export default defineConfig(({ mode }) => {
                     secure: true,
                 },
             },
-            host: true,
-            allowedHosts: ['.lvh.me'],
         },
     }
 })

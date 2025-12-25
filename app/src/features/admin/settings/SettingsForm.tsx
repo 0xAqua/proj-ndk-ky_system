@@ -4,29 +4,80 @@ import { SettingsHeader } from "@/features/admin/settings/components/SettingsHea
 import { AIOutputSettings } from "@/features/admin/settings/components/AIOutputSettings";
 import { AuthSettings } from "@/features/admin/settings/components/AuthSettings";
 import { SettingsNav } from "@/features/admin/settings/components/SettingsNav";
+import { AIOutputConfirmDialog } from "@/features/admin/settings/components/AIOutputConfirmDialog";
+import { AuthConfirmDialog } from "@/features/admin/settings/components/AuthConfirmDialog";
 import { useAIOutputSettings } from "@/features/admin/settings/hooks/useAIOutputSettings";
-import {useEffect, useState} from "react";
-import type {PromptConfig} from "@/lib//service/tenantConfig";
+import { useSecuritySettings } from "@/features/admin/settings/hooks/useSecuritySettings";
+import { useEffect, useState } from "react";
+import type { PromptConfig, SecurityConfig } from "@/lib/service/tenantConfig";
 
 type SettingsSection = "ai-output" | "auth";
 
 export const SettingsForm = () => {
     const [activeSection, setActiveSection] = useState<SettingsSection>("ai-output");
-    const { config, isLoading, isSaving, updateConfig } = useAIOutputSettings();
-    const [localConfig, setLocalConfig] = useState<PromptConfig | null>(null);
 
-    // configが取得されたら一度だけlocalConfigを初期化
+    // AI出力設定
+    const {
+        config: aiConfig,
+        isLoading: isAiLoading,
+        isSaving: isAiSaving,
+        updateConfig: updateAiConfig
+    } = useAIOutputSettings();
+    const [localAiConfig, setLocalAiConfig] = useState<PromptConfig | null>(null);
+    const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
+
+    // セキュリティ設定
+    const {
+        config: securityConfig,
+        isLoading: isSecurityLoading,
+        isSaving: isSecuritySaving,
+        updateConfig: updateSecurityConfig
+    } = useSecuritySettings();
+    const [localSecurityConfig, setLocalSecurityConfig] = useState<SecurityConfig | null>(null);
+    const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+
+    // AI設定の初期化
     useEffect(() => {
-        if (config && !localConfig) {
-            setLocalConfig(config);
+        if (aiConfig && !localAiConfig) {
+            setLocalAiConfig(aiConfig);
         }
-    }, [config, localConfig]);
+    }, [aiConfig, localAiConfig]);
 
-    const handleSave = async () => {
-        if (activeSection === "ai-output" && localConfig) {
-            await updateConfig(localConfig);
+    // セキュリティ設定の初期化
+    useEffect(() => {
+        if (securityConfig && !localSecurityConfig) {
+            setLocalSecurityConfig(securityConfig);
+        }
+    }, [securityConfig, localSecurityConfig]);
+
+    const handleSaveClick = () => {
+        if (activeSection === "ai-output") {
+            setIsAiDialogOpen(true);
+        } else if (activeSection === "auth") {
+            setIsAuthDialogOpen(true);
         }
     };
+
+    const handleConfirmAiSave = async () => {
+        if (localAiConfig) {
+            await updateAiConfig(localAiConfig);
+            setIsAiDialogOpen(false);
+        }
+    };
+
+    const handleConfirmAuthSave = async () => {
+        if (localSecurityConfig) {
+            await updateSecurityConfig(localSecurityConfig);
+            setIsAuthDialogOpen(false);
+        }
+    };
+
+    // 現在のセクションの状態
+    const isLoading = activeSection === "ai-output" ? isAiLoading : isSecurityLoading;
+    const isSaving = activeSection === "ai-output" ? isAiSaving : isSecuritySaving;
+    const hasChanges = activeSection === "ai-output"
+        ? localAiConfig !== null
+        : localSecurityConfig !== null;
 
     return (
         <Box maxW="5xl" mx="auto">
@@ -38,12 +89,18 @@ export const SettingsForm = () => {
                         <Box bg="white" p={8} borderRadius="xl" borderWidth="1px" borderColor="gray.200" shadow="sm">
                             {activeSection === "ai-output" && (
                                 <AIOutputSettings
-                                    config={localConfig || config}
-                                    onChange={setLocalConfig}
-                                    isLoading={isLoading}
+                                    config={localAiConfig || aiConfig}
+                                    onChange={setLocalAiConfig}
+                                    isLoading={isAiLoading}
                                 />
                             )}
-                            {activeSection === "auth" && <AuthSettings />}
+                            {activeSection === "auth" && (
+                                <AuthSettings
+                                    config={localSecurityConfig || securityConfig}
+                                    onChange={setLocalSecurityConfig}
+                                    isLoading={isSecurityLoading}
+                                />
+                            )}
                         </Box>
 
                         <Flex justify="flex-end">
@@ -54,9 +111,9 @@ export const SettingsForm = () => {
                                 px={8}
                                 borderRadius="md"
                                 _hover={{ bg: "orange.600" }}
-                                onClick={handleSave}
+                                onClick={handleSaveClick}
                                 loading={isSaving}
-                                disabled={isLoading || !localConfig}
+                                disabled={isLoading || !hasChanges}
                             >
                                 <PiFloppyDisk style={{ marginRight: "8px" }} />
                                 変更を保存
@@ -65,6 +122,22 @@ export const SettingsForm = () => {
                     </VStack>
                 </Box>
             </Flex>
+
+            {/* AI出力設定の確認ダイアログ */}
+            <AIOutputConfirmDialog
+                open={isAiDialogOpen}
+                onOpenChange={setIsAiDialogOpen}
+                onConfirm={handleConfirmAiSave}
+                isSaving={isAiSaving}
+            />
+
+            {/* 認証設定の確認ダイアログ */}
+            <AuthConfirmDialog
+                open={isAuthDialogOpen}
+                onOpenChange={setIsAuthDialogOpen}
+                onConfirm={handleConfirmAuthSave}
+                isSaving={isSecuritySaving}
+            />
         </Box>
     );
 };

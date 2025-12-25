@@ -15,7 +15,7 @@ const navItems = [
     },
     {
         id: "auth" as const,
-        label: "認証設定"
+        label: "セキュリティ認証設定"
     },
 ];
 

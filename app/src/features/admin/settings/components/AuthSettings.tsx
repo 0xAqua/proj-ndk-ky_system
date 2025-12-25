@@ -1,27 +1,59 @@
-// components/settings/AuthSettings.tsx
-import { Box, Flex, Stack, Text, Separator } from "@chakra-ui/react";
+import { Box, Flex, Stack, Text, Separator, Spinner } from "@chakra-ui/react";
 import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
 import { PiEnvelopeSimple, PiFingerprint, PiInfo } from "react-icons/pi";
+import type { SecurityConfig } from "@/lib/service/tenantConfig";
 
-export const AuthSettings = () => {
-    const [emailAuth, setEmailAuth] = useState(false);
-    const [passkeyEnabled, setPasskeyEnabled] = useState(false);
+interface AuthSettingsProps {
+    config: SecurityConfig | null;
+    onChange: (config: SecurityConfig) => void;
+    isLoading: boolean;
+}
+
+export const AuthSettings = ({ config, onChange, isLoading }: AuthSettingsProps) => {
+    if (isLoading || !config) {
+        return (
+            <Flex justify="center" align="center" minH="200px">
+                <Spinner size="lg" color="blue.500" />
+            </Flex>
+        );
+    }
+
+    const handleOtpToggle = () => {
+        // Passkey有効中はOTPをOFFにできない
+        if (config.otp_enabled && config.passkey_enabled) {
+            return;
+        }
+        onChange({
+            ...config,
+            otp_enabled: !config.otp_enabled,
+        });
+    };
+
+    const handlePasskeyToggle = () => {
+        const newPasskeyEnabled = !config.passkey_enabled;
+        onChange({
+            ...config,
+            passkey_enabled: newPasskeyEnabled,
+            // Passkey ON → OTP強制ON
+            otp_enabled: newPasskeyEnabled ? true : config.otp_enabled,
+        });
+    };
 
     return (
         <Box>
             <Stack gap={8}>
-                {/* メール認証 */}
+                {/* メール認証（OTP） */}
                 <Flex
                     justify="space-between"
                     align="center"
-                    cursor="pointer"
-                    onClick={() => setEmailAuth(!emailAuth)}
-                    _hover={{ bg: "gray.50" }}
+                    cursor={config.passkey_enabled ? "not-allowed" : "pointer"}
+                    onClick={handleOtpToggle}
+                    _hover={{ bg: config.passkey_enabled ? "transparent" : "gray.50" }}
                     p={2}
                     mx={-2}
                     borderRadius="md"
                     transition="background 0.2s"
+                    opacity={config.passkey_enabled ? 0.6 : 1}
                 >
                     <Flex align="start" gap={3} flex={1}>
                         <Box color="blue.500" mt={1}>
@@ -29,17 +61,22 @@ export const AuthSettings = () => {
                         </Box>
                         <Box flex={1}>
                             <Text fontWeight="semibold" color="gray.800">
-                                メール認証
+                                メール認証（One Time Password）
                             </Text>
                             <Text fontSize="sm" color="gray.500" mt={1}>
-                                ログイン時にメールアドレスによる認証を要求します
+                                ログイン時にメールアドレスによるワンタイムパスワード認証を要求します
                             </Text>
+                            {config.passkey_enabled && (
+                                <Text fontSize="xs" color="orange.500" mt={1}>
+                                    ※ Passkey有効時はメール認証も必須です
+                                </Text>
+                            )}
                         </Box>
                     </Flex>
 
                     <Switch
                         colorPalette="blue"
-                        checked={emailAuth}
+                        checked={config.otp_enabled}
                         pointerEvents="none"
                         size="lg"
                     />
@@ -53,7 +90,7 @@ export const AuthSettings = () => {
                         justify="space-between"
                         align="center"
                         cursor="pointer"
-                        onClick={() => setPasskeyEnabled(!passkeyEnabled)}
+                        onClick={handlePasskeyToggle}
                         _hover={{ bg: "gray.50" }}
                         p={2}
                         mx={-2}
@@ -76,7 +113,7 @@ export const AuthSettings = () => {
 
                         <Switch
                             colorPalette="blue"
-                            checked={passkeyEnabled}
+                            checked={config.passkey_enabled}
                             pointerEvents="none"
                             size="lg"
                         />
