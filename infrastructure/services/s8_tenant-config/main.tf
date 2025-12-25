@@ -150,7 +150,7 @@ resource "aws_apigatewayv2_route" "put_security_config" {
   authorizer_id      = var.origin_verify_authorizer_id
 }
 
-# Lambda Integration（変更なし）
+# Lambda Integration
 resource "aws_apigatewayv2_integration" "lambda" {
   api_id                 = var.api_gateway_id
   integration_type       = "AWS_PROXY"
@@ -159,7 +159,7 @@ resource "aws_apigatewayv2_integration" "lambda" {
   payload_format_version = "2.0"
 }
 
-# Lambda Permission（変更なし）
+# Lambda Permission
 resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGateway"
   action        = "lambda:InvokeFunction"
