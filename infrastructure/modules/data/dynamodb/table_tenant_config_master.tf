@@ -37,5 +37,10 @@ resource "aws_dynamodb_table" "tenant_config_master" {
 #   - fact_incidents             : N    - 過去事例インシデント数
 #   - countermeasures_per_case   : N    - 1インシデントあたりの対応策数
 #   - include_predicted_incidents: BOOL - AI予測インシデントを含めるか
+# security_config : M  - セキュリティ設定 ★追加
+#   - otp_enabled       : BOOL - OTP認証の有効/無効
+#   - passkey_enabled   : BOOL - Passkey認証の有効/無効
+#   - otp_required      : BOOL - OTP必須か任意か（オプション）
+#   - passkey_required  : BOOL - Passkey必須か任意か（オプション）
 # created_at    : N  - 作成日時
 # updated_at    : N  - 更新日時

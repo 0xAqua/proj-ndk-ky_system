@@ -114,25 +114,43 @@ resource "aws_iam_role_policy" "kms_policy" {
 # API Gateway Integration
 # ─────────────────────────────
 
-# GET /tenant-config - テナント設定取得
-resource "aws_apigatewayv2_route" "get_config" {
+# GET /tenant-config/prompt - プロンプト設定取得
+resource "aws_apigatewayv2_route" "get_prompt_config" {
   api_id             = var.api_gateway_id
-  route_key          = "GET /tenant-config"
+  route_key          = "GET /tenant-config/prompt"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
   authorization_type = "CUSTOM"
   authorizer_id      = var.origin_verify_authorizer_id
 }
 
-# PUT /tenant-config - テナント設定更新
-resource "aws_apigatewayv2_route" "put_config" {
+# PUT /tenant-config/prompt - プロンプト設定更新
+resource "aws_apigatewayv2_route" "put_prompt_config" {
   api_id             = var.api_gateway_id
-  route_key          = "PUT /tenant-config"
+  route_key          = "PUT /tenant-config/prompt"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
   authorization_type = "CUSTOM"
   authorizer_id      = var.origin_verify_authorizer_id
 }
 
-# Lambda Integration
+# GET /tenant-config/security - セキュリティ設定取得
+resource "aws_apigatewayv2_route" "get_security_config" {
+  api_id             = var.api_gateway_id
+  route_key          = "GET /tenant-config/security"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
+}
+
+# PUT /tenant-config/security - セキュリティ設定更新
+resource "aws_apigatewayv2_route" "put_security_config" {
+  api_id             = var.api_gateway_id
+  route_key          = "PUT /tenant-config/security"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
+}
+
+# Lambda Integration（変更なし）
 resource "aws_apigatewayv2_integration" "lambda" {
   api_id                 = var.api_gateway_id
   integration_type       = "AWS_PROXY"
@@ -141,7 +159,7 @@ resource "aws_apigatewayv2_integration" "lambda" {
   payload_format_version = "2.0"
 }
 
-# Lambda Permission
+# Lambda Permission（変更なし）
 resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGateway"
   action        = "lambda:InvokeFunction"
