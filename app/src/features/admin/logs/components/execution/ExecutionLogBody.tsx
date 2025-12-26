@@ -2,7 +2,7 @@ import { Table, Badge, Text } from "@chakra-ui/react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { summarizeList } from "@/features/admin/logs/utils/logUtils";
 import { ExecutionLogSkeleton } from "./ExecutionLogSkeleton";
-import type { ExecutionLog } from "@/lib/service/logs";
+import type { ExecutionLog } from "@/lib/service/logsService.ts";
 import {renderTooltipList} from "@/features/admin/logs/components/elements/renderTooltipList.tsx";
 
 type Props = {

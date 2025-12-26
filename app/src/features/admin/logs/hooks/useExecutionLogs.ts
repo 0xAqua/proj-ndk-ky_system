@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { logsService } from '@/lib/service/logs';
-import type { ExecutionLog, PaginationInfo } from '@/lib/service/logs';
+import { logsService } from '@/lib/service/logsService.ts';
+import type { ExecutionLog, PaginationInfo } from '@/lib/service/logsService.ts';
 import type { ExecutionLogFilterConditions } from '@/features/admin/logs/components/execution/ExecutionLogsFilterModal';
 
 export const useExecutionLogs = () => {

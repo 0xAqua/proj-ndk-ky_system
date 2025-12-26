@@ -6,7 +6,7 @@ import { LogsPagination } from "../elements/LogsPagination.tsx";
 import { ItemsPerPageSelect } from "../elements/ItemsPerPageSelect.tsx";
 import { ExecutionLogsFilterModal, type ExecutionLogFilterConditions } from "./ExecutionLogsFilterModal";
 import { ExecutionLogBody } from "@/features/admin/logs/components/execution/ExecutionLogBody";
-import type { ExecutionLog } from "@/lib/service/logs";
+import type { ExecutionLog } from "@/lib/service/logsService.ts";
 
 type Props = {
     data: ExecutionLog[];

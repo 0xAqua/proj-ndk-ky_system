@@ -86,3 +86,11 @@ output "access_history_table_name" {
 output "access_history_table_arn" {
   value = aws_dynamodb_table.access_history.arn
 }
+
+output "operation_history_table_name" {
+  value = aws_dynamodb_table.operation_history.name
+}
+
+output "operation_history_table_arn" {
+  value = aws_dynamodb_table.operation_history.arn
+}

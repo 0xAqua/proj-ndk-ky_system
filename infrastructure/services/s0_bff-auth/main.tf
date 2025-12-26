@@ -104,6 +104,11 @@ resource "aws_iam_role_policy" "dynamodb" {
         Effect = "Allow"
         Action = ["dynamodb:GetItem"]
         Resource = [var.tenant_config_table_arn]
+      },
+      {
+        Effect = "Allow"
+        Action = ["dynamodb:PutItem"]
+        Resource = [var.access_history_table_arn]
       }
     ]
   })
@@ -157,6 +162,7 @@ resource "aws_lambda_function" "bff_auth" {
       CLIENT_ID                = var.user_pool_client_id
       SESSION_TABLE            = var.auth_sessions_table_name
       TENANT_USER_MASTER_TABLE = var.tenant_user_master_table_name
+      ACCESS_HISTORY_TABLE     = var.access_history_table_name
       ALLOWED_ORIGINS          = join(",", var.allowed_origins)
       POWERTOOLS_SERVICE_NAME  = "BFFAuth"
       POWERTOOLS_LOG_LEVEL     = "INFO"

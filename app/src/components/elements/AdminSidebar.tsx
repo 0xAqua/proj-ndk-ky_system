@@ -5,7 +5,7 @@ import { NavItem } from "@/components/elements/NavItem";
 import { PiSquaresFour, PiUsers, PiListChecks, PiDatabase, PiSparkle, PiFileText, PiPencilSimple, PiGear } from "react-icons/pi";
 
 export const AdminSidebar = () => {
-    const { authState, userInfo, isExpanded, isLoggingOut, toggleExpanded, handleLogout } = useAdminSidebar();
+    const { authState, userInfo, isExpanded, toggleExpanded, handleLogout } = useAdminSidebar();
 
     if (authState === "unauthenticated") return null;
 
@@ -36,7 +36,7 @@ export const AdminSidebar = () => {
                     <Box w="full" px={2}><Box w="full" h="1px" bg="gray.200" my={2} /></Box>
                     <NavItem to="/entry" icon={PiPencilSimple} label="新規登録" isExpanded={isExpanded} isExternal iconColor="white" iconBg="orange.500" />
                     <NavItem to="/settings" icon={PiGear} label="システム設定" isExpanded={isExpanded} />
-                    <UserMenu isExpanded={isExpanded} userInfo={userInfo} isLoggingOut={isLoggingOut} onLogout={handleLogout} />
+                    <UserMenu isExpanded={isExpanded} userInfo={userInfo} onLogout={handleLogout} />
                 </VStack>
             </Flex>
         </Box>

@@ -122,7 +122,8 @@ module "s5_admin_user" {
   origin_verify_secret = module.secrets.origin_verify_secret_value
   origin_verify_authorizer_id = module.api_gateway.origin_verify_authorizer_id
 
-
+  operation_history_table_name = module.dynamodb.operation_history_table_name
+  operation_history_table_arn  = module.dynamodb.operation_history_table_arn
 }
 
 
@@ -197,6 +198,9 @@ module "s7_logs" {
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
 
   origin_verify_secret = module.secrets.origin_verify_secret_value
+  operation_history_table_name = module.dynamodb.operation_history_table_name
+  operation_history_table_arn  = module.dynamodb.operation_history_table_arn
+
 }
 
 
@@ -341,6 +345,8 @@ module "s3_vq_workflow" {
   tenant_config_table_name = module.dynamodb.tenant_config_master_table_name
   tenant_config_table_arn  = module.dynamodb.tenant_config_master_table_arn
 
+  operation_history_table_name = module.dynamodb.operation_history_table_name
+  operation_history_table_arn  = module.dynamodb.operation_history_table_arn
 }
 
 # ─────────────────────────────
@@ -468,15 +474,15 @@ module "bff_auth" {
 
   # ★ 修正: module.dynamodb から直接取得するように変更
   tenant_user_master_table_name = module.dynamodb.tenant_user_master_table_name
-  tenant_user_master_table_arn  = module.dynamodb.tenant_user_master_table_arn
+  tenant_user_master_table_arn = module.dynamodb.tenant_user_master_table_arn
 
   # Cognito
-  user_pool_id        = module.auth.user_pool_id
+  user_pool_id = module.auth.user_pool_id
   user_pool_client_id = module.auth.user_pool_client_id
 
   # DynamoDB (セッション管理)
   auth_sessions_table_name = module.dynamodb.auth_sessions_table_name
-  auth_sessions_table_arn  = module.dynamodb.auth_sessions_table_arn
+  auth_sessions_table_arn = module.dynamodb.auth_sessions_table_arn
 
   # API Gateway
   api_gateway_id            = module.api_gateway.api_id
@@ -496,8 +502,11 @@ module "bff_auth" {
   ]
 
   tenant_config_table_name = module.dynamodb.tenant_config_master_table_name
-  tenant_config_table_arn  = module.dynamodb.tenant_config_master_table_arn
+  tenant_config_table_arn = module.dynamodb.tenant_config_master_table_arn
 
+  # ★ アクセス履歴テーブル
+  access_history_table_name = module.dynamodb.access_history_table_name
+  access_history_table_arn  = module.dynamodb.access_history_table_arn
 }
 
 # ─────────────────────────────
@@ -525,4 +534,7 @@ module "s8_tenant_config" {
 
   # KMS
   lambda_kms_key_arn = module.kms.lambda_key_arn
+
+  operation_history_table_name = module.dynamodb.operation_history_table_name
+  operation_history_table_arn  = module.dynamodb.operation_history_table_arn
 }

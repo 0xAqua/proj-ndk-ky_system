@@ -1,6 +1,6 @@
-# Subscription Filter
-# これを導入するかEventBridgeで対応するのか
-
+# ─────────────────────────────
+# Operation History Table (操作履歴)
+# ─────────────────────────────
 resource "aws_dynamodb_table" "operation_history" {
   name         = "${local.name_prefix}-operation-history"
   billing_mode = "PAY_PER_REQUEST"
@@ -8,20 +8,51 @@ resource "aws_dynamodb_table" "operation_history" {
   # ─────────────────────────────
   # Key Schema
   # ─────────────────────────────
-  hash_key  = "timestamp"
-  range_key = "email"  # ← 変更
+  hash_key  = "tenant_id"
+  range_key = "timestamp_id"
+
 
   # ─────────────────────────────
   # Attribute Definitions
   # ─────────────────────────────
   attribute {
-    name = "timestamp"
-    type = "N"
+    name = "tenant_id"
+    type = "S"
   }
 
   attribute {
-    name = "email"  # ← 変更
+    name = "timestamp_id"
     type = "S"
+  }
+
+  attribute {
+    name = "category"
+    type = "S"
+  }
+
+  attribute {
+    name = "email"
+    type = "S"
+  }
+
+  # ─────────────────────────────
+  # GSI: カテゴリ × 時刻で絞り込み
+  # ─────────────────────────────
+  global_secondary_index {
+    name            = "CategoryIndex"
+    hash_key        = "tenant_id"
+    range_key       = "category"
+    projection_type = "ALL"
+  }
+
+  # ─────────────────────────────
+  # GSI: ユーザー（メール）で絞り込み
+  # ─────────────────────────────
+  global_secondary_index {
+    name            = "EmailIndex"
+    hash_key        = "tenant_id"
+    range_key       = "email"
+    projection_type = "ALL"
   }
 
   # ─────────────────────────────
@@ -41,20 +72,10 @@ resource "aws_dynamodb_table" "operation_history" {
   }
 
   tags = {
-    Project     = var.project
-    Environment = var.environment
-    Module      = "data-dynamodb"
-    Table       = "operation_history"
+    Project      = var.project
+    Environment  = var.environment
+    Module       = "data-dynamodb"
+    Table        = "operation_history"
+    BackupTarget = "True"
   }
 }
-
-# ─────────────────────────────
-# 保存する属性（参考用コメント）
-# ─────────────────────────────
-# timestamp     : N  - いつ（UNIXミリ秒）※PK
-# email         : S  - 誰が ※SK
-# tenant_id     : S  - テナントID
-# action        : S  - CREATE / UPDATE / DELETE / VIEW / EXECUTE
-# resource_type : S  - user / project / rag / ...
-# message       : S  - "ユーザー xxx@example.com を削除しました"
-# expires_at    : N  - TTL（90日後）

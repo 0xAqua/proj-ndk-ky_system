@@ -13,7 +13,6 @@ from modules import prompt_config, security_config
 logger = Logger()
 tracer = Tracer()
 
-# 環境変数
 TENANT_CONFIG_TABLE = os.environ.get('TENANT_CONFIG_TABLE')
 SESSION_TABLE = os.environ.get('SESSION_TABLE')
 
@@ -31,7 +30,6 @@ class DecimalEncoder(json.JSONEncoder):
 
 
 def create_response(status_code: int, body: dict) -> dict:
-    """レスポンス生成"""
     return {
         "statusCode": status_code,
         "headers": {
@@ -44,12 +42,10 @@ def create_response(status_code: int, body: dict) -> dict:
 
 
 def hash_session_id(session_id: str) -> str:
-    """セッションIDをSHA-256でハッシュ化"""
     return hashlib.sha256(session_id.encode()).hexdigest()
 
 
 def get_session(event: APIGatewayProxyEventV2):
-    """Cookieからセッション情報を取得"""
     raw_cookies = event.get('cookies', [])
     session_id = None
     for c in raw_cookies:
@@ -77,20 +73,28 @@ def get_session(event: APIGatewayProxyEventV2):
 @event_source(data_class=APIGatewayProxyEventV2)
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
-    # CSRFチェック
     raw_headers = {k.lower(): v for k, v in event.raw_event.get("headers", {}).items()}
     if raw_headers.get('x-requested-with', '').lower() != 'xmlhttprequest':
         return create_response(403, {"error": "Forbidden"})
 
-    # セッション認証
     session = get_session(event)
     if not session:
         return create_response(401, {"error": "Unauthorized"})
 
     tenant_id = session.get('tenant_id')
+    caller_email = session.get('email', 'unknown')  # ★ 追加
     logger.append_keys(tenant_id=tenant_id)
 
-    # ルーティング
+    # ★ IPアドレスを取得
+    ip_address = event.request_context.http.source_ip if hasattr(event.request_context.http, 'source_ip') else ""
+
+    # ★ コンテキストを作成
+    ctx = {
+        "tenant_id": tenant_id,
+        "caller_email": caller_email,
+        "ip_address": ip_address
+    }
+
     path = event.raw_event.get('rawPath', '')
     method = event.request_context.http.method
     body = json.loads(event.body or '{}') if event.body else {}
@@ -100,13 +104,13 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
         if method == 'GET':
             return prompt_config.handle_get(config_table, tenant_id)
         elif method == 'PUT':
-            return prompt_config.handle_put(config_table, tenant_id, body)
+            return prompt_config.handle_put(config_table, tenant_id, body, ctx)  # ★ ctx追加
 
     # /tenant-config/security
     elif '/tenant-config/security' in path:
         if method == 'GET':
             return security_config.handle_get(config_table, tenant_id)
         elif method == 'PUT':
-            return security_config.handle_put(config_table, tenant_id, body)
+            return security_config.handle_put(config_table, tenant_id, body, ctx)  # ★ ctx追加
 
     return create_response(404, {"error": "Not found"})

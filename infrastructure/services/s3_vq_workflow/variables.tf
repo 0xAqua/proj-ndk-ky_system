@@ -96,3 +96,10 @@ variable "tenant_config_table_arn" {
   description = "Tenant config master table ARN"
   type        = string
 }
+
+variable "operation_history_table_name" {
+  type = string
+}
+variable "operation_history_table_arn" {
+  type = string
+}

@@ -7,7 +7,7 @@ import boto3
 import hashlib
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from modules import execution_logs, access_logs
+from modules import execution_logs, access_logs, operation_logs  # ★ operation_logs追加
 
 logger = Logger()
 dynamodb = boto3.resource('dynamodb')
@@ -41,7 +41,6 @@ def get_session(event):
     if not session_id:
         return None
 
-    # ★ ハッシュ化してから検索
     hashed_id = hash_session_id(session_id)
 
     try:
@@ -53,7 +52,7 @@ def get_session(event):
 
         response = table.get_item(
             Key={
-                'session_id': hashed_id  # ★ 修正
+                'session_id': hashed_id
             }
         )
 
@@ -63,9 +62,9 @@ def get_session(event):
         print(f"Session check failed: {str(e)}")
         return None
 
+
 @logger.inject_lambda_context
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
-
     # ─────────────────────────────
     # CloudWatch Logs Subscription Filter からの呼び出し
     # ─────────────────────────────
@@ -73,7 +72,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
         return access_logs.save_logs(event)
 
     # ─────────────────────────────
-    # API Gateway からの呼び出し（既存処理）
+    # API Gateway からの呼び出し
     # ─────────────────────────────
     headers = {k.lower(): v for k, v in event.get("headers", {}).items()}
     expected = os.environ.get("ORIGIN_VERIFY_SECRET")
@@ -101,7 +100,11 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
     if path == '/logs/execution' and method == 'GET':
         return execution_logs.get_logs(event, context, tenant_id, origin)
 
-    if path == '/logs/access' and method == 'GET':  # ← 追加
+    if path == '/logs/access' and method == 'GET':
         return access_logs.get_logs(event, context, tenant_id, origin)
+
+    # ★ 追加
+    if path == '/logs/operation' and method == 'GET':
+        return operation_logs.get_logs(event, context, tenant_id, origin)
 
     return create_response(404, {'error': 'Not Found'}, origin)

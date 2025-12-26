@@ -61,8 +61,9 @@ resource "aws_lambda_function" "logs" {
       TENANT_VQ_MANAGER_TABLE  = var.tenant_vq_manager_table_name
       TENANT_USER_MASTER_TABLE = var.tenant_user_master_table_name
       TENANT_LOG_ARCHIVE_TABLE = var.tenant_log_archive_table_name
-      ACCESS_HISTORY_TABLE     = var.access_history_table_name    # ★ 追加
-      USER_POOL_ID             = var.user_pool_id                  # ★ 追加
+      ACCESS_HISTORY_TABLE     = var.access_history_table_name
+      OPERATION_HISTORY_TABLE  = var.operation_history_table_name  # ★ 追加
+      USER_POOL_ID             = var.user_pool_id
       LOG_LEVEL                = "INFO"
       SESSION_TABLE            = var.session_table_name
       POWERTOOLS_SERVICE_NAME  = "LogsService"
@@ -128,8 +129,10 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
           var.tenant_log_archive_table_arn,
           "${var.tenant_log_archive_table_arn}/index/*",
           var.session_table_arn,
-          var.access_history_table_arn,              # ★ 追加
-          "${var.access_history_table_arn}/index/*"  # ★ 追加
+          var.access_history_table_arn,
+          "${var.access_history_table_arn}/index/*",
+          var.operation_history_table_arn,              # ★ 追加
+          "${var.operation_history_table_arn}/index/*"  # ★ 追加
         ]
       }
     ]
@@ -213,6 +216,15 @@ resource "aws_lambda_permission" "api_gateway" {
   function_name = aws_lambda_function.logs.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${var.api_gateway_execution_arn}/*/*"
+}
+
+# ★ GET /logs/operation（追加）
+resource "aws_apigatewayv2_route" "operation_logs" {
+  api_id             = var.api_gateway_id
+  route_key          = "GET /logs/operation"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  authorization_type = "CUSTOM"
+  authorizer_id      = var.origin_verify_authorizer_id
 }
 
 # ─────────────────────────────

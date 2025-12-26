@@ -4,6 +4,7 @@ import time
 import boto3
 import requests
 from aws_lambda_powertools import Logger, Tracer
+from shared.operation_logger import log_operation, Category, Action
 
 logger = Logger()
 tracer = Tracer()
@@ -201,7 +202,7 @@ def lambda_handler(event, context):
 
             if not tenant_id:
                 logger.error("tenant_idがありません", action_category="ERROR")
-                return  # 処理不能
+                return
 
             # 1. 認証情報取得
             creds = get_vq_credentials(tenant_id)
@@ -217,12 +218,10 @@ def lambda_handler(event, context):
 
             logger.debug("VQ APIレスポンス", action_category="BATCH", response=data)
 
-            # ステータス確認 (processing / done)
             status = data.get('status')
 
             if status != 'done':
                 logger.info("ジョブは処理中です。再確認します。", action_category="BATCH", status=status)
-
                 sqs.send_message(
                     QueueUrl=SQS_QUEUE_URL,
                     MessageBody=record['body'],
@@ -234,9 +233,14 @@ def lambda_handler(event, context):
             result_reply = data.get('reply', '')
 
             if is_valid_content(result_reply):
-                # 成功: DB更新（Markdownコードブロックを除去して保存）
                 logger.info("検証成功 - DynamoDBに保存します", action_category="BATCH")
                 cleaned_reply = strip_markdown_code_block(result_reply)
+
+                # ★ email を取得するためにジョブ情報を取得
+                job_resp = table.get_item(Key={'job_id': job_id})
+                job_item = job_resp.get('Item', {})
+                email = job_item.get('email', 'unknown')
+
                 table.update_item(
                     Key={'job_id': job_id},
                     UpdateExpression="set #r=:r, #st=:s, updated_at=:u",
@@ -247,18 +251,32 @@ def lambda_handler(event, context):
                         ':u': int(time.time())
                     }
                 )
+
+                # ★ VQ完了を操作履歴に記録
+                log_operation(
+                    tenant_id=tenant_id,
+                    email=email,
+                    category=Category.VQ,
+                    action=Action.EXECUTE,
+                    target_type="vq_job",
+                    target_id=job_id,
+                    message="VQ実行が完了しました",
+                    detail={
+                        "type_names": job_item.get('type_names', []),
+                        "process_names": job_item.get('process_names', [])
+                    }
+                )
+
                 logger.info("ジョブ完了", action_category="BATCH", job_id=job_id)
             else:
-                # 失敗: やり直し (Re-create)
+                # 失敗: やり直し
                 logger.warning("検証失敗 - リトライします", action_category="ERROR")
 
-                # 無限ループ防止のための回数チェック
                 resp = table.get_item(Key={'job_id': job_id})
                 if 'Item' in resp:
                     current_item = resp['Item']
                     current_retry = int(current_item.get('retry_count', 0))
 
-                    # 例: 3回以上リトライしていたら、あきらめてFAILEDにする
                     if current_retry >= 3:
                         logger.error("リトライ上限に達しました - FAILEDに設定", action_category="ERROR", retry_count=current_retry)
                         table.update_item(
@@ -271,13 +289,11 @@ def lambda_handler(event, context):
                                 ':e': 'Validation failed multiple times. Invalid JSON format.'
                             }
                         )
-                        return  # ここで終了（再送しない）
+                        return
 
-                    # まだ上限に達していなければ再作成
                     logger.info("リトライ中", action_category="BATCH", retry_count=current_retry + 1)
                     recreate_job(creds, current_item, tenant_id, error_reason="Validation failed: Invalid JSON format.")
 
         except Exception as e:
-            # 待機用の例外チェックは不要になったので削除し、予期せぬエラーのみを扱う
             logger.exception("ワーカーエラーが発生しました", action_category="ERROR")
-            raise e  # 本当のエラーはDLQ行きにするため raise
+            raise e

@@ -35,6 +35,8 @@ resource "null_resource" "build_lambda" {
     # ソースコードをコピー（サブディレクトリ含む）
     cp -r ${local.src_dir}/*.py ${local.build_dir}/
     cp -r ${local.src_dir}/modules ${local.build_dir}/ 2>/dev/null || true
+    # ★ shared フォルダをコピー
+    cp -r ${path.module}/../shared ${local.build_dir}/ 2>/dev/null || true
   EOT
   }
 }
@@ -62,6 +64,7 @@ resource "aws_lambda_function" "tenant_config" {
   environment {
     variables = {
       TENANT_CONFIG_TABLE = var.tenant_config_table_name
+      OPERATION_HISTORY_TABLE   = var.operation_history_table_name
       LOG_LEVEL           = "INFO"
       SESSION_TABLE       = var.session_table_name
       COOKIE_SAME_SITE    = "Lax"
@@ -116,7 +119,10 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
           "dynamodb:PutItem",
           "dynamodb:UpdateItem"
         ]
-        Resource = var.tenant_config_table_arn
+        Resource = [
+          var.tenant_config_table_arn,
+          var.operation_history_table_arn  # ★ 追加
+        ]
       },
       {
         Effect   = "Allow"

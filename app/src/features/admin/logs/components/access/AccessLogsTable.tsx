@@ -6,7 +6,7 @@ import { LogsPagination } from "../elements/LogsPagination";
 import { ItemsPerPageSelect } from "../elements/ItemsPerPageSelect";
 import { AccessLogsFilterModal, type AccessLogFilterConditions } from "./AccessLogsFilterModal";
 import { AccessLogBody } from "./AccessLogBody";
-import type { AccessLog } from "@/lib/service/logs";
+import type { AccessLog } from "@/lib/service/logsService.ts";
 
 type Props = {
     data: AccessLog[];

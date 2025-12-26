@@ -1,26 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
-import { logsService, type AccessLog, type PaginationInfo } from "@/lib/service/logsService.ts";
-import type { AccessLogFilterConditions } from "../components/access/AccessLogsFilterModal";
+import { logsService, type OperationLog, type PaginationInfo } from "@/lib/service/logsService";
+import type { OperationLogFilterConditions } from "../components/operation/OperationLogsFilterModal";
 
-export const useAccessLogs = () => {
-    const [logs, setLogs] = useState<AccessLog[]>([]);
+export const useOperationLogs = () => {
+    const [logs, setLogs] = useState<OperationLog[]>([]);
     const [pagination, setPagination] = useState<PaginationInfo | null>(null);
     const [loading, setLoading] = useState(true);
 
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(30);
     const [search, setSearch] = useState("");
-    const [filters, setFilters] = useState<AccessLogFilterConditions>({
+    const [filters, setFilters] = useState<OperationLogFilterConditions>({
         startDate: "",
         endDate: "",
-        ipAddress: "",
-        destination: [],
+        category: [],
+        action: [],
     });
 
     const fetchLogs = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await logsService.getAccessLogs({
+            const res = await logsService.getOperationLogs({
                 page,
                 limit,
                 search,
@@ -29,7 +29,7 @@ export const useAccessLogs = () => {
             setLogs(res.items);
             setPagination(res.pagination);
         } catch (err) {
-            console.error("Failed to fetch access logs:", err);
+            console.error("Failed to fetch operation logs:", err);
             setLogs([]);
         } finally {
             setLoading(false);
@@ -37,7 +37,7 @@ export const useAccessLogs = () => {
     }, [page, limit, search, filters]);
 
     useEffect(() => {
-        fetchLogs();
+        void fetchLogs();
     }, [fetchLogs]);
 
     const handleSetLimit = (newLimit: number) => {
@@ -50,7 +50,7 @@ export const useAccessLogs = () => {
         setSearch(text);
     };
 
-    const handleSetFilters = (newFilters: AccessLogFilterConditions) => {
+    const handleSetFilters = (newFilters: OperationLogFilterConditions) => {
         setPage(1);
         setFilters(newFilters);
     };

@@ -71,3 +71,13 @@ variable "kms_key_id" {
 variable "origin_verify_authorizer_id" {
   type = string
 }
+
+variable "access_history_table_name" {
+  type        = string
+  description = "アクセス履歴テーブルの名前"
+}
+
+variable "access_history_table_arn" {
+  type        = string
+  description = "アクセス履歴テーブルのARN"
+}

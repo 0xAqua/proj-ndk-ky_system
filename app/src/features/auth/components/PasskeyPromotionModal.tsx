@@ -111,17 +111,23 @@ export const PasskeyPromotionModal = ({ isOpen, onClose, onComplete }: Props) =>
                     </Dialog.Body>
                     <Dialog.Footer pt={4} gap={3}>
                         <Button
-                            variant="ghost"
+                            variant="outline"
+                            rounded="full"
+                            h={12}
+                            w={36}
                             onClick={onComplete}
                             disabled={isLoading}
                         >
                             今はしない
                         </Button>
                         <Button
+                            h={12}
+                            w={36}
                             colorPalette="green"
                             onClick={handleRegister}
                             loading={isLoading}
                             loadingText="登録中..."
+                            rounded="full"
                         >
                             登録する
                         </Button>

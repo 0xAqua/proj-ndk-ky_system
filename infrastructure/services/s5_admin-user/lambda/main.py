@@ -6,9 +6,8 @@ from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.data_classes import event_source, APIGatewayProxyEventV2
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from urllib.parse import unquote  # ← 追加: URLエンコードされたemailのデコード用
+from urllib.parse import unquote
 
-# 各アクションのハンドラをインポート
 from modules import list_users, create_user, get_user, update_user, delete_user
 
 logger = Logger()
@@ -18,7 +17,6 @@ dynamodb = boto3.resource('dynamodb')
 SESSION_TABLE = os.environ.get('SESSION_TABLE')
 
 def create_response(status_code: int, body: dict, origin: str) -> dict:
-    """CORS・Cookie対応の共通レスポンス生成"""
     return {
         "statusCode": status_code,
         "headers": {
@@ -30,13 +28,9 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
     }
 
 def hash_session_id(session_id: str) -> str:
-    """セッションIDをSHA-256でハッシュ化"""
     return hashlib.sha256(session_id.encode()).hexdigest()
 
 def get_session(event):
-    """
-    Cookie から sessionId を抽出し、DynamoDB からセッション情報を取得します。
-    """
     cookies = event.get('cookies', [])
     session_id = None
 
@@ -89,26 +83,30 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
         return create_response(401, {"message": "Unauthorized"}, origin)
 
     tenant_id = str(session.get("tenant_id"))
-    caller_email = str(session.get("email"))  # ← 変更
+    caller_email = str(session.get("email"))
 
     # 管理者権限のチェック
     if session.get("role") != "admin":
-        logger.warning(f"一般ユーザーによる管理操作を拒否しました: {caller_email}")  # ← 変更
+        logger.warning(f"一般ユーザーによる管理操作を拒否しました: {caller_email}")
         return create_response(403, {"message": "Access Denied"}, origin)
 
-    logger.append_keys(tenant_id=tenant_id, email=caller_email)  # ← 変更
+    logger.append_keys(tenant_id=tenant_id, email=caller_email)
 
     # ルーティング情報取得
     http_method = event.request_context.http.method
     path = event.raw_path
     path_params = event.path_parameters or {}
 
+    # ★ IPアドレスを取得
+    ip_address = event.request_context.http.source_ip if hasattr(event.request_context.http, 'source_ip') else ""
+
     # ハンドラに渡すコンテキスト
     ctx = {
         "tenant_id": tenant_id,
-        "caller_email": caller_email,  # ← 変更
+        "caller_email": caller_email,
         "session": session,
-        "origin": origin
+        "origin": origin,
+        "ip_address": ip_address  # ★ 追加
     }
 
     logger.info(f"Admin Request: {http_method} {path}", action_category="EXECUTE")
@@ -121,15 +119,14 @@ def lambda_handler(event: APIGatewayProxyEventV2, context: LambdaContext):
             elif http_method == "POST":
                 return create_user.handle(event, ctx)
 
-        elif path.startswith("/admin/users/") and path_params.get("email"):  # ← 変更
-            # URLエンコードされたemailをデコード（例: test%40example.com → test@example.com）
-            target_email = unquote(path_params["email"])  # ← 変更
+        elif path.startswith("/admin/users/") and path_params.get("email"):
+            target_email = unquote(path_params["email"])
             if http_method == "GET":
-                return get_user.handle(event, ctx, target_email)  # ← 変更
+                return get_user.handle(event, ctx, target_email)
             elif http_method == "PATCH":
-                return update_user.handle(event, ctx, target_email)  # ← 変更
+                return update_user.handle(event, ctx, target_email)
             elif http_method == "DELETE":
-                return delete_user.handle(event, ctx, target_email)  # ← 変更
+                return delete_user.handle(event, ctx, target_email)
 
         return create_response(404, {"message": "Not Found"}, origin)
 

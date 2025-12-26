@@ -31,18 +31,54 @@ COOKIE_SAME_SITE = os.environ.get('COOKIE_SAME_SITE', 'Lax')
 SESSION_TTL_SECONDS = int(os.environ.get('SESSION_TTL_SECONDS', '3600'))
 KMS_KEY_ID = os.environ['KMS_KEY_ID']
 PENDING_AUTH_TTL_SECONDS = int(os.environ.get('PENDING_AUTH_TTL_SECONDS', '300'))  # 5分
+ACCESS_HISTORY_TABLE = os.environ.get('ACCESS_HISTORY_TABLE')
 
 # DynamoDBテーブル
 session_table = dynamodb.Table(SESSION_TABLE)
 user_master_table = dynamodb.Table(TENANT_USER_MASTER_TABLE)
 tenant_config_table = dynamodb.Table(TENANT_CONFIG_TABLE)
-
+access_history_table = dynamodb.Table(ACCESS_HISTORY_TABLE)
 MAX_SESSION_DURATION = 3 * 60 * 60  # 3時間
 
 
 # ============================================
 # 共通ユーティリティ
 # ============================================
+# ─────────────────────────────
+# 追加: アクセスログ保存用関数
+# ─────────────────────────────
+def save_access_log(email: str, ip_address: str, tenant_id: str = 'UNKNOWN',
+                    user_sub: str = None, user_agent: str = '',
+                    event_type: str = 'Login', result: str = 'Success',
+                    detail: str = None):
+    """DynamoDBにアクセス履歴を保存（失敗してもメイン処理は止めない）"""
+    try:
+        timestamp = int(time.time())
+        # ソートキーを一意にするためのランダム値
+        event_id = secrets.token_hex(8)
+
+        item = {
+            'tenant_id': tenant_id,
+            'timestamp_event_id': f"{timestamp}#{event_id}",
+            'email': email,
+            'event_type': event_type,
+            'result': result,
+            'ip_address': ip_address,
+            'user_agent': user_agent,
+            'created_at': timestamp,
+            'expires_at': timestamp + (90 * 24 * 60 * 60) # 90日保存
+        }
+
+        if user_sub:
+            item['user_sub'] = user_sub
+        if detail:
+            item['detail'] = detail # エラー内容など
+
+        access_history_table.put_item(Item=item)
+
+    except Exception as e:
+        # ログ保存のエラーはログに出すだけで、ログイン処理自体は続行させる
+        logger.error(f"Failed to save access log: {e}")
 
 def encrypt_token(token: str) -> str:
     """KMSでトークンを暗号化"""
@@ -473,6 +509,10 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
         username = body.get('username', '').strip()
         password = body.get('password', '')
 
+        http_ctx = event.get('requestContext', {}).get('http', {})
+        source_ip = http_ctx.get('sourceIp', 'unknown')
+        user_agent = http_ctx.get('userAgent', '')
+
         if not username or not password:
             return create_response(400, {'error': '入力が不足しています'}, cors_headers)
 
@@ -487,6 +527,17 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
                 AuthParameters={'USERNAME': username, 'PASSWORD': password}
             )
         except Exception as e:
+            error_code = getattr(e, 'response', {}).get('Error', {}).get('Code', str(e))
+
+            save_access_log(
+                email=username, # ログインしようとしたメアド
+                ip_address=source_ip,
+                user_agent=user_agent,
+                tenant_id='UNKNOWN', # 失敗時はテナント不明
+                event_type='Login',
+                result='Failure',
+                detail=error_code
+            )
             return handle_cognito_error(e, cors_headers)
 
         # ChallengeName がある場合（NEW_PASSWORD_REQUIREDなど）
@@ -566,6 +617,9 @@ def handle_verify_otp(event: dict, cors_headers: dict) -> dict:
         body = json.loads(event.get('body', '{}'))
         pending_key = body.get('pending_key', '').strip()
         otp_code = body.get('otp_code', '').strip()
+        http_ctx = event.get('requestContext', {}).get('http', {})
+        source_ip = http_ctx.get('sourceIp', 'unknown')
+        user_agent = http_ctx.get('userAgent', '')
 
         if not pending_key or not otp_code:
             return create_response(400, {'error': '入力が不足しています'}, cors_headers)
@@ -602,14 +656,36 @@ def handle_verify_otp(event: dict, cors_headers: dict) -> dict:
             )
         except cognito.exceptions.NotAuthorizedException:
             logger.warning("OTP verification failed - NotAuthorized", action_category="AUTH")
+            save_access_log(
+                tenant_id=tenant_id,
+                email=email,
+                ip_address=source_ip,
+                user_agent=user_agent,
+                event_type='Login(OTP)', # OTP段階での失敗とわかるように
+                result='Failure',
+                detail='InvalidOTP'
+            )
+
             return create_response(401, {'error': 'InvalidOTP'}, cors_headers)
         except cognito.exceptions.CodeMismatchException:
+        # ★ ここにもログ保存を追加すると、入力ミスも検知できます
             logger.warning("OTP verification failed - CodeMismatch", action_category="AUTH")
-            return create_response(401, {'error': 'InvalidOTP'}, cors_headers)
-        except Exception as e:
-            logger.exception("OTP verification failed")
+            save_access_log(
+                tenant_id=tenant_id, email=email, ip_address=source_ip,
+                user_agent=user_agent, event_type='Login(OTP)',
+                result='Failure', detail='CodeMismatch'
+            )
             return create_response(401, {'error': 'InvalidOTP'}, cors_headers)
 
+        except Exception as e:
+            # ★ 予期せぬエラーも記録しておくとデバッグに役立ちます
+            logger.exception("OTP verification failed")
+            save_access_log(
+                tenant_id=tenant_id, email=email, ip_address=source_ip,
+                user_agent=user_agent, event_type='Login(OTP)',
+                result='Failure', detail=str(e)
+            )
+            return create_response(401, {'error': 'InvalidOTP'}, cors_headers)
         # ──────────────────────────────────────────────────────────
         # 3. 結果判定
         # ──────────────────────────────────────────────────────────
@@ -715,9 +791,25 @@ def handle_resend_otp(event: dict, cors_headers: dict) -> dict:
 def create_session_and_response(tokens: Dict, user_info: Dict, event: dict, cors_headers: dict) -> dict:
     """セッション作成してCookieレスポンスを返す"""
     email = user_info.get('email', '')
-    tenant_id = user_info.get('custom:tenant_id', 'UNKNOWN')
-    source_ip = event.get('requestContext', {}).get('http', {}).get('sourceIp', 'unknown')
     now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    tenant_id = user_info.get('custom:tenant_id', 'UNKNOWN')
+    user_sub = user_info.get('sub') # subを取得
+
+    # RequestContextからIPとUAを取得
+    http_ctx = event.get('requestContext', {}).get('http', {})
+    source_ip = http_ctx.get('sourceIp', 'unknown')
+    user_agent = http_ctx.get('userAgent', '')
+
+    # ▼▼▼ 追加: 成功ログの保存 ▼▼▼
+    save_access_log(
+        tenant_id=tenant_id,
+        email=email,
+        user_sub=user_sub,
+        ip_address=source_ip,
+        user_agent=user_agent,
+        event_type='Login',
+        result='Success'
+    )
 
     has_passkey = False
     try:

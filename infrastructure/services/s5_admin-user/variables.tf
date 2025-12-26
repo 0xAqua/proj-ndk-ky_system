@@ -85,3 +85,13 @@ variable "session_table_arn" {
 variable "origin_verify_authorizer_id" {
   type = string
 }
+
+variable "operation_history_table_name" {
+  description = "Operation history DynamoDB table name"
+  type        = string
+}
+
+variable "operation_history_table_arn" {
+  description = "Operation history DynamoDB table ARN"
+  type        = string
+}

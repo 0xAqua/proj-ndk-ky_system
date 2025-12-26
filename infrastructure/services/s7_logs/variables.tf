@@ -113,3 +113,11 @@ variable "cognito_log_group_arn" {
   description = "Cognito CloudWatch Log Group ARN"
   type        = string
 }
+
+variable "operation_history_table_name" {
+  type = string
+}
+variable "operation_history_table_arn" {
+  type = string
+}
+

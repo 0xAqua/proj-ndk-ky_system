@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from aws_lambda_powertools import Logger, Tracer
 from botocore.exceptions import ClientError
 from .cognito_client import cognito, USER_POOL_ID, tenant_user_master_table
+from shared.operation_logger import log_user_created  # ★ 追加
 
 logger = Logger()
 tracer = Tracer()
@@ -23,16 +24,16 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
 def handle(event, ctx):
     """ユーザー新規作成（Cognito + DynamoDB）"""
     tenant_id = ctx["tenant_id"]
-    caller_email = ctx["caller_email"]  # ← 変更: 操作を行っている管理者のemail
+    caller_email = ctx["caller_email"]
     origin = ctx.get("origin", "*")
+    ip_address = ctx.get("ip_address", "")  # ★ 追加
 
     try:
         body = json.loads(event.body) if event.body else {}
     except json.JSONDecodeError:
         return create_response(400, {"message": "Invalid JSON"}, origin)
 
-    # 必須バリデーション（emailとpasswordのみ）
-    required = ["email", "password"]  # ← 変更: family_name, given_name を削除
+    required = ["email", "password"]
     missing = [f for f in required if not body.get(f)]
     if missing:
         return create_response(400, {"message": f"Missing fields: {missing}"}, origin)
@@ -41,11 +42,9 @@ def handle(event, ctx):
     password = body["password"]
     role = body.get("role", "user")
 
-    # 部署情報の整形
     departments = body.get("departments", {})
     departments["DEPT#1"] = "共通"
 
-    # タイムスタンプ生成 (ISO8601形式で統一)
     now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
     logger.info(f"ユーザー作成を開始: {email}", action_category="EXECUTE")
@@ -59,7 +58,7 @@ def handle(event, ctx):
                 {"Name": "email", "Value": email},
                 {"Name": "email_verified", "Value": "true"},
                 {"Name": "custom:tenant_id", "Value": tenant_id},
-            ],  # ← 変更: family_name, given_name を削除
+            ],
             MessageAction="SUPPRESS"
         )
 
@@ -71,10 +70,10 @@ def handle(event, ctx):
             Permanent=True
         )
 
-        # 3. DynamoDB に登録（キー: tenant_id + email）
+        # 3. DynamoDB に登録
         user_item = {
             "tenant_id": tenant_id,
-            "email": email,  # ← 変更: user_id を削除、email がキー
+            "email": email,
             "departments": departments,
             "role": role,
             "status": "ACTIVE",
@@ -82,10 +81,19 @@ def handle(event, ctx):
             "created_at": now_iso,
             "updated_at": now_iso,
             "status_changed_at": now_iso,
-            "status_changed_by": caller_email  # ← 変更
+            "status_changed_by": caller_email
         }
 
         tenant_user_master_table.put_item(Item=user_item)
+
+        # ★ 操作履歴を記録
+        log_user_created(
+            tenant_id=tenant_id,
+            email=caller_email,
+            target_email=email,
+            role=role,
+            ip_address=ip_address
+        )
 
         logger.info(f"ユーザー作成完了: {email}", action_category="EXECUTE")
         return create_response(201, {

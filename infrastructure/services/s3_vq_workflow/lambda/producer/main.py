@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.data_classes import event_source, APIGatewayProxyEventV2
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from shared.operation_logger import log_vq_executed
 
 logger = Logger()
 tracer = Tracer()
@@ -268,6 +269,18 @@ def handle_post(event, session, origin):
                 'mid': mid,
                 'tenant_id': tenant_id
             })
+        )
+
+        ip_address = event.request_context.http.source_ip if hasattr(event.request_context, 'http') else ""
+        log_vq_executed(
+            tenant_id=tenant_id,
+            email=email,
+            job_id=job_id,
+            detail={
+                "type_names": input_data.get('typeNames', []),
+                "process_names": input_data.get('processNames', [])
+            },
+            ip_address=ip_address
         )
 
         return create_response(200, {"job_id": job_id, "message": "Job accepted"}, origin)

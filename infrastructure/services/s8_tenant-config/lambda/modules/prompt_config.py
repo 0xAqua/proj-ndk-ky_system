@@ -1,11 +1,11 @@
 import time
 from aws_lambda_powertools import Logger
+from shared.operation_logger import log_config_updated  # ★ 追加
 
 logger = Logger()
 
 
 def create_response(status_code: int, body: dict) -> dict:
-    """レスポンス生成"""
     import json
     from decimal import Decimal
 
@@ -47,7 +47,7 @@ def handle_get(config_table, tenant_id: str) -> dict:
         return create_response(500, {"error": str(e)})
 
 
-def handle_put(config_table, tenant_id: str, body: dict) -> dict:
+def handle_put(config_table, tenant_id: str, body: dict, ctx: dict = None) -> dict:  # ★ ctx追加
     """プロンプト設定を更新"""
     try:
         prompt_config = body.get('prompt_config')
@@ -55,13 +55,11 @@ def handle_put(config_table, tenant_id: str, body: dict) -> dict:
         if not prompt_config:
             return create_response(400, {"error": "prompt_config is required"})
 
-        # バリデーション
         required_keys = ['total_incidents', 'fact_incidents', 'countermeasures_per_case', 'include_predicted_incidents']
         for key in required_keys:
             if key not in prompt_config:
                 return create_response(400, {"error": f"Missing required key: {key}"})
 
-        # 数値バリデーション
         if not isinstance(prompt_config.get('total_incidents'), int) or prompt_config['total_incidents'] < 1:
             return create_response(400, {"error": "total_incidents must be a positive integer"})
 
@@ -74,17 +72,14 @@ def handle_put(config_table, tenant_id: str, body: dict) -> dict:
         if not isinstance(prompt_config.get('include_predicted_incidents'), bool):
             return create_response(400, {"error": "include_predicted_incidents must be a boolean"})
 
-        # fact_incidents <= total_incidents チェック
         if prompt_config['fact_incidents'] > prompt_config['total_incidents']:
             return create_response(400, {"error": "fact_incidents cannot exceed total_incidents"})
 
         now = int(time.time())
 
-        # 既存チェック
         existing = config_table.get_item(Key={'tenant_id': tenant_id}).get('Item')
 
         if existing:
-            # 更新
             config_table.update_item(
                 Key={'tenant_id': tenant_id},
                 UpdateExpression="SET prompt_config = :pc, updated_at = :ua",
@@ -94,13 +89,22 @@ def handle_put(config_table, tenant_id: str, body: dict) -> dict:
                 }
             )
         else:
-            # 新規作成
             config_table.put_item(Item={
                 'tenant_id': tenant_id,
                 'prompt_config': prompt_config,
                 'created_at': now,
                 'updated_at': now
             })
+
+        # ★ 操作履歴を記録
+        if ctx:
+            log_config_updated(
+                tenant_id=tenant_id,
+                email=ctx.get('caller_email', 'unknown'),
+                config_type="prompt",
+                detail=prompt_config,
+                ip_address=ctx.get('ip_address', '')
+            )
 
         return create_response(200, {
             "message": "Config updated successfully",

@@ -1,6 +1,6 @@
 import { Table, Badge, Text } from "@chakra-ui/react";
 import { AccessLogSkeleton } from "./AccessLogSkeleton";
-import type { AccessLog } from "@/lib/service/logs";
+import type { AccessLog } from "@/lib/service/logsService.ts";
 
 type Props = {
     data: AccessLog[];

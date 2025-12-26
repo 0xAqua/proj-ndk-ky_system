@@ -1,45 +1,20 @@
 import { useState } from 'react';
 import { Box, Flex } from '@chakra-ui/react';
 import { LogsSidebar } from '@/features/admin/logs/components/elements/LogsSidebar.tsx';
-import { OperationLogsTable } from '@/features/admin/logs/components/operation/OperationLogsTable';
 import { ExecutionLogsFrom } from '@/features/admin/logs/ExecutionLogsForm';
 
-import type { OperationLogFilterConditions } from '@/features/admin/logs/components/operation/OperationLogsFilterModal';
 import {AccessLogsForm} from "@/features/admin/logs/AccessLogsForm.tsx";
+import {OperationLogsForm} from "@/features/admin/logs/OperationLogsForm.tsx";
 
 type LogType = 'access' | 'operation' | 'execution';
 
 export const LogsForm = () => {
     // 基本的な表示状態
     const [selectedLog, setSelectedLog] = useState<LogType>('access');
-    const [itemsPerPage, setItemsPerPage] = useState<number>(30);
-    const [currentPage, setCurrentPage] = useState<number>(1);
 
-    // --- 各ログの検索・フィルター実行時のハンドラー ---
-    // 実際の実装ではここで API へのフェッチ処理などを行います
-    const handleSearch = (text: string) => {
-        console.log(`${selectedLog} search:`, text);
-        setCurrentPage(1); // 検索時は1ページ目に戻す
-    };
-
-    const handleFilterApply = (filters: any) => {
-        console.log(`${selectedLog} filters applied:`, filters);
-        setCurrentPage(1);
-    };
-
-    // --- ページネーション・切り替えハンドラー ---
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page);
-    };
-
-    const handleItemsPerPageChange = (items: number) => {
-        setItemsPerPage(items);
-        setCurrentPage(1);
-    };
 
     const handleLogTypeChange = (logType: LogType) => {
         setSelectedLog(logType);
-        setCurrentPage(1); // ログ種別変更時はページをリセット
     };
 
     return (
@@ -57,16 +32,7 @@ export const LogsForm = () => {
 
                 {/* 操作履歴 */}
                 {selectedLog === 'operation' && (
-                    <OperationLogsTable
-                        data={[]}
-                        totalItems={0}
-                        currentPage={currentPage}
-                        itemsPerPage={itemsPerPage}
-                        onPageChange={handlePageChange}
-                        onItemsPerPageChange={handleItemsPerPageChange}
-                        onSearch={handleSearch}
-                        onFilterApply={(f: OperationLogFilterConditions) => handleFilterApply(f)}
-                    />
+                    <OperationLogsForm />
                 )}
 
                 {/* 実行履歴 */}

@@ -29,7 +29,6 @@ export const UserMenu = ({ isExpanded, userInfo, isLoggingOut, onLogout }: any) 
                     {isExpanded && (
                         <>
                             <Box flex={1} textAlign="left" ml={1} overflow="hidden">
-                                <Text fontSize="sm" fontWeight="bold" truncate>{userInfo.name}</Text>
                                 <Text fontSize="xs" color="gray.500" truncate>{userInfo.email}</Text>
                             </Box>
                             <Box color="gray.400" mr={2}><LuChevronDown size={14} /></Box>

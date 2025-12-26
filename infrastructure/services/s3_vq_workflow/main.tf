@@ -50,6 +50,7 @@ resource "null_resource" "producer_build" {
 
       # ソースコードをコピー
       cp ${local.producer_src_dir}/*.py ${local.producer_build_dir}/
+      cp -r ${path.module}/../shared ${local.producer_build_dir}/ 2>/dev/null || true
     EOT
   }
 
@@ -98,6 +99,7 @@ resource "null_resource" "worker_build" {
 
       # ソースコードをコピー
       cp ${local.worker_src_dir}/*.py ${local.worker_build_dir}/
+      cp -r ${path.module}/../shared ${local.producer_build_dir}/ 2>/dev/null || true
     EOT
   }
 }
@@ -133,7 +135,7 @@ data "aws_iam_policy_document" "producer_policy" {
   statement { # DynamoDB Put/Get
     effect    = "Allow"
     actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"]
-    resources = [var.job_table_arn, var.session_table_arn, var.tenant_config_table_arn]  # ← 追加
+    resources = [var.job_table_arn, var.session_table_arn, var.tenant_config_table_arn, var.operation_history_table_arn]  # ← 追加
   }
   statement { # SQS Send
     effect    = "Allow"
@@ -176,7 +178,11 @@ data "aws_iam_policy_document" "worker_policy" {
   statement { # DynamoDB Read/Update
     effect    = "Allow"
     actions   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
-    resources = [var.job_table_arn, var.session_table_arn]
+    resources = [
+      var.job_table_arn,
+      var.session_table_arn,
+      var.operation_history_table_arn  # ★ 追加
+    ]
   }
   statement { # SQS Receive/Delete/Send (★Sendは再試行ロジックで必要)
     effect    = "Allow"
@@ -230,6 +236,7 @@ resource "aws_lambda_function" "producer" {
       COOKIE_SAME_SITE  = "Lax"
       ORIGIN_VERIFY_SECRET          = var.origin_verify_secret
       TENANT_CONFIG_TABLE    = var.tenant_config_table_name
+      OPERATION_HISTORY_TABLE   = var.operation_history_table_name
     }
   }
 
@@ -271,6 +278,8 @@ resource "aws_lambda_function" "worker" {
       AUTH_API_URL     = "${var.external_api_base_url}/public-api/v1/auth"
       SESSION_TABLE    = var.session_table_name
       COOKIE_SAME_SITE  = "Lax"
+
+      OPERATION_HISTORY_TABLE   = var.operation_history_table_name
     }
   }
 

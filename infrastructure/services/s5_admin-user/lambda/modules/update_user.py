@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from aws_lambda_powertools import Logger, Tracer
 from botocore.exceptions import ClientError
 from .cognito_client import cognito, USER_POOL_ID, tenant_user_master_table
+from shared.operation_logger import log_user_updated  # ★ 追加
 
 logger = Logger()
 tracer = Tracer()
@@ -20,11 +21,12 @@ def create_response(status_code: int, body: dict, origin: str) -> dict:
     }
 
 @tracer.capture_method
-def handle(event, ctx, email):  # ← 変更
+def handle(event, ctx, email):
     """ユーザー更新 (Cognito + DynamoDB 同期)"""
     tenant_id = ctx["tenant_id"]
-    caller_email = ctx["caller_email"]  # ← 変更
+    caller_email = ctx["caller_email"]
     origin = ctx.get("origin", "*")
+    ip_address = ctx.get("ip_address", "")  # ★ 追加
 
     try:
         body = json.loads(event.body) if event.body else {}
@@ -34,14 +36,13 @@ def handle(event, ctx, email):  # ← 変更
     if not body:
         return create_response(400, {"message": "No update fields provided"}, origin)
 
-    # タイムスタンプ生成
     now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
     logger.info(f"ユーザー更新処理開始: {email}")
 
     try:
         # 1. 現在のデータを取得
         existing_resp = tenant_user_master_table.get_item(
-            Key={"tenant_id": tenant_id, "email": email}  # ← 変更
+            Key={"tenant_id": tenant_id, "email": email}
         )
         existing = existing_resp.get("Item")
 
@@ -65,27 +66,43 @@ def handle(event, ctx, email):  # ← 変更
             ":zero": 0
         }
 
-        # 更新を許可するフィールド（family_name, given_name を削除）
-        allowed_fields = ["departments", "role", "status"]  # ← 変更
+        # ★ 変更内容を記録用に保持
+        changes = {}
+
+        allowed_fields = ["departments", "role", "status"]
         for field in allowed_fields:
             if field in body:
                 update_expr_parts.append(f"#{field} = :{field}")
                 expr_names[f"#{field}"] = field
                 expr_values[f":{field}"] = body[field]
 
-                # ステータス変更時は監査項目も追加
+                # ★ 変更内容を記録
+                changes[field] = {
+                    "from": existing.get(field),
+                    "to": body[field]
+                }
+
                 if field == "status":
                     update_expr_parts.append("status_changed_at = :now")
                     update_expr_parts.append("status_changed_by = :by")
-                    expr_values[":by"] = caller_email  # ← 変更
+                    expr_values[":by"] = caller_email
 
         # クエリ実行
         tenant_user_master_table.update_item(
-            Key={"tenant_id": tenant_id, "email": email},  # ← 変更
+            Key={"tenant_id": tenant_id, "email": email},
             UpdateExpression="SET " + ", ".join(update_expr_parts),
             ExpressionAttributeNames=expr_names,
             ExpressionAttributeValues=expr_values,
-            ConditionExpression="attribute_exists(email)"  # ← 変更
+            ConditionExpression="attribute_exists(email)"
+        )
+
+        # ★ 操作履歴を記録
+        log_user_updated(
+            tenant_id=tenant_id,
+            email=caller_email,
+            target_email=email,
+            changes=changes,
+            ip_address=ip_address
         )
 
         logger.info(f"ユーザー更新完了: {email}")

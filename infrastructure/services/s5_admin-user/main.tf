@@ -35,6 +35,8 @@ resource "null_resource" "build_lambda" {
     # ソースコードをコピー（サブディレクトリ含む）
     cp -r ${local.src_dir}/*.py ${local.build_dir}/
     cp -r ${local.src_dir}/modules ${local.build_dir}/ 2>/dev/null || true
+    cp -r ${path.module}/../shared ${local.build_dir}/ 2>/dev/null || true
+
   EOT
   }
 }
@@ -69,6 +71,7 @@ resource "aws_lambda_function" "admin_user" {
       LOG_LEVEL               = "INFO"
       COOKIE_SAME_SITE  = "Lax"
       ORIGIN_VERIFY_SECRET          = var.origin_verify_secret
+      OPERATION_HISTORY_TABLE   = var.operation_history_table_name
 
     }
   }
@@ -132,7 +135,8 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
           var.tenant_user_master_table_arn,
           "${var.tenant_user_master_table_arn}/index/*",
           # ★ 追加: セッション管理テーブルへのアクセス権限
-          var.session_table_arn
+          var.session_table_arn,
+          var.operation_history_table_arn
         ]
       }
     ]
