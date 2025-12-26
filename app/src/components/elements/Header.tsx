@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/menu.tsx";
 
 export const Header = () => {
-    const { logout, email, role, isLoggingOut } = useAuth();  // ← 追加
+    const { logout, email, role } = useAuth();  // ← 追加
 
     const displayName = email || "ユーザー";
 
@@ -86,15 +86,10 @@ export const Header = () => {
                             color="red.600"
                             _hover={{ bg: "red.50", color: "red.700" }}
                             onClick={logout}  // ← シンプルに
-                            disabled={isLoggingOut}  // ← 二重クリック防止
                             gap={2}
-                            cursor={isLoggingOut ? "not-allowed" : "pointer"}
                         >
                             <LuLogOut />
-                            <Text fontWeight="bold">
-                                {isLoggingOut ? "ログアウト中..." : "ログアウト"}
-                            </Text>
-                        </MenuItem>
+                         </MenuItem>
                     </MenuContent>
                 </MenuRoot>
             </Flex>

@@ -226,23 +226,3 @@ resource "aws_apigatewayv2_route" "operation_logs" {
   authorization_type = "CUSTOM"
   authorizer_id      = var.origin_verify_authorizer_id
 }
-
-# ─────────────────────────────
-# ★ CloudWatch Logs Subscription Filter（追加）
-# ─────────────────────────────
-resource "aws_lambda_permission" "cloudwatch_logs" {
-  statement_id  = "AllowCloudWatchLogs"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.logs.function_name
-  principal     = "logs.ap-northeast-1.amazonaws.com"
-  source_arn    = "${var.cognito_log_group_arn}:*"
-}
-
-resource "aws_cloudwatch_log_subscription_filter" "cognito_logs" {
-  name            = "${var.name_prefix}-cognito-subscription"
-  log_group_name  = var.cognito_log_group_name
-  filter_pattern  = "{ $.message.eventType = \"SignIn\" || $.message.eventType = \"SignIn_Failure\" }"
-  destination_arn = aws_lambda_function.logs.arn
-
-  depends_on = [aws_lambda_permission.cloudwatch_logs]
-}
