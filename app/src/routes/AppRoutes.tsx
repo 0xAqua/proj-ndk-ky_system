@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { LoginPage } from '@/pages/LoginPage';
+import { PasswordResetPage } from '@/pages/PasswordResetPage.tsx';
 import { EntryPage } from "@/pages/EntryPage";
 import { ResultPage } from "@/pages/ResultPage";
 import { AuthGuard } from '@/features/auth/components/AuthGuard';
@@ -18,6 +19,8 @@ export const AppRoutes = () => {
             {/* --- A. 認証不要 + AuthLayout 適用 --- */}
             <Route element={<AuthLayout />}>
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/forgot-password" element={<PasswordResetPage />} />
+
             </Route>
 
             {/* --- B. 一般ユーザー・管理者共通 + MainLayout 適用 --- */}

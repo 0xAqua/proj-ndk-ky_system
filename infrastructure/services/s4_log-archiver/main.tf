@@ -3,7 +3,39 @@
 # ─────────────────────────────
 locals {
   lambda_src_dir = "${path.module}/lambda"
+  build_dir      = "${path.module}/build"
 }
+
+# ─────────────────────────────
+# ビルドプロセス (散らかり防止版)
+# ─────────────────────────────
+resource "null_resource" "build_lambda_package" {
+  triggers = {
+    # requirements.txt か .py ファイルに変更があった時だけ再実行
+    requirements_hash = filesha256("${local.lambda_src_dir}/requirements.txt")
+    code_hash         = sha256(join("", [for f in fileset(local.lambda_src_dir, "*.py") : filesha256("${local.lambda_src_dir}/${f}")]))
+  }
+
+  provisioner "local-exec" {
+    # 修正後: Linux (ARM64) 用のライブラリを強制的にインストールします
+    command = <<-EOT
+      echo "Building package for Linux (ARM64)..."
+      rm -rf ${local.build_dir}
+      mkdir -p ${local.build_dir}
+
+      pip install -r ${local.lambda_src_dir}/requirements.txt \
+        -t ${local.build_dir} \
+        --platform manylinux2014_aarch64 \
+        --implementation cp \
+        --python-version 3.12 \
+        --only-binary=:all: \
+        --upgrade
+
+      cp ${local.lambda_src_dir}/*.py ${local.build_dir}/
+    EOT
+  }
+}
+
 
 # ─────────────────────────────
 # 1. IAM Role & Lambda Function
@@ -102,10 +134,6 @@ resource "aws_lambda_function" "this" {
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-
-  layers = [
-    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
-  ]
 
   environment {
     variables = {

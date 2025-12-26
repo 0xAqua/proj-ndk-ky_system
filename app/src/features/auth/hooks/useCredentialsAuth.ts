@@ -1,7 +1,14 @@
-// useCredentialsAuth.ts
 import { useState } from "react";
-import { authService } from '@/lib/service/auth';
+import { authService, type LoginResponse } from '@/lib/service/authService.ts';
 import { getAuthErrorMessage } from "@/features/auth/utils/authErrors";
+
+export interface CredentialsAuthResult {
+    success: boolean;
+    otpRequired?: boolean;
+    passkeyRequired?: boolean;
+    pendingKey?: string;
+    maskedEmail?: string;
+}
 
 export const useCredentialsAuth = () => {
     const [username, setUsername] = useState("");
@@ -9,42 +16,48 @@ export const useCredentialsAuth = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleLogin = async () => {
+    const handleLogin = async (): Promise<CredentialsAuthResult> => {
         const trimmedUsername = username.trim();
         const trimmedPassword = password.trim();
 
         if (!trimmedUsername || !trimmedPassword) {
             setError("メールアドレスとパスワードを入力してください。");
-            return;
+            return { success: false };
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(trimmedUsername)) {
             setError("有効なメールアドレスを入力してください。");
-            return;
+            return { success: false };
         }
 
         setIsLoading(true);
         setError(null);
 
         try {
-            await authService.login(trimmedUsername, trimmedPassword);
+            const result: LoginResponse = await authService.login(trimmedUsername, trimmedPassword);
+
+            // OTP必要な場合
+            if (result.otp_required) {
+                return {
+                    success: false,
+                    otpRequired: true,
+                    passkeyRequired: result.passkey_required, // ここでフラグを渡す
+                    pendingKey: result.pending_key,
+                    maskedEmail: result.masked_email,
+                };
+            }
+
+            // 通常ログイン成功
             setPassword("");
             return { success: true };
 
         } catch (err: unknown) {
-            // 1. BFF (Axios) からのエラーレスポンスを解析
             const axiosError = err as { response?: { data?: { error?: string } } };
-
-            // 2. BFF が返したエラーコード（例: "LimitExceededException"）を取得
             const errorCode = axiosError.response?.data?.error;
-
-            // 3. getAuthErrorMessage を呼び出して日本語メッセージに変換
-            // オブジェクト形式で渡すのが今の実装と最も相性が良いです。
             const message = getAuthErrorMessage({
                 code: errorCode || 'DefaultError'
             });
-
             setError(message);
             return { success: false };
         } finally {
@@ -53,6 +66,7 @@ export const useCredentialsAuth = () => {
     };
 
     const clearError = () => setError(null);
+    const clearPassword = () => setPassword("");
 
     return {
         username,
@@ -61,7 +75,9 @@ export const useCredentialsAuth = () => {
         setPassword,
         isLoading,
         error,
+        setError,
         handleLogin,
-        clearError
+        clearError,
+        clearPassword,
     };
 };

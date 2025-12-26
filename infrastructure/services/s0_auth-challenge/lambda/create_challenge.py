@@ -25,8 +25,23 @@ OTP_EXPIRY_SECONDS = int(os.environ.get("OTP_EXPIRY_SECONDS", "300"))  # 5分
 
 
 def generate_otp(length: int = 6) -> str:
-    """6桁のOTPコードを生成"""
+    """OTPコードを生成"""
     return "".join([str(random.randint(0, 9)) for _ in range(length)])
+
+
+def delete_existing_otp(tenant_id: str, email: str) -> None:
+    """既存のOTPレコードを削除（再送信時用）"""
+    table = dynamodb.Table(OTP_TABLE_NAME)
+    try:
+        table.delete_item(
+            Key={
+                "tenant_id": tenant_id,
+                "email": email,
+            }
+        )
+        logger.info("既存OTPを削除しました", action_category="AUTH")
+    except ClientError:
+        pass  # 存在しない場合は無視
 
 
 def save_otp_to_dynamodb(tenant_id: str, email: str, otp: str, user_id: str) -> None:
@@ -54,9 +69,13 @@ def send_otp_email(email: str, otp: str) -> None:
     """OTPコードをメールで送信"""
     subject = "【認証コード】ログイン確認"
 
-    # プレーンテキスト版（シンプルに）
-    body_text = (otp
-    )
+    body_text = f"""ログイン認証コード
+
+{otp}
+
+このコードは{OTP_EXPIRY_SECONDS // 60}分間有効です。
+心当たりのない場合は、このメールを無視してください。
+"""
 
     ses.send_email(
         Source=SENDER_EMAIL,
@@ -68,7 +87,21 @@ def send_otp_email(email: str, otp: str) -> None:
             },
         },
     )
-    logger.info("OTPメールを送信しました", action_category="AUTH", email=email)
+    logger.info("OTPメールを送信しました", action_category="AUTH", email=mask_email(email))
+
+
+def mask_email(email: str) -> str:
+    """メールアドレスをマスク（例: t***@example.com）"""
+    if "@" not in email:
+        return "***"
+
+    local, domain = email.split("@")
+    if len(local) <= 1:
+        masked_local = "*"
+    else:
+        masked_local = local[0] + "*" * (len(local) - 1)
+
+    return f"{masked_local}@{domain}"
 
 
 @tracer.capture_lambda_handler
@@ -77,10 +110,11 @@ def lambda_handler(event, context):
     """
     OTPチャレンジの作成
 
-    1. OTPコード生成（6桁）
-    2. DynamoDBに保存（TTL付き）
-    3. SESでメール送信
-    4. Cognitoにチャレンジパラメータを返却
+    1. 既存OTP削除（再送信対応）
+    2. OTPコード生成（6桁）
+    3. DynamoDBに保存（TTL付き）
+    4. SESでメール送信
+    5. Cognitoにチャレンジパラメータを返却
     """
     request = event.get("request", {})
     user_attributes = request.get("userAttributes", {})
@@ -98,26 +132,27 @@ def lambda_handler(event, context):
         raise ValueError("Email is required for OTP authentication")
 
     try:
-        # 1. OTP生成
+        # 1. 既存OTP削除（再送信時に古いOTPを無効化）
+        delete_existing_otp(tenant_id, email)
+
+        # 2. OTP生成
         otp = generate_otp(OTP_LENGTH)
         logger.info("OTPを生成しました", action_category="AUTH", otp_length=OTP_LENGTH)
 
-        # 2. DynamoDBに保存
+        # 3. DynamoDBに保存
         save_otp_to_dynamodb(tenant_id, email, otp, user_id)
 
-        # 3. メール送信
+        # 4. メール送信
         send_otp_email(email, otp)
 
-        # 4. レスポンス設定
+        # 5. レスポンス設定
         response = event.get("response", {})
 
-        # publicChallengeParameters: クライアントに返す情報（OTPは含めない）
         response["publicChallengeParameters"] = {
             "email": email,
             "maskedEmail": mask_email(email),
         }
 
-        # privateChallengeParameters: 検証時に使用（内部用）
         response["privateChallengeParameters"] = {
             "answer": otp,
             "tenant_id": tenant_id,
@@ -134,17 +169,3 @@ def lambda_handler(event, context):
         raise
 
     return event
-
-
-def mask_email(email: str) -> str:
-    """メールアドレスをマスク（例: t***@example.com）"""
-    if "@" not in email:
-        return "***"
-
-    local, domain = email.split("@")
-    if len(local) <= 1:
-        masked_local = "*"
-    else:
-        masked_local = local[0] + "*" * (len(local) - 1)
-
-    return f"{masked_local}@{domain}"

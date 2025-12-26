@@ -6,7 +6,7 @@ import time
 import base64
 import hashlib
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, Optional
 from botocore.exceptions import ClientError
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -25,16 +25,20 @@ USER_POOL_ID = os.environ['USER_POOL_ID']
 CLIENT_ID = os.environ['CLIENT_ID']
 SESSION_TABLE = os.environ['SESSION_TABLE']
 TENANT_USER_MASTER_TABLE = os.environ['TENANT_USER_MASTER_TABLE']
+TENANT_CONFIG_TABLE = os.environ['TENANT_CONFIG_TABLE']  # 追加
 ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', '').split(',')
 COOKIE_SAME_SITE = os.environ.get('COOKIE_SAME_SITE', 'Lax')
 SESSION_TTL_SECONDS = int(os.environ.get('SESSION_TTL_SECONDS', '3600'))
 KMS_KEY_ID = os.environ['KMS_KEY_ID']
+PENDING_AUTH_TTL_SECONDS = int(os.environ.get('PENDING_AUTH_TTL_SECONDS', '300'))  # 5分
 
 # DynamoDBテーブル
 session_table = dynamodb.Table(SESSION_TABLE)
 user_master_table = dynamodb.Table(TENANT_USER_MASTER_TABLE)
+tenant_config_table = dynamodb.Table(TENANT_CONFIG_TABLE)
 
 MAX_SESSION_DURATION = 3 * 60 * 60  # 3時間
+
 
 # ============================================
 # 共通ユーティリティ
@@ -127,6 +131,105 @@ def build_cookie(name: str, value: str, max_age: int) -> str:
     return "; ".join(cookie_parts)
 
 
+def mask_email(email: str) -> str:
+    """メールアドレスをマスク（例: t***@example.com）"""
+    if "@" not in email:
+        return "***"
+    local, domain = email.split("@")
+    if len(local) <= 1:
+        masked_local = "*"
+    else:
+        masked_local = local[0] + "*" * (len(local) - 1)
+    return f"{masked_local}@{domain}"
+
+
+# ============================================
+# テナント設定
+# ============================================
+
+def get_tenant_security_config(tenant_id: str) -> Dict:
+    try:
+        resp = tenant_config_table.get_item(Key={'tenant_id': tenant_id})
+        item = resp.get('Item', {})
+        return item.get('security_config', {
+            'otp_enabled': False,
+            'passkey_enabled': False
+        })
+    except Exception as e:
+        # エラーの詳細をログに出す
+        logger.error(f"DETAILED ERROR: {str(e)}")
+        return {'otp_enabled': False, 'passkey_enabled': False}
+
+
+# ============================================
+# Pending Auth（OTP待ち状態の一時保存）
+# ============================================
+
+def save_pending_auth(tenant_id: str, email: str, cognito_session: str, user_info: Dict) -> str:
+    """
+    OTP検証待ちの状態を一時保存
+    セッションテーブルにpending_プレフィックスで保存
+    """
+    pending_key = generate_session_id()
+    hashed_key = hash_session_id(f"pending_{pending_key}")
+    current_time = int(time.time())
+    expires_at = current_time + PENDING_AUTH_TTL_SECONDS
+
+    session_table.put_item(Item={
+        'session_id': hashed_key,
+        'type': 'pending_auth',
+        'tenant_id': tenant_id,
+        'email': email,
+        'cognito_session': encrypt_token(cognito_session),
+        'user_info': json.dumps(user_info),
+        'expires_at': expires_at,
+        'created_at': current_time,
+        'ttl': expires_at + 3600,
+    })
+
+    logger.info("Pending auth saved", email=mask_email(email))
+    return pending_key
+
+
+def get_pending_auth(pending_key: str) -> Optional[Dict]:
+    """OTP検証待ちの状態を取得"""
+    hashed_key = hash_session_id(f"pending_{pending_key}")
+
+    try:
+        resp = session_table.get_item(Key={'session_id': hashed_key})
+        item = resp.get('Item')
+
+        if not item:
+            return None
+
+        if item.get('type') != 'pending_auth':
+            return None
+
+        if item.get('expires_at', 0) < int(time.time()):
+            # 期限切れ → 削除
+            session_table.delete_item(Key={'session_id': hashed_key})
+            return None
+
+        return {
+            'tenant_id': item.get('tenant_id'),
+            'email': item.get('email'),
+            'cognito_session': decrypt_token(item.get('cognito_session')),
+            'user_info': json.loads(item.get('user_info', '{}')),
+        }
+    except Exception:
+        logger.exception("Failed to get pending auth")
+        return None
+
+
+def delete_pending_auth(pending_key: str) -> None:
+    """OTP検証待ちの状態を削除"""
+    hashed_key = hash_session_id(f"pending_{pending_key}")
+    try:
+        session_table.delete_item(Key={'session_id': hashed_key})
+    except Exception:
+        logger.exception("Failed to delete pending auth")
+
+
 # ============================================
 # メインハンドラー
 # ============================================
@@ -137,15 +240,13 @@ def lambda_handler(event: dict, context: LambdaContext):
     method = event.get('requestContext', {}).get('http', {}).get('method', '')
     path = event.get('rawPath', '')
     headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
-    logger.info(f"DEBUG - Path: {path}, Method: {method}")
-    logger.info(f"DEBUG - All headers: {headers}")
     origin = headers.get('origin', '')
     cors_headers = get_cors_headers(origin)
 
     if method == 'OPTIONS':
         return handle_preflight(cors_headers)
 
-    # CSRFチェック (X-Requested-Withヘッダーの存在を確認)
+    # CSRFチェック
     if headers.get('x-requested-with', '').lower() != 'xmlhttprequest':
         logger.warning("CSRF check failed: missing X-Requested-With header")
         return create_response(403, {'error': 'Forbidden'}, cors_headers)
@@ -153,14 +254,198 @@ def lambda_handler(event: dict, context: LambdaContext):
     # ルーティング
     if path == '/bff/auth/login' and method == 'POST':
         return handle_login(event, cors_headers)
+    elif path == '/bff/auth/verify-otp' and method == 'POST':
+        return handle_verify_otp(event, cors_headers)
+    elif path == '/bff/auth/resend-otp' and method == 'POST':
+        return handle_resend_otp(event, cors_headers)
+        # ★ Passkey 認証（ログイン）用パスを追加
+    elif path == '/bff/auth/passkey/options' and method == 'POST':
+        return handle_passkey_options(event, cors_headers)
+    elif path == '/bff/auth/passkey/verify' and method == 'POST':
+        return handle_passkey_verify(event, cors_headers)
+        # ★ Passkey 登録（ログイン後）用パスを追加
+    elif path == '/bff/auth/passkey/register-options' and method == 'POST':
+        return handle_passkey_register_options(event, cors_headers)
+    elif path == '/bff/auth/passkey/register-verify' and method == 'POST':
+        return handle_passkey_register_verify(event, cors_headers)
+        # 既存のパス
     elif path == '/bff/auth/session' and method == 'GET':
         return handle_session_check(event, cors_headers)
     elif path == '/bff/auth/logout' and method == 'POST':
         return handle_logout(event, cors_headers)
     elif path == '/bff/auth/refresh' and method == 'POST':
         return handle_refresh(event, cors_headers)
+    # パスワードリセット
+    elif path == '/bff/auth/forgot-password' and method == 'POST':
+        return handle_forgot_password(event, cors_headers)
+    elif path == '/bff/auth/reset-password' and method == 'POST':
+        return handle_reset_password(event, cors_headers)
 
     return create_response(404, {'error': 'Not found'}, cors_headers)
+
+# ============================================
+# Passkey 認証アクション (Login)
+# ============================================
+def handle_passkey_verify(event: dict, cors_headers: dict) -> dict:
+    """Passkey認証の検証（ログイン完了）"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        username = body.get('username')
+        credential = body.get('credential')
+        encrypted_session = body.get('cognito_session')
+
+        if not username or not credential or not encrypted_session:
+            return create_response(400, {'error': 'Missing parameters'}, cors_headers)
+
+        # Cognitoのセッションを復号
+        cognito_session = decrypt_token(encrypted_session)
+
+        # Cognitoにチャレンジ応答を送信
+        resp = cognito.admin_respond_to_auth_challenge(
+            UserPoolId=USER_POOL_ID,
+            ClientId=CLIENT_ID,
+            ChallengeName='WEB_AUTHN',
+            Session=cognito_session,
+            ChallengeResponses={
+                'USERNAME': username,
+                'CREDENTIAL': json.dumps(credential)
+            }
+        )
+
+        # 認証成功
+        if 'AuthenticationResult' not in resp:
+            return create_response(401, {'error': 'AuthFailed'}, cors_headers)
+
+        tokens = resp['AuthenticationResult']
+        user_info = decode_id_token(tokens['IdToken'])
+
+        # セッション発行（OTPと同じ処理）
+        return create_session_and_response(tokens, user_info, event, cors_headers)
+
+    except Exception:
+        logger.exception("Passkey verify error")
+        return create_response(401, {'error': 'PasskeyAuthFailed'}, cors_headers)
+
+def handle_passkey_options(event: dict, cors_headers: dict) -> dict:
+    """Passkey認証用のチャレンジ(Options)を取得"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        username = body.get('username', '').strip()
+
+        if not username:
+            return create_response(400, {'error': 'Username is required'}, cors_headers)
+
+        resp = cognito.admin_initiate_auth(
+            UserPoolId=USER_POOL_ID,
+            ClientId=CLIENT_ID,
+            AuthFlow='USER_AUTH',
+            AuthParameters={
+                'USERNAME': username,
+                'PREFERRED_CHALLENGE': 'WEB_AUTHN'
+            }
+        )
+
+        logger.info(f"Cognito passkey response", extra={
+            "challenge_name": resp.get('ChallengeName'),
+            "available_challenges": resp.get('AvailableChallenges'),
+            "challenge_parameters": resp.get('ChallengeParameters')
+        })
+
+        # ★ WEB_AUTHN に修正
+        if resp.get('ChallengeName') != 'WEB_AUTHN':
+            return create_response(400, {'error': 'PasskeyNotSupported'}, cors_headers)
+
+        # チャレンジとセッションを返す
+        return create_response(200, {
+            'public_challenge': resp['ChallengeParameters'],
+            'cognito_session': encrypt_token(resp['Session'])
+        }, cors_headers)
+
+    except Exception:
+        logger.exception("Failed to get passkey options")
+        return create_response(500, {'error': 'InternalServerError'}, cors_headers)
+
+def handle_passkey_register_options(event: dict, cors_headers: dict) -> dict:
+    """Passkey登録用のチャレンジを取得 (要ログイン)"""
+    cookies = parse_cookies(event)
+    session_id = cookies.get('sessionId')
+
+    if not session_id:
+        return create_response(401, {'error': 'Unauthorized'}, cors_headers)
+
+    hashed_id = hash_session_id(session_id)
+    try:
+        resp = session_table.get_item(Key={'session_id': hashed_id})
+        session = resp.get('Item')
+
+        if not session or session.get('expires_at', 0) < int(time.time()):
+            return create_response(401, {'error': 'SessionExpired'}, cors_headers)
+
+        tenant_id = session.get('tenant_id')
+        email = session.get('email')
+        logger.append_keys(tenant_id=tenant_id, email=mask_email(email))
+
+        access_token = decrypt_token(session.get('access_token'))
+
+        # Cognitoから登録用オプションを取得
+        register_resp = cognito.start_web_authn_registration(
+            AccessToken=access_token
+        )
+
+        logger.info("Passkey register options retrieved successfully")
+
+        return create_response(200, {
+            'status': 'success',
+            'creation_options': register_resp['CredentialCreationOptions']
+        }, cors_headers)
+
+    except Exception:
+        logger.exception("Register options error")
+        return create_response(500, {'error': 'InternalServerError'}, cors_headers)
+
+
+def handle_passkey_register_verify(event: dict, cors_headers: dict) -> dict:
+    """Passkeyの登録を確定させる (要ログイン)"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        credential = body.get('credential')
+
+        if not credential:
+            return create_response(400, {'error': 'Credential is required'}, cors_headers)
+
+        cookies = parse_cookies(event)
+        session_id = cookies.get('sessionId')
+
+        if not session_id:
+            return create_response(401, {'error': 'Unauthorized'}, cors_headers)
+
+        hashed_id = hash_session_id(session_id)
+        resp = session_table.get_item(Key={'session_id': hashed_id})
+        session_data = resp.get('Item')
+
+        if not session_data or session_data.get('expires_at', 0) < int(time.time()):
+            return create_response(401, {'error': 'SessionExpired'}, cors_headers)
+
+        access_token = decrypt_token(session_data.get('access_token'))
+
+        cognito.complete_web_authn_registration(
+            AccessToken=access_token,
+            Credential=credential
+        )
+
+        # ★ セッションの has_passkey を更新
+        session_table.update_item(
+            Key={'session_id': hashed_id},
+            UpdateExpression='SET has_passkey = :val',
+            ExpressionAttributeValues={':val': True}
+        )
+
+        logger.info("Passkey registration completed successfully")
+        return create_response(200, {'success': True}, cors_headers)
+
+    except Exception:
+        logger.exception("Register verification error")
+        return create_response(400, {'error': 'PasskeyRegistrationFailed'}, cors_headers)
 
 
 def handle_preflight(cors_headers: dict) -> dict:
@@ -182,7 +467,7 @@ def handle_preflight(cors_headers: dict) -> dict:
 # ============================================
 
 def handle_login(event: dict, cors_headers: dict) -> dict:
-    """ログイン処理: Cognito認証 → ユーザーマスタ同期 → セッション作成"""
+    """ログイン処理: パスワード検証 → OTP要否判定 → セッション or OTPチャレンジ"""
     try:
         body = json.loads(event.get('body', '{}'))
         username = body.get('username', '').strip()
@@ -192,88 +477,81 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
             return create_response(400, {'error': '入力が不足しています'}, cors_headers)
 
         # ──────────────────────────────────────────────────────────
-        # 1. Cognito認証
+        # 1. パスワード検証（ADMIN_USER_PASSWORD_AUTH）
         # ──────────────────────────────────────────────────────────
         try:
-            resp = cognito.initiate_auth(
+            auth_resp = cognito.admin_initiate_auth(
+                UserPoolId=USER_POOL_ID,
                 ClientId=CLIENT_ID,
-                AuthFlow='USER_PASSWORD_AUTH',
+                AuthFlow='ADMIN_USER_PASSWORD_AUTH',
                 AuthParameters={'USERNAME': username, 'PASSWORD': password}
             )
         except Exception as e:
             return handle_cognito_error(e, cors_headers)
 
-        tokens = resp['AuthenticationResult']
-        user_info = decode_id_token(tokens['IdToken'])
+        # ChallengeName がある場合（NEW_PASSWORD_REQUIREDなど）
+        if 'ChallengeName' in auth_resp:
+            challenge = auth_resp['ChallengeName']
+            if challenge == 'NEW_PASSWORD_REQUIRED':
+                return create_response(401, {'error': 'NewPasswordRequired'}, cors_headers)
+            return create_response(401, {'error': challenge}, cors_headers)
 
-        # emailをユーザー識別子として使用
+        # 認証成功
+        tokens = auth_resp['AuthenticationResult']
+        user_info = decode_id_token(tokens['IdToken'])
         email = user_info.get('email', '')
         tenant_id = user_info.get('custom:tenant_id', 'UNKNOWN')
-        source_ip = event.get('requestContext', {}).get('http', {}).get('sourceIp', 'unknown')
 
-        # 現在時刻 (ISO8601形式: ユーザーマスタ用)
-        now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        logger.append_keys(tenant_id=tenant_id, email=mask_email(email))
+        logger.info("Password verification successful", action_category="AUTH")
 
         # ──────────────────────────────────────────────────────────
-        # 2. ユーザーマスタの同期 & 最新Role取得
-        #    キー: tenant_id + email
+        # 2. テナントのセキュリティ設定を確認
+        # ──────────────────────────────────────────────────────────
+        security_config = get_tenant_security_config(tenant_id)
+        otp_enabled = security_config.get('otp_enabled', False)
+        passkey_enabled = security_config.get('passkey_enabled', False)
+
+        logger.info(f"OTP enabled: {otp_enabled}", action_category="AUTH")
+
+        # ──────────────────────────────────────────────────────────
+        # 3-A. OTP無効 → 従来通りセッション発行
+        # ──────────────────────────────────────────────────────────
+        if not otp_enabled:
+            return create_session_and_response(tokens, user_info, event, cors_headers)
+
+        # ──────────────────────────────────────────────────────────
+        # 3-B. OTP有効 → CUSTOM_AUTHでOTPチャレンジ開始
         # ──────────────────────────────────────────────────────────
         try:
-            master_resp = user_master_table.update_item(
-                Key={'tenant_id': tenant_id, 'email': email},
-                UpdateExpression="""
-                    SET last_login_at = :now, 
-                        last_login_ip = :ip, 
-                        #s = :status,
-                        updated_at = :now
-                """,
-                ExpressionAttributeNames={"#s": "status"},
-                ExpressionAttributeValues={
-                    ":now": now_iso,
-                    ":ip": source_ip,
-                    ":status": "ACTIVE"
-                },
-                ReturnValues="ALL_NEW"
+            custom_resp = cognito.admin_initiate_auth(
+                UserPoolId=USER_POOL_ID,
+                ClientId=CLIENT_ID,
+                AuthFlow='CUSTOM_AUTH',
+                AuthParameters={'USERNAME': username}
             )
-            user_master = master_resp.get('Attributes', {})
-            user_role = user_master.get('role', 'user')
-        except ClientError as e:
-            logger.error(f"Failed to update user master: {e}")
-            # マスタに存在しない等の場合でもログインは継続させるが、roleは最小権限に
-            user_role = 'user'
+        except Exception as e:
+            logger.exception("CUSTOM_AUTH initiation failed")
+            return create_response(500, {'error': 'OTPInitFailed'}, cors_headers)
 
-        # ──────────────────────────────────────────────────────────
-        # 3. セッション作成
-        # ──────────────────────────────────────────────────────────
-        session_id = generate_session_id()
-        hashed_id = hash_session_id(session_id)
-        current_time = int(time.time())
-        expires_at = current_time + SESSION_TTL_SECONDS
+        cognito_session = custom_resp.get('Session')
+        if not cognito_session:
+            logger.error("No session returned from CUSTOM_AUTH")
+            return create_response(500, {'error': 'OTPInitFailed'}, cors_headers)
 
-        session_table.put_item(Item={
-            'session_id': hashed_id,
-            'tenant_id': tenant_id,
-            'email': email,
-            'role': user_role,
-            'id_token': encrypt_token(tokens['IdToken']),
-            'access_token': encrypt_token(tokens['AccessToken']),
-            'refresh_token': encrypt_token(tokens['RefreshToken']),
-            'expires_at': expires_at,
-            'created_at': current_time,
-            'ttl': expires_at + 86400,  # DynamoDB TTL用 (24時間余裕を持たせる)
-        })
+        # Pending Authを保存
+        pending_key = save_pending_auth(tenant_id, email, cognito_session, user_info)
 
-        logger.info("Login successful", extra={
-            'email': email,
-            'tenant_id': tenant_id,
-            'role': user_role,
-            'ip': source_ip
-        })
+        # publicChallengeParameters からマスクメールを取得（あれば）
+        challenge_params = custom_resp.get('ChallengeParameters', {})
+        masked_email = challenge_params.get('maskedEmail', mask_email(email))
 
-        cookie = build_cookie('sessionId', session_id, SESSION_TTL_SECONDS)
-        response = create_response(200, {'success': True}, cors_headers)
-        response['headers']['Set-Cookie'] = cookie
-        return response
+        return create_response(200, {
+            'otp_required': otp_enabled,
+            'passkey_required': passkey_enabled,
+            'pending_key': pending_key,
+            'masked_email': masked_email
+        }, cors_headers)
 
     except json.JSONDecodeError:
         return create_response(400, {'error': 'InvalidJSONFormat'}, cors_headers)
@@ -282,11 +560,235 @@ def handle_login(event: dict, cors_headers: dict) -> dict:
         return create_response(500, {'error': 'InternalServerError'}, cors_headers)
 
 
+def handle_verify_otp(event: dict, cors_headers: dict) -> dict:
+    """OTP検証: チャレンジ応答 → セッション発行"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        pending_key = body.get('pending_key', '').strip()
+        otp_code = body.get('otp_code', '').strip()
+
+        if not pending_key or not otp_code:
+            return create_response(400, {'error': '入力が不足しています'}, cors_headers)
+
+        # ──────────────────────────────────────────────────────────
+        # 1. Pending Auth取得
+        # ──────────────────────────────────────────────────────────
+        pending = get_pending_auth(pending_key)
+        if not pending:
+            logger.warning("Pending auth not found or expired")
+            return create_response(401, {'error': 'SessionExpired'}, cors_headers)
+
+        tenant_id = pending['tenant_id']
+        email = pending['email']
+        cognito_session = pending['cognito_session']
+        user_info = pending['user_info']
+
+        logger.append_keys(tenant_id=tenant_id, email=mask_email(email))
+        logger.info("OTP verification started", action_category="AUTH")
+
+        # ──────────────────────────────────────────────────────────
+        # 2. Cognitoにチャレンジ応答
+        # ──────────────────────────────────────────────────────────
+        try:
+            challenge_resp = cognito.admin_respond_to_auth_challenge(
+                UserPoolId=USER_POOL_ID,
+                ClientId=CLIENT_ID,
+                ChallengeName='CUSTOM_CHALLENGE',
+                Session=cognito_session,
+                ChallengeResponses={
+                    'USERNAME': email,
+                    'ANSWER': otp_code
+                }
+            )
+        except cognito.exceptions.NotAuthorizedException:
+            logger.warning("OTP verification failed - NotAuthorized", action_category="AUTH")
+            return create_response(401, {'error': 'InvalidOTP'}, cors_headers)
+        except cognito.exceptions.CodeMismatchException:
+            logger.warning("OTP verification failed - CodeMismatch", action_category="AUTH")
+            return create_response(401, {'error': 'InvalidOTP'}, cors_headers)
+        except Exception as e:
+            logger.exception("OTP verification failed")
+            return create_response(401, {'error': 'InvalidOTP'}, cors_headers)
+
+        # ──────────────────────────────────────────────────────────
+        # 3. 結果判定
+        # ──────────────────────────────────────────────────────────
+
+        # まだチャレンジが続く場合（再試行）
+        if 'ChallengeName' in challenge_resp:
+            # 新しいSessionを保存して再試行を許可
+            new_session = challenge_resp.get('Session')
+            if new_session:
+                # Pending Authを更新
+                delete_pending_auth(pending_key)
+                new_pending_key = save_pending_auth(tenant_id, email, new_session, user_info)
+                return create_response(401, {
+                    'error': 'InvalidOTP',
+                    'retry': True,
+                    'pending_key': new_pending_key
+                }, cors_headers)
+            return create_response(401, {'error': 'InvalidOTP'}, cors_headers)
+
+        # 認証成功
+        if 'AuthenticationResult' not in challenge_resp:
+            logger.error("No AuthenticationResult in response")
+            return create_response(500, {'error': 'AuthFailed'}, cors_headers)
+
+        tokens = challenge_resp['AuthenticationResult']
+
+        # Pending Auth削除
+        delete_pending_auth(pending_key)
+
+        logger.info("OTP verification successful", action_category="AUTH")
+
+        # セッション発行
+        return create_session_and_response(tokens, user_info, event, cors_headers)
+
+    except json.JSONDecodeError:
+        return create_response(400, {'error': 'InvalidJSONFormat'}, cors_headers)
+    except Exception:
+        logger.exception("Verify OTP error")
+        return create_response(500, {'error': 'InternalServerError'}, cors_headers)
+
+
+def handle_resend_otp(event: dict, cors_headers: dict) -> dict:
+    """OTP再送信"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        pending_key = body.get('pending_key', '').strip()
+
+        if not pending_key:
+            return create_response(400, {'error': 'pending_key is required'}, cors_headers)
+
+        # Pending Auth取得
+        pending = get_pending_auth(pending_key)
+        if not pending:
+            return create_response(401, {'error': 'SessionExpired'}, cors_headers)
+
+        tenant_id = pending['tenant_id']
+        email = pending['email']
+        cognito_session = pending['cognito_session']
+        user_info = pending['user_info']
+
+        logger.append_keys(tenant_id=tenant_id, email=mask_email(email))
+        logger.info("OTP resend requested", action_category="AUTH")
+
+        # RESENDを送信してdefine_authで再チャレンジ
+        try:
+            challenge_resp = cognito.admin_respond_to_auth_challenge(
+                UserPoolId=USER_POOL_ID,
+                ClientId=CLIENT_ID,
+                ChallengeName='CUSTOM_CHALLENGE',
+                Session=cognito_session,
+                ChallengeResponses={
+                    'USERNAME': email,
+                    'ANSWER': 'RESEND'
+                }
+            )
+        except Exception as e:
+            logger.exception("OTP resend failed")
+            return create_response(500, {'error': 'ResendFailed'}, cors_headers)
+
+        # 新しいSessionを保存
+        new_session = challenge_resp.get('Session')
+        if not new_session:
+            return create_response(500, {'error': 'ResendFailed'}, cors_headers)
+
+        delete_pending_auth(pending_key)
+        new_pending_key = save_pending_auth(tenant_id, email, new_session, user_info)
+
+        logger.info("OTP resent successfully", action_category="AUTH")
+
+        return create_response(200, {
+            'success': True,
+            'pending_key': new_pending_key,
+            'masked_email': mask_email(email)
+        }, cors_headers)
+
+    except json.JSONDecodeError:
+        return create_response(400, {'error': 'InvalidJSONFormat'}, cors_headers)
+    except Exception:
+        logger.exception("Resend OTP error")
+        return create_response(500, {'error': 'InternalServerError'}, cors_headers)
+
+
+def create_session_and_response(tokens: Dict, user_info: Dict, event: dict, cors_headers: dict) -> dict:
+    """セッション作成してCookieレスポンスを返す"""
+    email = user_info.get('email', '')
+    tenant_id = user_info.get('custom:tenant_id', 'UNKNOWN')
+    source_ip = event.get('requestContext', {}).get('http', {}).get('sourceIp', 'unknown')
+    now_iso = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+    has_passkey = False
+    try:
+        passkey_resp = cognito.list_web_authn_credentials(
+            AccessToken=tokens['AccessToken']
+        )
+        has_passkey = len(passkey_resp.get('Credentials', [])) > 0
+    except Exception:
+        logger.warning("Failed to check passkey status")
+
+    # ユーザーマスタ更新 & Role取得
+    try:
+        master_resp = user_master_table.update_item(
+            Key={'tenant_id': tenant_id, 'email': email},
+            UpdateExpression="""
+                SET last_login_at = :now, 
+                    last_login_ip = :ip, 
+                    #s = :status,
+                    updated_at = :now
+            """,
+            ExpressionAttributeNames={"#s": "status"},
+            ExpressionAttributeValues={
+                ":now": now_iso,
+                ":ip": source_ip,
+                ":status": "ACTIVE"
+            },
+            ReturnValues="ALL_NEW"
+        )
+        user_master = master_resp.get('Attributes', {})
+        user_role = user_master.get('role', 'user')
+    except ClientError:
+        logger.error("Failed to update user master")
+        user_role = 'user'
+
+    # セッション作成
+    session_id = generate_session_id()
+    hashed_id = hash_session_id(session_id)
+    current_time = int(time.time())
+    expires_at = current_time + SESSION_TTL_SECONDS
+
+    session_table.put_item(Item={
+        'session_id': hashed_id,
+        'tenant_id': tenant_id,
+        'email': email,
+        'role': user_role,
+        'has_passkey': has_passkey,
+        'id_token': encrypt_token(tokens['IdToken']),
+        'access_token': encrypt_token(tokens['AccessToken']),
+        'refresh_token': encrypt_token(tokens['RefreshToken']),
+        'expires_at': expires_at,
+        'created_at': current_time,
+        'ttl': expires_at + 86400,
+    })
+
+    logger.info("Login successful", extra={
+        'email': mask_email(email),
+        'tenant_id': tenant_id,
+        'role': user_role,
+        'ip': source_ip
+    })
+
+    cookie = build_cookie('sessionId', session_id, SESSION_TTL_SECONDS)
+    response = create_response(200, {'success': True}, cors_headers)
+    response['headers']['Set-Cookie'] = cookie
+    return response
+
+
 def handle_cognito_error(e, cors_headers):
     """Cognitoの例外をフロントエンド向けにマッピング"""
     error_code = getattr(e, 'response', {}).get('Error', {}).get('Code', 'InternalServerError')
 
-    # セキュリティ上の理由で、ユーザー不在とパスワード間違いは同じコードにする
     if error_code in ['NotAuthorizedException', 'UserNotFoundException']:
         logger.warning(f"Auth failure: {error_code}")
         return create_response(401, {'error': 'InvalidUsernameOrPassword'}, cors_headers)
@@ -322,19 +824,22 @@ def handle_session_check(event: dict, cors_headers: dict) -> dict:
         if not session or session.get('expires_at', 0) < int(time.time()):
             return create_response(200, {'authenticated': False}, cors_headers)
 
+        if session.get('type') == 'pending_auth':
+            return create_response(200, {'authenticated': False}, cors_headers)
+
         return create_response(200, {
             'authenticated': True,
             'user': {
                 'email': session.get('email'),
                 'tenant_id': session.get('tenant_id'),
                 'role': session.get('role'),
+                'hasPasskey': session.get('has_passkey', False),  # ★ 追加
             }
         }, cors_headers)
 
     except Exception:
         logger.exception("Session check error")
         return create_response(500, {'error': 'InternalServerError'}, cors_headers)
-
 
 def handle_logout(event: dict, cors_headers: dict) -> dict:
     """ログアウト: セッション削除 + Cognitoグローバルサインアウト + Cookieクリア"""
@@ -349,7 +854,6 @@ def handle_logout(event: dict, cors_headers: dict) -> dict:
 
             if session and session.get('access_token'):
                 try:
-                    # トークンを復号してCognitoからサインアウト
                     cognito.global_sign_out(
                         AccessToken=decrypt_token(session['access_token'])
                     )
@@ -362,7 +866,7 @@ def handle_logout(event: dict, cors_headers: dict) -> dict:
         except Exception:
             logger.exception("Logout error")
 
-    cookie = build_cookie('sessionId', '', 0)  # Cookieを即時無効化
+    cookie = build_cookie('sessionId', '', 0)
     response = create_response(200, {'success': True}, cors_headers)
     response['headers']['Set-Cookie'] = cookie
     return response
@@ -379,16 +883,18 @@ def handle_refresh(event: dict, cors_headers: dict) -> dict:
     hashed_id = hash_session_id(session_id)
 
     try:
-        # ★ まずセッションを取得
         resp = session_table.get_item(Key={'session_id': hashed_id})
         session = resp.get('Item')
 
         if not session:
             return create_response(401, {'error': 'InvalidSession'}, cors_headers)
 
+        # pending_authは通常セッションではない
+        if session.get('type') == 'pending_auth':
+            return create_response(401, {'error': 'InvalidSession'}, cors_headers)
+
         current_time = int(time.time())
 
-        # ① 無操作15分チェック（expires_at が過去なら拒否）
         if session.get('expires_at', 0) < current_time:
             session_table.delete_item(Key={'session_id': hashed_id})
             cookie = build_cookie('sessionId', '', 0)
@@ -396,7 +902,6 @@ def handle_refresh(event: dict, cors_headers: dict) -> dict:
             response['headers']['Set-Cookie'] = cookie
             return response
 
-        # ② 最大3時間チェック
         if session.get('created_at', 0) + MAX_SESSION_DURATION < current_time:
             session_table.delete_item(Key={'session_id': hashed_id})
             cookie = build_cookie('sessionId', '', 0)
@@ -404,7 +909,6 @@ def handle_refresh(event: dict, cors_headers: dict) -> dict:
             response['headers']['Set-Cookie'] = cookie
             return response
 
-        # ③ リフレッシュトークン取得
         encrypted_refresh_token = session.get('refresh_token')
         if not encrypted_refresh_token:
             return create_response(401, {'error': 'RefreshTokenMissing'}, cors_headers)
@@ -428,7 +932,6 @@ def handle_refresh(event: dict, cors_headers: dict) -> dict:
         new_expires_at = int(time.time()) + SESSION_TTL_SECONDS
 
         update_expression = 'SET id_token = :id, access_token = :access, expires_at = :exp, #ttl = :ttl'
-
         expression_values = {
             ':id': encrypt_token(new_tokens['IdToken']),
             ':access': encrypt_token(new_tokens['AccessToken']),
@@ -436,12 +939,10 @@ def handle_refresh(event: dict, cors_headers: dict) -> dict:
             ':ttl': new_expires_at + 86400,
         }
 
-        # Rotation有効時は必ず入ってくるが、念のため存在チェックを入れると安全
         if 'RefreshToken' in new_tokens:
             update_expression += ', refresh_token = :refresh'
             expression_values[':refresh'] = encrypt_token(new_tokens['RefreshToken'])
 
-        # DynamoDB更新実行
         session_table.update_item(
             Key={'session_id': hashed_id},
             UpdateExpression=update_expression,
@@ -457,3 +958,77 @@ def handle_refresh(event: dict, cors_headers: dict) -> dict:
     except Exception:
         logger.exception("Refresh error")
         return create_response(500, {'error': 'InternalServerError'}, cors_headers)
+
+
+# ============================================
+# パスワードリセット
+# ============================================
+
+def handle_forgot_password(event: dict, cors_headers: dict) -> dict:
+    """パスワードリセット用のコード送信"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        email = body.get('email', '').strip()
+
+        if not email:
+            return create_response(400, {'error': 'Email is required'}, cors_headers)
+
+        try:
+            cognito.forgot_password(
+                ClientId=CLIENT_ID,
+                Username=email
+            )
+        except cognito.exceptions.UserNotFoundException:
+            # セキュリティ上、ユーザーが存在しなくても成功を返す
+            pass
+        except cognito.exceptions.LimitExceededException:
+            return create_response(429, {'error': 'LimitExceeded'}, cors_headers)
+        except Exception as e:
+            logger.exception("Forgot password error")
+            return create_response(500, {'error': 'InternalServerError'}, cors_headers)
+
+        logger.info("Password reset code sent", email=mask_email(email))
+        return create_response(200, {
+            'success': True,
+            'masked_email': mask_email(email)
+        }, cors_headers)
+
+    except json.JSONDecodeError:
+        return create_response(400, {'error': 'InvalidJSONFormat'}, cors_headers)
+
+
+def handle_reset_password(event: dict, cors_headers: dict) -> dict:
+    """パスワードリセットの実行"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        email = body.get('email', '').strip()
+        code = body.get('code', '').strip()
+        new_password = body.get('new_password', '')
+
+        if not email or not code or not new_password:
+            return create_response(400, {'error': 'Missing required fields'}, cors_headers)
+
+        try:
+            cognito.confirm_forgot_password(
+                ClientId=CLIENT_ID,
+                Username=email,
+                ConfirmationCode=code,
+                Password=new_password
+            )
+        except cognito.exceptions.CodeMismatchException:
+            return create_response(400, {'error': 'InvalidCode'}, cors_headers)
+        except cognito.exceptions.ExpiredCodeException:
+            return create_response(400, {'error': 'CodeExpired'}, cors_headers)
+        except cognito.exceptions.InvalidPasswordException as e:
+            return create_response(400, {'error': 'InvalidPassword', 'message': str(e)}, cors_headers)
+        except cognito.exceptions.LimitExceededException:
+            return create_response(429, {'error': 'LimitExceeded'}, cors_headers)
+        except Exception:
+            logger.exception("Reset password error")
+            return create_response(500, {'error': 'InternalServerError'}, cors_headers)
+
+        logger.info("Password reset successful", email=mask_email(email))
+        return create_response(200, {'success': True}, cors_headers)
+
+    except json.JSONDecodeError:
+        return create_response(400, {'error': 'InvalidJSONFormat'}, cors_headers)

@@ -1,2 +1,5 @@
 aws-lambda-powertools
 aws-xray-sdk
+boto3
+botocore
+aws-lambda-powertools

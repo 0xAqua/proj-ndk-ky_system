@@ -5,6 +5,49 @@
 
 locals {
   lambda_src_dir = "${path.module}/lambda"
+  # ビルド用の一時ディレクトリ（ここが散らかってもOKな場所）
+  build_dir      = "${path.module}/build/auth_challenge"
+}
+
+# ─────────────────────────────
+# 共通ビルドプロセス (散らかり防止 & Layer廃止)
+# ─────────────────────────────
+resource "null_resource" "build_lambda_package" {
+  triggers = {
+    # requirements.txt か .py ファイルに変更があった時だけ再実行
+    requirements_hash = filesha256("${local.lambda_src_dir}/requirements.txt")
+    code_hash         = sha256(join("", [for f in fileset(local.lambda_src_dir, "*.py") : filesha256("${local.lambda_src_dir}/${f}")]))
+  }
+
+  provisioner "local-exec" {
+    # 修正後: Linux (ARM64) 用のライブラリを強制的にインストールします
+    command = <<-EOT
+      echo "Building package for Linux (ARM64)..."
+      rm -rf ${local.build_dir}
+      mkdir -p ${local.build_dir}
+
+      pip install -r ${local.lambda_src_dir}/requirements.txt \
+        -t ${local.build_dir} \
+        --platform manylinux2014_aarch64 \
+        --implementation cp \
+        --python-version 3.12 \
+        --only-binary=:all: \
+        --upgrade
+
+      cp ${local.lambda_src_dir}/*.py ${local.build_dir}/
+    EOT
+  }
+}
+
+# ビルドディレクトリの中身をまとめてZip化
+data "archive_file" "lambda_artifact" {
+  type        = "zip"
+  source_dir  = local.build_dir
+  output_path = "${path.module}/auth_challenge_payload.zip"
+
+  excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+
+  depends_on = [null_resource.build_lambda_package]
 }
 
 # ─────────────────────────────
@@ -33,12 +76,6 @@ resource "aws_iam_role_policy_attachment" "define_auth_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-data "archive_file" "define_auth_zip" {
-  type        = "zip"
-  source_file = "${local.lambda_src_dir}/define_auth.py"
-  output_path = "${path.module}/define_auth_payload.zip"
-}
-
 resource "aws_lambda_function" "define_auth" {
   function_name = "${var.name_prefix}-define-auth"
   role          = aws_iam_role.define_auth.arn
@@ -48,15 +85,17 @@ resource "aws_lambda_function" "define_auth" {
   timeout       = 10
   memory_size   = 128
 
-  layers = ["arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:59"]
+  # ★ 共通Zipファイルを使用
+  filename         = data.archive_file.lambda_artifact.output_path
+  source_code_hash = data.archive_file.lambda_artifact.output_base64sha256
 
-  filename         = data.archive_file.define_auth_zip.output_path
-  source_code_hash = data.archive_file.define_auth_zip.output_base64sha256
+  # Layersは削除 (requirements.txtに含まれるため)
 
   environment {
     variables = {
       POWERTOOLS_SERVICE_NAME = "DefineAuthChallenge"
       LOG_LEVEL               = "INFO"
+      MAX_OTP_ATTEMPTS        = "5"
     }
   }
 }
@@ -87,18 +126,17 @@ resource "aws_iam_role_policy_attachment" "create_challenge_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# SES送信権限
 resource "aws_iam_role_policy_attachment" "create_challenge_ses" {
   role       = aws_iam_role.create_challenge.name
   policy_arn = var.ses_send_policy_arn
 }
 
-# DynamoDB書き込み権限
 data "aws_iam_policy_document" "create_challenge_dynamodb" {
   statement {
     effect = "Allow"
     actions = [
       "dynamodb:PutItem",
+      "dynamodb:DeleteItem"
     ]
     resources = [var.otp_table_arn]
   }
@@ -110,7 +148,6 @@ resource "aws_iam_role_policy" "create_challenge_dynamodb" {
   policy = data.aws_iam_policy_document.create_challenge_dynamodb.json
 }
 
-# KMS権限（環境変数暗号化用）
 data "aws_iam_policy_document" "create_challenge_kms" {
   statement {
     effect    = "Allow"
@@ -125,32 +162,7 @@ resource "aws_iam_role_policy" "create_challenge_kms" {
   policy = data.aws_iam_policy_document.create_challenge_kms.json
 }
 
-# Lambda依存ライブラリのインストール
-resource "null_resource" "create_challenge_deps" {
-  triggers = {
-    requirements = filesha256("${local.lambda_src_dir}/requirements.txt")
-  }
-
-  provisioner "local-exec" {
-    working_dir = local.lambda_src_dir
-
-    command = <<-EOT
-      echo "[create_challenge] install deps with pip"
-      rm -rf aws_lambda_powertools* __pycache__
-      pip install -r requirements.txt -t .
-      echo "[create_challenge] deps installed"
-    EOT
-  }
-}
-
-data "archive_file" "create_challenge_zip" {
-  type        = "zip"
-  source_dir  = local.lambda_src_dir
-  output_path = "${path.module}/create_challenge_payload.zip"
-  excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
-
-  depends_on = [null_resource.create_challenge_deps]
-}
+# ★ 以前あった個別ビルドの null_resource と archive_file は削除しました ★
 
 resource "aws_lambda_function" "create_challenge" {
   function_name = "${var.name_prefix}-create-challenge"
@@ -161,10 +173,9 @@ resource "aws_lambda_function" "create_challenge" {
   timeout       = 30
   memory_size   = 256
 
-  layers = ["arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:59"]
-
-  filename         = data.archive_file.create_challenge_zip.output_path
-  source_code_hash = data.archive_file.create_challenge_zip.output_base64sha256
+  # ★ 共通Zipファイルを使用
+  filename         = data.archive_file.lambda_artifact.output_path
+  source_code_hash = data.archive_file.lambda_artifact.output_base64sha256
 
   kms_key_arn = var.lambda_kms_key_arn
 
@@ -206,7 +217,6 @@ resource "aws_iam_role_policy_attachment" "verify_challenge_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# DynamoDB読み取り・更新・削除権限
 data "aws_iam_policy_document" "verify_challenge_dynamodb" {
   statement {
     effect = "Allow"
@@ -225,7 +235,6 @@ resource "aws_iam_role_policy" "verify_challenge_dynamodb" {
   policy = data.aws_iam_policy_document.verify_challenge_dynamodb.json
 }
 
-# KMS権限
 data "aws_iam_policy_document" "verify_challenge_kms" {
   statement {
     effect    = "Allow"
@@ -240,14 +249,7 @@ resource "aws_iam_role_policy" "verify_challenge_kms" {
   policy = data.aws_iam_policy_document.verify_challenge_kms.json
 }
 
-data "archive_file" "verify_challenge_zip" {
-  type        = "zip"
-  source_dir  = local.lambda_src_dir
-  output_path = "${path.module}/verify_challenge_payload.zip"
-  excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
-
-  depends_on = [null_resource.create_challenge_deps]
-}
+# ★ 個別の archive_file は削除しました ★
 
 resource "aws_lambda_function" "verify_challenge" {
   function_name = "${var.name_prefix}-verify-challenge"
@@ -258,10 +260,9 @@ resource "aws_lambda_function" "verify_challenge" {
   timeout       = 10
   memory_size   = 128
 
-  layers = ["arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:59"]
-
-  filename         = data.archive_file.verify_challenge_zip.output_path
-  source_code_hash = data.archive_file.verify_challenge_zip.output_base64sha256
+  # ★ 共通Zipファイルを使用
+  filename         = data.archive_file.lambda_artifact.output_path
+  source_code_hash = data.archive_file.lambda_artifact.output_base64sha256
 
   kms_key_arn = var.lambda_kms_key_arn
 

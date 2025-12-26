@@ -4,6 +4,8 @@
 locals {
   producer_src_dir = "${path.module}/lambda/producer"
   worker_src_dir   = "${path.module}/lambda/worker"
+  producer_build_dir = "${path.module}/build/producer"
+  worker_build_dir   = "${path.module}/build/worker"
 }
 
 # ─────────────────────────────
@@ -19,60 +21,94 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
-
 # ─────────────────────────────
-# ソースコードのZIP化
+# ソースコードのビルド & ZIP化
 # ─────────────────────────────
 
-resource "null_resource" "producer_deps" {
+# --- Producer 用ビルド ---
+resource "null_resource" "producer_build" {
   triggers = {
     requirements = filesha256("${local.producer_src_dir}/requirements.txt")
-    main_py      = filesha256("${local.producer_src_dir}/main.py")
+    # フォルダ内の全.pyファイルを監視
+    code_hash    = sha256(join("", [for f in fileset(local.producer_src_dir, "*.py") : filesha256("${local.producer_src_dir}/${f}")]))
   }
 
   provisioner "local-exec" {
-    working_dir = local.producer_src_dir
     command = <<-EOT
-      echo "[s3_vq_workflow/producer] install requests"
-      # Powertools は Layer で提供されるのでインストール不要
-      # requests とその依存関係だけをローカルにインストール
-      pip install requests -t .
+      echo "Building package for Linux (ARM64)..."
+      rm -rf ${local.producer_build_dir}
+      mkdir -p ${local.producer_build_dir}
+
+      # ★ 修正ポイント: Linux (aarch64) 用のバイナリを強制的に取得するオプションを追加
+      pip install -r ${local.producer_src_dir}/requirements.txt \
+        -t ${local.producer_build_dir} \
+        --platform manylinux2014_aarch64 \
+        --implementation cp \
+        --python-version 3.12 \
+        --only-binary=:all: \
+        --upgrade
+
+      # ソースコードをコピー
+      cp ${local.producer_src_dir}/*.py ${local.producer_build_dir}/
     EOT
   }
+
 }
-
-resource "null_resource" "worker_deps" {
-  triggers = {
-    requirements = filesha256("${local.worker_src_dir}/requirements.txt")
-    main_py      = filesha256("${local.producer_src_dir}/main.py")
-  }
-
-  provisioner "local-exec" {
-    working_dir = local.worker_src_dir
-    command = <<-EOT
-      echo "[s3_vq_workflow/producer] install requests"
-      # Powertools は Layer で提供されるのでインストール不要
-      # requests とその依存関係だけをローカルにインストール
-      pip install requests -t .
-    EOT
-  }
-}
-
 
 data "archive_file" "producer_zip" {
   type        = "zip"
-  source_dir  = local.producer_src_dir
+  source_dir  = local.producer_build_dir
   output_path = "${path.module}/producer_payload.zip"
-  excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
-  depends_on  = [null_resource.producer_deps]
+  excludes = [
+    "__pycache__",
+    ".venv",
+    "*.dist-info",
+    "**/.DS_Store",
+    ".gitkeep",
+    "boto3/**",
+    "botocore/**",
+    "s3transfer/**",
+    "bin/**"
+  ]
+  depends_on  = [null_resource.producer_build]
+}
+
+# --- Worker 用ビルド ---
+resource "null_resource" "worker_build" {
+  triggers = {
+    requirements = filesha256("${local.worker_src_dir}/requirements.txt")
+    # フォルダ内の全.pyファイルを監視 (元コードのコピペミスを修正: producer -> worker)
+    code_hash    = sha256(join("", [for f in fileset(local.worker_src_dir, "*.py") : filesha256("${local.worker_src_dir}/${f}")]))
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Building package for Linux (ARM64)..."
+      rm -rf ${local.worker_build_dir}
+      mkdir -p ${local.worker_build_dir}
+
+      # ★ 修正ポイント: Linux (aarch64) 用のバイナリを強制的に取得するオプションを追加
+      pip install -r ${local.worker_src_dir}/requirements.txt \
+        -t ${local.worker_build_dir} \
+        --platform manylinux2014_aarch64 \
+        --implementation cp \
+        --python-version 3.12 \
+        --only-binary=:all: \
+        --upgrade
+
+      # ソースコードをコピー
+      cp ${local.worker_src_dir}/*.py ${local.worker_build_dir}/
+    EOT
+  }
 }
 
 data "archive_file" "worker_zip" {
   type        = "zip"
-  source_dir  = local.worker_src_dir
+  source_dir  = local.worker_build_dir
   output_path = "${path.module}/worker_payload.zip"
   excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
-  depends_on  = [null_resource.producer_deps]
+
+  depends_on  = [null_resource.worker_build]
 }
 
 # ─────────────────────────────
@@ -181,10 +217,6 @@ resource "aws_lambda_function" "producer" {
   source_code_hash = data.archive_file.producer_zip.output_base64sha256
   kms_key_arn = var.lambda_kms_key_arn
 
-  layers = [
-    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
-  ]
-
   environment {
     variables = {
       JOB_TABLE_NAME   = var.job_table_name
@@ -222,10 +254,6 @@ resource "aws_lambda_function" "worker" {
   kms_key_arn = var.lambda_kms_key_arn
 
   reserved_concurrent_executions = 10
-
-  layers = [
-    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
-  ]
 
   environment {
     variables = {

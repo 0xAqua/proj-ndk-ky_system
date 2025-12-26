@@ -1,12 +1,54 @@
 # ─────────────────────────────
-# Lambda Function
+# 0. ローカル変数 & ビルド設定
 # ─────────────────────────────
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/lambda"
-  output_path = "${path.module}/lambda_payload.zip"
+locals {
+  # ソースコードの場所（既存のパス）
+  src_dir   = "${path.module}/lambda"
+  # ビルド作業用の一時ディレクトリ
+  build_dir = "${path.module}/build/admin_user"
 }
 
+# ─────────────────────────────
+# ソースコードのビルド & ZIP化
+# ─────────────────────────────
+resource "null_resource" "build_lambda" {
+  triggers = {
+    requirements = filesha256("${local.src_dir}/requirements.txt")
+    # フォルダ内の全.pyファイルを監視
+    code_hash    = sha256(join("", [for f in fileset(local.src_dir, "*.py") : filesha256("${local.src_dir}/${f}")]))
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+    echo "Building package for Linux (ARM64)..."
+    rm -rf ${local.build_dir}
+    mkdir -p ${local.build_dir}
+
+    pip install -r ${local.src_dir}/requirements.txt \
+      -t ${local.build_dir} \
+      --platform manylinux2014_aarch64 \
+      --implementation cp \
+      --python-version 3.12 \
+      --only-binary=:all: \
+      --upgrade
+
+    # ソースコードをコピー（サブディレクトリ含む）
+    cp -r ${local.src_dir}/*.py ${local.build_dir}/
+    cp -r ${local.src_dir}/modules ${local.build_dir}/ 2>/dev/null || true
+  EOT
+  }
+}
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_dir  = local.build_dir  # ★ ビルド済みディレクトリを指定
+  output_path = "${path.module}/lambda_payload.zip"
+
+  # 不要なキャッシュファイルを除外
+  excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+
+  depends_on  = [null_resource.build_lambda]
+}
 resource "aws_lambda_function" "admin_user" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = var.name_prefix
@@ -16,10 +58,6 @@ resource "aws_lambda_function" "admin_user" {
   runtime          = "python3.12"
   timeout          = 30
   memory_size      = 256
-
-  layers = [
-    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:7"
-  ]
 
   environment {
     variables = {

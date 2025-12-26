@@ -74,11 +74,15 @@ def delete_otp(tenant_id: str, email: str) -> None:
 def lambda_handler(event, context):
     """
     OTPコードの検証
+
+    1. RESENDリクエストの場合は失敗を返す（define_authで再チャレンジ）
+    2. DynamoDBからOTP取得
+    3. 有効期限チェック
+    4. 試行回数チェック
+    5. OTP一致チェック
     """
     request = event.get("request", {})
-    # ★修正: responseの初期化を一番上に移動
     response = event.get("response", {})
-
     user_attributes = request.get("userAttributes", {})
 
     # ユーザー情報
@@ -91,29 +95,31 @@ def lambda_handler(event, context):
     # ユーザーが入力したOTP
     user_answer = request.get("challengeAnswer", "").strip()
 
-    # ★追加: 再送信リクエストの検知
+    # ──────────────────────────────────────────────────────────
+    # 1. 再送信リクエスト
+    # ──────────────────────────────────────────────────────────
     if user_answer == "RESEND":
-        logger.info("再送信リクエストを受信しました", action_category="AUTH")
-        # 認証は「失敗」扱いにすることで define_auth に戻すが
-        # DynamoDBの試行回数は増やさない
+        logger.info("OTP再送信リクエスト", action_category="AUTH")
         response["answerCorrect"] = False
         event["response"] = response
         return event
+
+    logger.info("OTP検証を開始", action_category="AUTH")
 
     # privateChallengeParameters から期待値を取得（バックアップ）
     private_params = request.get("privateChallengeParameters", {})
     expected_answer = private_params.get("answer")
 
-    logger.info("OTP検証を開始", action_category="AUTH")
-
     answer_correct = False
 
     try:
-        # DynamoDBから保存されたOTPを取得
+        # ──────────────────────────────────────────────────────────
+        # 2. DynamoDBからOTP取得
+        # ──────────────────────────────────────────────────────────
         otp_record = get_otp_from_dynamodb(tenant_id, email)
 
         if not otp_record:
-            logger.warning("OTPレコードが見つかりません", action_category="ERROR")
+            logger.warning("OTPレコードが見つかりません", action_category="AUTH")
             response["answerCorrect"] = False
             event["response"] = response
             return event
@@ -123,38 +129,50 @@ def lambda_handler(event, context):
         attempts = otp_record.get("attempts", 0)
         current_time = int(time.time())
 
-        # 有効期限チェック
+        # ──────────────────────────────────────────────────────────
+        # 3. 有効期限チェック
+        # ──────────────────────────────────────────────────────────
         if current_time > expires_at:
-            logger.warning("OTPの有効期限が切れています", action_category="ERROR")
+            logger.warning("OTPの有効期限切れ", action_category="AUTH")
             delete_otp(tenant_id, email)
             response["answerCorrect"] = False
             event["response"] = response
             return event
 
-        # 試行回数チェック
+        # ──────────────────────────────────────────────────────────
+        # 4. 試行回数チェック
+        # ──────────────────────────────────────────────────────────
         if attempts >= MAX_ATTEMPTS:
-            logger.warning("試行回数の上限を超えました", action_category="ERROR", max_attempts=MAX_ATTEMPTS)
+            logger.warning(
+                "OTP試行回数上限",
+                action_category="AUTH",
+                attempts=attempts,
+                max_attempts=MAX_ATTEMPTS
+            )
             delete_otp(tenant_id, email)
             response["answerCorrect"] = False
             event["response"] = response
             return event
 
-        # OTP一致チェック（DynamoDB優先、なければprivateChallengeParameters）
+        # ──────────────────────────────────────────────────────────
+        # 5. OTP一致チェック
+        # ──────────────────────────────────────────────────────────
         if stored_otp and user_answer == stored_otp:
             answer_correct = True
-            logger.info("OTP検証成功（DynamoDB）", action_category="AUTH")
+            logger.info("OTP検証成功", action_category="AUTH")
         elif expected_answer and user_answer == expected_answer:
+            # フォールバック（DynamoDB障害時）
             answer_correct = True
-            logger.info("OTP検証成功（privateChallengeParameters）", action_category="AUTH")
+            logger.info("OTP検証成功（フォールバック）", action_category="AUTH")
         else:
-            logger.warning("OTP検証失敗 - コード不一致", action_category="ERROR")
+            logger.warning("OTP検証失敗 - コード不一致", action_category="AUTH")
             increment_attempts(tenant_id, email)
 
+        # 成功時はOTPレコードを削除
         if answer_correct:
-            # 成功時はOTPレコードを削除
             delete_otp(tenant_id, email)
 
-    except Exception as e:
+    except Exception:
         logger.exception("OTP検証中にエラーが発生しました", action_category="ERROR")
         answer_correct = False
 

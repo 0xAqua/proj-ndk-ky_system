@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { authService } from "@/lib/service/auth";
+import { authService } from "@/lib/service/authService.ts";
 
 export const useAuth = () => {
     const navigate = useNavigate();
@@ -37,17 +37,6 @@ export const useAuth = () => {
         (isAuthenticated && (isContextLoading || !authContext));
 
     const user = authContext?.user;
-
-    // ★ デバッグログ追加
-    console.log('[useAuth]', {
-        isSessionLoading,
-        isContextLoading,
-        isLoading,
-        isAuthenticated,
-        sessionUser: session?.user,
-        authContextUser: user,
-        role: user?.role ?? session?.user?.role,
-    });
 
     const logout = useCallback(async () => {
         if (isLoggingOut.current) return;

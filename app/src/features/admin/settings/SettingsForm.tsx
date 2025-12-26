@@ -109,7 +109,8 @@ export const SettingsForm = () => {
                                 color="white"
                                 size="lg"
                                 px={8}
-                                borderRadius="md"
+                                h={12}
+                                rounded="full"
                                 _hover={{ bg: "orange.600" }}
                                 onClick={handleSaveClick}
                                 loading={isSaving}

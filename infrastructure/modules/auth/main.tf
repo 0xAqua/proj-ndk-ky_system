@@ -112,13 +112,10 @@ resource "aws_cognito_user_pool" "this" {
   # ─────────────────────────────
   # Email OTP カスタム認証トリガー
   # ─────────────────────────────
-  dynamic "lambda_config" {
-    for_each = var.define_auth_lambda_arn != null ? [1] : []
-    content {
-      define_auth_challenge          = var.define_auth_lambda_arn
-      create_auth_challenge          = var.create_auth_lambda_arn
-      verify_auth_challenge_response = var.verify_auth_lambda_arn
-    }
+  lambda_config {
+    define_auth_challenge          = var.define_auth_lambda_arn
+    create_auth_challenge          = var.create_auth_lambda_arn
+    verify_auth_challenge_response = var.verify_auth_lambda_arn
   }
 }
 
@@ -144,7 +141,8 @@ resource "aws_cognito_user_pool_client" "web" {
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
     "ALLOW_USER_PASSWORD_AUTH",
-    "ALLOW_CUSTOM_AUTH",
+    "ALLOW_ADMIN_USER_PASSWORD_AUTH", # OK: パスワード検証用
+    "ALLOW_CUSTOM_AUTH",               # OK: OTPチャレンジ開始用
     "ALLOW_REFRESH_TOKEN_AUTH",
     "ALLOW_USER_AUTH"
   ]

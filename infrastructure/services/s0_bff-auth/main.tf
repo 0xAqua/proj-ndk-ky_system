@@ -4,6 +4,39 @@
 
 locals {
   lambda_src_dir = "${path.module}/lambda"
+  build_dir      = "${path.module}/build"
+}
+
+# ─────────────────────────────
+# ビルドプロセス (散らかり防止版)
+# ─────────────────────────────
+resource "null_resource" "build_lambda_package" {
+  triggers = {
+    # requirements.txt か .py ファイルに変更があった時だけ再実行
+    requirements_hash = filesha256("${local.lambda_src_dir}/requirements.txt")
+    code_hash         = sha256(join("", [for f in fileset(local.lambda_src_dir, "*.py") : filesha256("${local.lambda_src_dir}/${f}")]))
+  }
+
+  provisioner "local-exec" {
+    # Linux (ARM64) 用のライブラリを build ディレクトリに集約し、ソースコードもそこにコピーする
+    command = <<-EOT
+      echo "Building package for Linux (ARM64)..."
+      rm -rf ${local.build_dir}
+      mkdir -p ${local.build_dir}
+
+      # ライブラリのインストール
+      pip install -r ${local.lambda_src_dir}/requirements.txt \
+        -t ${local.build_dir} \
+        --platform manylinux2014_aarch64 \
+        --implementation cp \
+        --python-version 3.12 \
+        --only-binary=:all: \
+        --upgrade
+
+      # ソースコードのコピー
+      cp ${local.lambda_src_dir}/*.py ${local.build_dir}/
+    EOT
+  }
 }
 
 # 1. IAM Role & AssumeRole (変更なし)
@@ -27,7 +60,7 @@ resource "aws_iam_role_policy_attachment" "basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# 2. Cognito権限 (変更なし)
+# 2. Cognito権限
 resource "aws_iam_role_policy" "cognito" {
   name = "cognito-access"
   role = aws_iam_role.bff_auth.id
@@ -38,7 +71,12 @@ resource "aws_iam_role_policy" "cognito" {
       Action = [
         "cognito-idp:InitiateAuth",
         "cognito-idp:RespondToAuthChallenge",
-        "cognito-idp:GetUser"
+        "cognito-idp:GetUser",
+        "cognito-idp:AdminInitiateAuth",
+        "cognito-idp:AdminRespondToAuthChallenge",
+        "cognito-idp:AssociateWebAuthnCredential",
+        "cognito-idp:VerifyWebAuthnCredential",
+        "cognito-idp:UpdateUserAttributes"
       ]
       Resource = ["*"]
     }]
@@ -53,25 +91,25 @@ resource "aws_iam_role_policy" "dynamodb" {
     Version = "2012-10-17"
     Statement = [
       {
-        # セッション管理テーブル (変更なし)
         Effect = "Allow"
         Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
         Resource = [var.auth_sessions_table_arn]
       },
       {
-        # ★修正: ユーザーマスタテーブル (role取得 + ログイン情報更新用)
         Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:UpdateItem" # ← これを追加
-        ]
+        Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
         Resource = [var.tenant_user_master_table_arn]
+      },
+      {
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem"]
+        Resource = [var.tenant_config_table_arn]
       }
     ]
   })
 }
 
-# 4. KMS権限 (変更なし)
+# 4. KMS権限
 resource "aws_iam_role_policy" "kms" {
   name = "kms-decrypt-access"
   role = aws_iam_role.bff_auth.id
@@ -79,36 +117,33 @@ resource "aws_iam_role_policy" "kms" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = [
-        "kms:Encrypt",
-        "kms:Decrypt"
-      ]
+      Action   = ["kms:Encrypt", "kms:Decrypt"]
       Resource = [var.lambda_kms_key_arn]
     }]
   })
 }
 
-# 5. Lambdaパッケージング ★他サービスに合わせ null_resource 削除
+# 5. Lambdaパッケージング (修正済み)
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = local.lambda_src_dir
+  # ↓↓↓ ここが最重要修正ポイントです（buildディレクトリを指定する） ↓↓↓
+  source_dir  = local.build_dir
   output_path = "${path.module}/bff_auth_payload.zip"
-  excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+  excludes    = ["__pycache__", "*.dist-info", "**/.DS_Store"]
+
+  # ビルドが終わってからZipを作成する
+  depends_on = [null_resource.build_lambda_package]
 }
 
-# 6. Lambda Function ★環境変数を追加
+# 6. Lambda Function
 resource "aws_lambda_function" "bff_auth" {
   function_name = var.name_prefix
   role          = aws_iam_role.bff_auth.arn
   handler       = "main.lambda_handler"
   runtime       = "python3.12"
-  architectures = ["x86_64"]
+  architectures = ["arm64"]
   timeout       = 30
   memory_size   = 256
-
-  layers = [
-    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-x86_64:7"
-  ]
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
@@ -117,17 +152,18 @@ resource "aws_lambda_function" "bff_auth" {
 
   environment {
     variables = {
-      KMS_KEY_ID              = var.kms_key_id
+      KMS_KEY_ID               = var.kms_key_id
       USER_POOL_ID             = var.user_pool_id
       CLIENT_ID                = var.user_pool_client_id
       SESSION_TABLE            = var.auth_sessions_table_name
-      # ★ Python側の KeyError 解消のために追加
       TENANT_USER_MASTER_TABLE = var.tenant_user_master_table_name
       ALLOWED_ORIGINS          = join(",", var.allowed_origins)
       POWERTOOLS_SERVICE_NAME  = "BFFAuth"
       POWERTOOLS_LOG_LEVEL     = "INFO"
-      COOKIE_SAME_SITE  = "Lax"
+      COOKIE_SAME_SITE         = "Lax"
       SESSION_TTL_SECONDS      = "3600"
+      TENANT_CONFIG_TABLE      = var.tenant_config_table_name
+      PENDING_AUTH_TTL_SECONDS = "300"
     }
   }
 }
@@ -138,16 +174,31 @@ resource "aws_cloudwatch_log_group" "bff_auth" {
   retention_in_days = 30
 }
 
-# 8. API Gateway v2 統合 & 権限 (変更なし)
+# 8. API Gateway v2 統合 & 権限
 resource "aws_apigatewayv2_integration" "bff_auth" {
-  api_id           = var.api_gateway_id
-  integration_type = "AWS_PROXY"
-  integration_uri  = aws_lambda_function.bff_auth.invoke_arn
+  api_id                 = var.api_gateway_id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.bff_auth.invoke_arn
   payload_format_version = "2.0"
 }
 
 resource "aws_apigatewayv2_route" "routes" {
-  for_each  = toset(["POST /bff/auth/login", "POST /bff/auth/logout", "GET /bff/auth/session", "POST /bff/auth/refresh"])
+  for_each  = toset([
+    "POST /bff/auth/login",
+    "POST /bff/auth/logout",
+    "GET /bff/auth/session",
+    "POST /bff/auth/refresh",
+    "POST /bff/auth/verify-otp",
+    "POST /bff/auth/resend-otp",
+    "POST /bff/auth/passkey/options",
+    "POST /bff/auth/passkey/verify",
+    "POST /bff/auth/passkey/register-options",
+    "POST /bff/auth/passkey/register-verify",
+    "POST /bff/auth/passkey/login",
+    "POST /bff/auth/forgot-password",
+    "POST /bff/auth/reset-password"
+  ])
+
   api_id    = var.api_gateway_id
   route_key = each.key
   target    = "integrations/${aws_apigatewayv2_integration.bff_auth.id}"

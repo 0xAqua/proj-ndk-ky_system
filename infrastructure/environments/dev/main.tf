@@ -483,6 +483,10 @@ module "bff_auth" {
     "https://ndisol.kytest.weeeef.com",
     "https://kytest.weeeef.com"
   ]
+
+  tenant_config_table_name = module.dynamodb.tenant_config_master_table_name
+  tenant_config_table_arn  = module.dynamodb.tenant_config_master_table_arn
+
 }
 
 # ─────────────────────────────

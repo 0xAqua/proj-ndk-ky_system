@@ -33,6 +33,16 @@ variable "api_gateway_execution_arn" {
   type        = string
 }
 
+variable "tenant_config_table_name" {
+  type        = string
+  description = "tenant_config_master DynamoDB テーブル名"
+}
+
+variable "tenant_config_table_arn" {
+  type        = string
+  description = "tenant_config_master DynamoDB テーブル ARN"
+}
+
 variable "lambda_kms_key_arn" {
   description = "KMS key ARN for Lambda environment variable encryption"
   type        = string

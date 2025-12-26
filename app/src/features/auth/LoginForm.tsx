@@ -1,95 +1,141 @@
-import {VStack, Text, Image, Link} from "@chakra-ui/react";
+import { VStack, Text, Image, Link } from "@chakra-ui/react";
 import logo from '@/assets/logo.jpg';
-import { useLoginForm } from "./hooks/useLoginForm.ts";
-import { CredentialsForm } from "./components/CredentialsForm.tsx";
+import { useState } from "react"; // 追加
+import { useLoginForm } from "./hooks/useLoginForm";
+import { CredentialsForm } from "./components/CredentialsForm";
+import { OtpForm } from "./components/OtpForm";
 import { EnvBadge } from "@/components/elements/EnvBadge";
-
-// 将来使うかもしれないのでimportだけ残してコメントアウトするか、完全に消してもOKです
-// import { PasskeyPromotionModal } from "./components/PasskeyPromotionModal.tsx";
-// import { OtpForm } from "./components/OtpForm.tsx";
-// import { PasskeyLoginButton } from "./components/PasskeyLoginButton.tsx";
+import { PasskeyLoginButton } from "@/features/auth/components/PasskeyLoginButton";
+import { PasskeyPromotionModal } from "@/features/auth/components/PasskeyPromotionModal";
 
 export const LoginForm = () => {
     const {
-        // step, // 今回はstepによる画面切り替えを行わないため未使用
+        step,
         username,
         setUsername,
         password,
         setPassword,
-        // otp,          // 未使用
-        // setOtp,       // 未使用
+        otp,
+        setOtp,
+        maskedEmail,
         handleLogin,
-        // handleVerifyOtp,     // 未使用
+        handleVerifyOtp,
+        handlePasskeyLogin,
+        handleResend,
+        handleBackToLogin,
         isLoading,
         error,
-        // showPasskeyModal,    // 未使用
-        // setShowPasskeyModal, // 未使用
-        // handlePasskeyLogin,  // 未使用
-        // handleModalComplete, // 未使用
-        // handleBackToLogin,   // 未使用
-        // handleResend,        // 未使用
-        // resendMessage        // 未使用
+        resendMessage,
+        isPromotionOpen,
+        onPromotionComplete,
+        setIsPromotionOpen,
     } = useLoginForm();
 
+    // メールとパスワードの画面分けを管理するローカルステート
+    const [authPhase, setAuthPhase] = useState<'email' | 'password'>('email');
 
-
+    // 画面切り替えのタイトル制御
+    const getTitle = () => {
+        if (step === 'INPUT_OTP') return '認証コード入力';
+        return authPhase === 'email' ? 'ログイン' : 'パスワード入力';
+    };
 
     return (
-        <>
-            {/* ★Passkey訴求モーダルは削除（またはコメントアウト） */}
-            {/* <PasskeyPromotionModal ... /> */}
+        <VStack gap={6} width="100%">
+            <Image src={logo} alt="KY System logo" width="78px" mt="4" />
 
-            <VStack gap={6}>
-                <Image src={logo} alt="KY System logo" width="78px" mt="4" />
-                <VStack>
-                    <Text fontSize="2xl" fontWeight="bold" mb="2" mt="2">
-                        ログイン
-                    </Text>
-                    <EnvBadge />
-                </VStack>
+            <VStack>
+                <Text fontSize="2xl" fontWeight="bold" mb="2" mt="2">
+                    {getTitle()}
+                </Text>
+                <EnvBadge />
+            </VStack>
 
-                <VStack gap={1} mb="4">
-                    <Text fontSize="sm" color="gray.600">
-                        危険予知システムへようこそ
-                    </Text>
-                    {/* 文言も固定化 */}
-                    <Text fontSize="sm" color="gray.600">ログイン情報を入力してください</Text>
-                </VStack>
-
-                {/* エラー表示エリア */}
-                {error && (
-                    <Text color="red.500" fontSize="sm" textAlign="center" fontWeight="bold">
-                        {error}
-                    </Text>
-                )}
-
-                {/* ★OTP再送信メッセージ表示エリアは削除 */}
-
-                {/* Step 1: ID/PASS入力フォーム (条件分岐を外して常に表示) */}
-                <CredentialsForm
-                    username={username}
-                    password={password}
-                    isLoading={isLoading}
-                    onUsernameChange={setUsername}
-                    onPasswordChange={setPassword}
-                    onSubmit={handleLogin}
-                />
-
-                {/* ★Passkeyログインボタンは削除 */}
-                {/* <PasskeyLoginButton ... /> */}
-
-
-                {/* ★Step 2: OTP入力フォームは削除（将来復活する場合はここに戻す） */}
-                {/* {step === 'INPUT_OTP' && ( ... )} */}
-
-
-                {/* パスワード忘れリンク */}
-                <Text textAlign="left" mt={2} fontSize="sm">
-                    <Link color="blue.500" href="#">
-                        パスワードをお忘れですか？
-                    </Link>
+            <VStack gap={1} mb="4">
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                    {step === 'INPUT_OTP'
+                        ? '認証コードを入力してください'
+                        : (authPhase === 'email'
+                            ? '危険予知システムへようこそ'
+                            : 'ログイン情報を入力してください')}
                 </Text>
             </VStack>
-        </>
+
+            {/* エラー表示 */}
+            {error && (
+                <Text color="red.500" fontSize="sm" textAlign="center" fontWeight="bold">
+                    {error}
+                </Text>
+            )}
+
+            {/* 再送信成功メッセージ */}
+            {resendMessage && (
+                <Text color="green.500" fontSize="sm" textAlign="center" fontWeight="bold">
+                    {resendMessage}
+                </Text>
+            )}
+
+            {/* Step 1: ID/PASS入力フェーズ */}
+            {step === 'INPUT_CREDENTIALS' && (
+                <VStack w="full" gap={6}>
+                    <CredentialsForm
+                        authPhase={authPhase}
+                        setAuthPhase={setAuthPhase}
+                        username={username}
+                        password={password}
+                        isLoading={isLoading}
+                        onUsernameChange={setUsername}
+                        onPasswordChange={setPassword}
+                        onSubmit={handleLogin}
+                    />
+
+                    {/* --- 常に表示するオプションエリア --- */}
+                    <VStack gap={4} w="full">
+                        {/* パスキーはパスワード入力画面の時だけ表示（またはお好みで共通化） */}
+                        {authPhase === 'password' && (
+                            <PasskeyLoginButton
+                                isLoading={isLoading}
+                                onClick={handlePasskeyLogin}
+                            />
+                        )}
+
+                        {/* パスワード忘れリンク：常に表示 */}
+                        <Text textAlign="center" fontSize="sm">
+                            <Link
+                                color="blue.500"
+                                href="/forgot-password"
+                                variant="underline"
+                                _hover={{ color: "blue.600" }}
+                            >
+                                パスワードをお忘れですか？
+                            </Link>
+                        </Text>
+                    </VStack>
+                </VStack>
+            )}
+
+            {/* Step 2: OTP入力 */}
+            {step === 'INPUT_OTP' && (
+                <OtpForm
+                    username={maskedEmail}
+                    otp={otp}
+                    isLoading={isLoading}
+                    onOtpChange={setOtp}
+                    onSubmit={handleVerifyOtp}
+                    onBack={() => {
+                        setAuthPhase('email'); // OTPから戻る際はメール入力に戻す
+                        handleBackToLogin();
+                    }}
+                    onResend={handleResend}
+                />
+            )}
+
+            {/* パスキー登録勧奨モーダル */}
+            <PasskeyPromotionModal
+                isOpen={isPromotionOpen}
+                onClose={() => setIsPromotionOpen(false)}
+                onComplete={onPromotionComplete}
+            />
+        </VStack>
     );
 };

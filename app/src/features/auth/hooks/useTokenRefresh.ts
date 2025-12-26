@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from './useAuth';
-import { authService } from '@/lib/service/auth';
+import { authService } from '@/lib/service/authService.ts';
 
 const REFRESH_INTERVAL = 14 * 60 * 1000;        // 14分
 const ACTIVITY_THRESHOLD = 5 * 60 * 1000;       // 5分以内に操作があればリフレッシュ

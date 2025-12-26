@@ -26,7 +26,8 @@ export const SubmitButton = ({ onClick, children, ...props }: Props) => {
             fontSize="md"
             fontWeight="bold"
             transition="all 0.2s"
-
+            h="12"
+            rounded="full"
             // ── 動作 ──
             onClick={onClick}
 

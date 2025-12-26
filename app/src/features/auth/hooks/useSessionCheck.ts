@@ -1,7 +1,7 @@
 // src/features/auth/hooks/useSessionCheck.ts
 import { useEffect } from 'react';
 import { useAuth } from './useAuth';
-import { authService } from '@/lib/service/auth';
+import { authService } from '@/lib/service/authService.ts';
 
 export const useSessionCheck = () => {
     const { logout, isAuthenticated } = useAuth();

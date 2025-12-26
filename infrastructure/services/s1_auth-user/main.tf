@@ -3,6 +3,34 @@
 # ─────────────────────────────
 locals {
   lambda_src_dir = "${path.module}/lambda"
+  build_dir      = "${path.module}/build"
+}
+
+# ─────────────────────────────
+# ビルドプロセス (散らかり防止版)
+# ─────────────────────────────
+resource "null_resource" "build_lambda_package" {
+  triggers = {
+    requirements_hash = filesha256("${local.lambda_src_dir}/requirements.txt")
+    code_hash         = sha256(join("", [for f in fileset(local.lambda_src_dir, "*.py") : filesha256("${local.lambda_src_dir}/${f}")]))
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      rm -rf ${local.build_dir}
+      mkdir -p ${local.build_dir}
+
+      pip install -r ${local.lambda_src_dir}/requirements.txt \
+        -t ${local.build_dir} \
+        --platform manylinux2014_aarch64 \
+        --implementation cp \
+        --python-version 3.12 \
+        --only-binary=:all: \
+        --upgrade
+
+      cp ${local.lambda_src_dir}/*.py ${local.build_dir}/
+    EOT
+  }
 }
 
 # ─────────────────────────────
@@ -72,9 +100,12 @@ resource "aws_iam_role_policy" "dynamodb_read" {
 
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = local.lambda_src_dir
+  source_dir  = local.build_dir
+
   output_path = "${path.module}/lambda_payload.zip"
   excludes    = ["__pycache__", ".venv", "*.dist-info", "**/.DS_Store", ".gitkeep"]
+
+  depends_on = [null_resource.build_lambda_package]
 }
 
 resource "aws_lambda_function" "this" {
@@ -91,10 +122,6 @@ resource "aws_lambda_function" "this" {
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   kms_key_arn = var.lambda_kms_key_arn
-
-  layers = [
-    "arn:aws:lambda:ap-northeast-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python312-arm64:7"
-  ]
 
   environment {
     variables = {
