@@ -1,7 +1,8 @@
-import { Box, Flex, Stack, Text, Separator, Spinner } from "@chakra-ui/react";
+import { Box, Flex, Stack, Text, Separator } from "@chakra-ui/react";
 import { Switch } from "@/components/ui/switch";
 import { PiEnvelopeSimple, PiFingerprint, PiInfo } from "react-icons/pi";
 import type { SecurityConfig } from "@/lib/service/tenantConfig";
+import {AuthSettingsSkeleton} from "@/features/admin/settings/components/AuthSettingsSkeleton.tsx";
 
 interface AuthSettingsProps {
     config: SecurityConfig | null;
@@ -12,11 +13,10 @@ interface AuthSettingsProps {
 export const AuthSettings = ({ config, onChange, isLoading }: AuthSettingsProps) => {
     if (isLoading || !config) {
         return (
-            <Flex justify="center" align="center" minH="200px">
-                <Spinner size="lg" color="blue.500" />
-            </Flex>
+            <AuthSettingsSkeleton />
         );
     }
+
 
     const handleOtpToggle = () => {
         // Passkey有効中はOTPをOFFにできない

@@ -81,6 +81,7 @@ export const AccessLogsTable = ({
                                 <Table.ColumnHeader color="gray.600" fontWeight="bold">結果</Table.ColumnHeader>
                                 <Table.ColumnHeader color="gray.600" fontWeight="bold">IPアドレス</Table.ColumnHeader>
                                 <Table.ColumnHeader color="gray.600" fontWeight="bold">場所</Table.ColumnHeader>
+                                <Table.ColumnHeader color="gray.600" fontWeight="bold">脅威</Table.ColumnHeader>
                             </Table.Row>
                         </Table.Header>
 

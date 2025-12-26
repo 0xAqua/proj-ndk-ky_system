@@ -81,6 +81,8 @@ export const AccessLogBody = ({ data, loading, rowsPerPage }: Props) => {
                         <Text>
                             {log.city && log.country ? `${log.city}, ${log.country}` : log.country || "-"}
                         </Text>
+                    </Table.Cell>
+                    <Table.Cell fontSize="sm" color="gray.500">
                         {log.riskLevel && getRiskBadge(log.riskLevel)}
                     </Table.Cell>
                 </Table.Row>
