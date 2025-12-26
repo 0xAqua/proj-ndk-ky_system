@@ -99,7 +99,8 @@ resource "null_resource" "worker_build" {
 
       # ソースコードをコピー
       cp ${local.worker_src_dir}/*.py ${local.worker_build_dir}/
-      cp -r ${path.module}/../shared ${local.producer_build_dir}/ 2>/dev/null || true
+      cp -r ${path.module}/../shared ${local.worker_build_dir}/ 2>/dev/null || true
+
     EOT
   }
 }

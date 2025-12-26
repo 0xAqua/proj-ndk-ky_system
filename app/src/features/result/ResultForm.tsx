@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { useLocation, Navigate } from "react-router-dom";
-import { Box, Stack, StackSeparator } from "@chakra-ui/react";
+import {useLocation, Navigate, useNavigate} from "react-router-dom";
+import {Box, Button, Stack, StackSeparator} from "@chakra-ui/react";
 
 // Hooks & Utils
 import { useJobResult } from "@/features/result/hooks/useJobResult";
@@ -13,11 +13,13 @@ import { ResultFormSkeleton } from "@/features/result/components/elements/Result
 import { ProcessingModal } from "@/features/result/components/elements/ProcessingModal";
 
 import type { RawIncident } from "@/features/result/types";
+import {MdArrowBack} from "react-icons/md";
 
 export const ResultForm = () => {
     const location = useLocation();
     const state = location.state as { jobId?: string } | null;
     const jobId = state?.jobId;
+    const navigate = useNavigate();
 
     const { status, result, error, isLoading } = useJobResult({
         jobId: jobId ?? "",
@@ -37,10 +39,14 @@ export const ResultForm = () => {
     // ロジック判定
     // ──────────────────────────────────────────
 
-    if (!jobId) return <Navigate to="/" replace />;
+    if (!jobId) return <Navigate to="/entry" replace />;
 
     // 待機判定：ロード中、または完了・失敗以外のステータス（PROCESSING等）
     const isWaiting = isLoading || (status !== "COMPLETED" && status !== "FAILED");
+
+    const handleBack = () => {
+        navigate("/entry"); // 入力フォームのパスへ戻る
+    };
 
     return (
         <Box w="full" maxW="4xl" mx="auto" position="relative">
@@ -85,6 +91,35 @@ export const ResultForm = () => {
                             })}
                         </Stack>
                     )}
+                </Box>
+
+            )}
+            {/* 3. 戻るボタン */}
+            {!error && !isWaiting && (
+                <Box mt={10} mb={6} textAlign="center">
+                    <Button
+                        onClick={handleBack}
+
+                        // ▼ ベースのスタイル (通常時)
+                        size="lg"
+                        variant="outline"
+                        bg="orange.500"
+                        color="white"       // 文字をオレンジ500
+                        borderWidth="2px"        // 枠線を少し太くして色を強調
+                        rounded="full"
+                        px={10}
+                        h={14}
+                        fontSize="md"
+                        fontWeight="bold"
+                        _active={{
+                            transform: "translateY(0)",
+                            boxShadow: "none"
+                        }}
+                        transition="all 0.3s ease" // アニメーションを少しゆったりに
+                    >
+                        <MdArrowBack size={20} />
+                        条件入力へ戻る
+                    </Button>
                 </Box>
             )}
         </Box>

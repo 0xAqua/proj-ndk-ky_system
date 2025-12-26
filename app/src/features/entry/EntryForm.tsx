@@ -120,6 +120,11 @@ export const EntryForm = () => {
     // ──────────────────────────────────────────
     const handlePreSubmitCheck = () => {
         // 各項目ごとにチェックして、足りないものを個別に通知する
+        if (!date) {
+            notify.warning("施工日を入力してください。", "入力チェック");
+            return;
+        }
+
         if (selectedTypeIds.length === 0) {
             notify.warning("工事種別を1つ以上選択してください。", "入力チェック");
             return;
