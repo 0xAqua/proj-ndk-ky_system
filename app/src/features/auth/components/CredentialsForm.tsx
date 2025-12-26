@@ -131,7 +131,9 @@ export const CredentialsForm = ({
                                 />
                             </Group>
                         </Field.Root>
-
+                        <Text fontSize="xs" color="gray.500" mt={1}>
+                            パスキーを登録すると、パスワード入力は不要になります。
+                        </Text>
                         <Button
                             type="submit"
                             w="full"

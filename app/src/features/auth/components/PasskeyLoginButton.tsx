@@ -19,7 +19,7 @@ export const PasskeyLoginButton = ({ isLoading, onClick }: Props) => {
             _hover={{ boxShadow: "md", transform: "translateY(-1px)" }}
         >
             <MdFingerprint size={20} color="var(--chakra-colors-green-500)" />
-            生体認証でログイン
+            パスキーでログイン
         </Button>
     );
 };
