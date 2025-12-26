@@ -5,20 +5,35 @@ resource "aws_dynamodb_table" "access_history" {
   # ─────────────────────────────
   # Key Schema
   # ─────────────────────────────
-  hash_key  = "timestamp"
-  range_key = "email"  # ← 変更
+  hash_key  = "tenant_id"           # ← テナント別に分離
+  range_key = "timestamp_event_id"  # ← timestamp#eventId で一意性担保
 
   # ─────────────────────────────
   # Attribute Definitions
   # ─────────────────────────────
   attribute {
-    name = "timestamp"
-    type = "N"
+    name = "tenant_id"
+    type = "S"
   }
 
   attribute {
-    name = "email"  # ← 変更
+    name = "timestamp_event_id"
     type = "S"
+  }
+
+  attribute {
+    name = "email"
+    type = "S"
+  }
+
+  # ─────────────────────────────
+  # GSI: メールアドレスで検索用
+  # ─────────────────────────────
+  global_secondary_index {
+    name            = "EmailIndex"
+    hash_key        = "tenant_id"
+    range_key       = "email"
+    projection_type = "ALL"
   }
 
   # ─────────────────────────────
@@ -46,13 +61,17 @@ resource "aws_dynamodb_table" "access_history" {
 }
 
 # ─────────────────────────────
-# 保存する属性（参考用コメント）
+# 保存する属性
 # ─────────────────────────────
-# timestamp   : N  - いつ（UNIXミリ秒）※PK
-# email       : S  - 誰が ※SK
-# tenant_id   : S  - テナントID
-# action      : S  - LOGIN / LOGOUT / TOKEN_REFRESH / LOGIN_FAILED
-# source_ip   : S  - どこから
-# user_agent  : S  - 何で（ブラウザ/モバイル）
-# result      : S  - SUCCESS / FAILED
-# expires_at  : N  - TTL（90日後）
+# tenant_id          : S  - テナントID ※PK
+# timestamp_event_id : S  - "1735182411276#9ae213af-..." ※SK
+# email              : S  - 誰が
+# event_type         : S  - SignIn / SignIn_Failure / TokenRefresh
+# result             : S  - Pass / Fail
+# ip_address         : S  - どこから
+# city               : S  - 都市
+# country            : S  - 国
+# risk_level         : S  - LOW / MEDIUM / HIGH
+# user_sub           : S  - CognitoユーザーID（参照用）
+# created_at         : N  - UNIXタイムスタンプ（ソート・表示用）
+# expires_at         : N  - TTL（90日後）

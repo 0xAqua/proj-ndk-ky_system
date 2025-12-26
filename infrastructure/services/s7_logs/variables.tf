@@ -81,3 +81,35 @@ variable "origin_verify_secret" {
 variable "origin_verify_authorizer_id" {
   type = string
 }
+
+# ★ 追加分
+
+variable "access_history_table_name" {
+  description = "Access history DynamoDB table name"
+  type        = string
+}
+
+variable "access_history_table_arn" {
+  description = "Access history DynamoDB table ARN"
+  type        = string
+}
+
+variable "user_pool_id" {
+  description = "Cognito User Pool ID"
+  type        = string
+}
+
+variable "user_pool_arn" {
+  description = "Cognito User Pool ARN"
+  type        = string
+}
+
+variable "cognito_log_group_name" {
+  description = "Cognito CloudWatch Log Group name"
+  type        = string
+}
+
+variable "cognito_log_group_arn" {
+  description = "Cognito CloudWatch Log Group ARN"
+  type        = string
+}

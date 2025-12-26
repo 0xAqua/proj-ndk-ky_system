@@ -7,7 +7,7 @@ import boto3
 import hashlib
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from modules import execution_logs
+from modules import execution_logs, access_logs
 
 logger = Logger()
 dynamodb = boto3.resource('dynamodb')
@@ -62,8 +62,19 @@ def get_session(event):
     except Exception as e:
         print(f"Session check failed: {str(e)}")
         return None
+
 @logger.inject_lambda_context
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
+
+    # ─────────────────────────────
+    # CloudWatch Logs Subscription Filter からの呼び出し
+    # ─────────────────────────────
+    if 'awslogs' in event:
+        return access_logs.save_logs(event)
+
+    # ─────────────────────────────
+    # API Gateway からの呼び出し（既存処理）
+    # ─────────────────────────────
     headers = {k.lower(): v for k, v in event.get("headers", {}).items()}
     expected = os.environ.get("ORIGIN_VERIFY_SECRET")
 
@@ -86,9 +97,11 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
     path = event.get('rawPath', '')
     method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
 
-    # 3. ルーティング (引数に tenant_id と origin を追加)
+    # 3. ルーティング
     if path == '/logs/execution' and method == 'GET':
         return execution_logs.get_logs(event, context, tenant_id, origin)
 
-    # ... (その他のパス)
+    if path == '/logs/access' and method == 'GET':  # ← 追加
+        return access_logs.get_logs(event, context, tenant_id, origin)
+
     return create_response(404, {'error': 'Not Found'}, origin)

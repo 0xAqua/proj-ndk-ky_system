@@ -172,6 +172,18 @@ module "s7_logs" {
   tenant_log_archive_table_name  = module.dynamodb.tenant_log_archive_table_name
   tenant_log_archive_table_arn   = module.dynamodb.tenant_log_archive_table_arn
 
+  # ★ アクセス履歴テーブル
+  access_history_table_name = module.dynamodb.access_history_table_name
+  access_history_table_arn  = module.dynamodb.access_history_table_arn
+
+  # ★ Cognito
+  user_pool_id  = module.auth.user_pool_id
+  user_pool_arn = module.auth.user_pool_arn
+
+  # ★ Cognito CloudWatch Logs（auth モジュールから取得）
+  cognito_log_group_name = module.auth.cognito_log_group_name
+  cognito_log_group_arn  = module.auth.cognito_log_group_arn
+
   # API Gateway
   api_gateway_id            = module.api_gateway.api_id
   api_gateway_execution_arn = module.api_gateway.api_execution_arn
@@ -185,7 +197,6 @@ module "s7_logs" {
   session_table_arn  = module.dynamodb.auth_sessions_table_arn
 
   origin_verify_secret = module.secrets.origin_verify_secret_value
-
 }
 
 

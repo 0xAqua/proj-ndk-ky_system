@@ -78,3 +78,11 @@ output "tenant_config_master_table_arn" {
   description = "Tenant config master table ARN"
   value       = aws_dynamodb_table.tenant_config_master.arn
 }
+
+output "access_history_table_name" {
+  value = aws_dynamodb_table.access_history.name
+}
+
+output "access_history_table_arn" {
+  value = aws_dynamodb_table.access_history.arn
+}

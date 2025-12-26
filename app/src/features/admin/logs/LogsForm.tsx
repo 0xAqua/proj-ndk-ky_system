@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { Box, Flex } from '@chakra-ui/react';
 import { LogsSidebar } from '@/features/admin/logs/components/elements/LogsSidebar.tsx';
-import { AccessLogsTable } from '@/features/admin/logs/components/access/AccessLogsTable';
 import { OperationLogsTable } from '@/features/admin/logs/components/operation/OperationLogsTable';
 import { ExecutionLogsFrom } from '@/features/admin/logs/ExecutionLogsForm';
 
-import type {AccessLogFilterConditions} from '@/features/admin/logs/components/access/AccessLogsFilterModal';
 import type { OperationLogFilterConditions } from '@/features/admin/logs/components/operation/OperationLogsFilterModal';
+import {AccessLogsForm} from "@/features/admin/logs/AccessLogsForm.tsx";
 
 type LogType = 'access' | 'operation' | 'execution';
 
@@ -53,16 +52,7 @@ export const LogsForm = () => {
             <Box flex={1} p={8} overflowY="auto">
                 {/* アクセス履歴 */}
                 {selectedLog === 'access' && (
-                    <AccessLogsTable
-                        data={[]} // ここに取得したデータを渡す
-                        totalItems={0}
-                        currentPage={currentPage}
-                        itemsPerPage={itemsPerPage}
-                        onPageChange={handlePageChange}
-                        onItemsPerPageChange={handleItemsPerPageChange}
-                        onSearch={handleSearch}
-                        onFilterApply={(f: AccessLogFilterConditions) => handleFilterApply(f)}
-                    />
+                    <AccessLogsForm />
                 )}
 
                 {/* 操作履歴 */}

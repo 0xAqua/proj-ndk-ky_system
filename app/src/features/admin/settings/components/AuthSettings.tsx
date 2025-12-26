@@ -103,7 +103,7 @@ export const AuthSettings = ({ config, onChange, isLoading }: AuthSettingsProps)
                             </Box>
                             <Box flex={1}>
                                 <Text fontWeight="semibold" color="gray.800">
-                                    Passkey設定
+                                    （推奨）Passkey設定
                                 </Text>
                                 <Text fontSize="sm" color="gray.500" mt={1}>
                                     生体認証やセキュリティキーでのログインを有効化します
